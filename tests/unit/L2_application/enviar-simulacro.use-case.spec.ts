@@ -182,6 +182,61 @@ describe('EnviarSimulacroUseCase', () => {
     });
   });
 
+  describe('admissionArea — propagación al EnvioRequest + encolado', () => {
+    // El use case lee `MarkingsStorage.getAdmissionArea(examId)` con
+    // fallback DEFAULT_ADMISSION_AREA (design.md D3 de `add-admission-area`).
+    // El default NO se persiste — el fake refleja eso (nunca setAdmissionArea).
+    it('area sembrada con seedAdmissionArea se propaga al EnvioRequest', async () => {
+      storage.seedMarcacion('exam-1', 1, 'A');
+      storage.seedAdmissionArea('exam-1', 'MAT');
+      api.willResolveEnviar({ ack: validAck() });
+
+      await useCase.execute({ examId: 'exam-1' });
+
+      expect(api.getEnviarCalls()[0].admissionArea).toBe('MAT');
+    });
+
+    it('sin sembrar (storage retorna null) → EnvioRequest recibe GENERAL', async () => {
+      storage.seedMarcacion('exam-1', 1, 'A');
+      // NO se llama seedAdmissionArea → getAdmissionArea() retorna null.
+      api.willResolveEnviar({ ack: validAck() });
+
+      await useCase.execute({ examId: 'exam-1' });
+
+      expect(api.getEnviarCalls()[0].admissionArea).toBe('GENERAL');
+    });
+
+    it('el use case NUNCA invoca setAdmissionArea (default NO se persiste)', async () => {
+      storage.seedMarcacion('exam-1', 1, 'A');
+      // Sin sembrar: el use case resuelve GENERAL en memoria y lo pasa al
+      // adapter, pero NO llama setAdmissionArea. Esto preserva la distinción
+      // "eligió GENERAL" vs "todavía no eligió" (D3).
+      api.willResolveEnviar({ ack: validAck() });
+
+      await useCase.execute({ examId: 'exam-1' });
+
+      expect(storage.getOpsLog()).not.toContain('markings.setAdmissionArea');
+    });
+
+    it('en NetworkError, el EnvioPendiente guardado incluye el admissionArea resuelto', async () => {
+      storage.seedMarcacion('exam-1', 1, 'A');
+      storage.seedAdmissionArea('exam-1', 'CIE');
+      api.willRejectEnviar(new NetworkError());
+
+      const result = await useCase.execute({ examId: 'exam-1' });
+
+      expect(result.status).toBe('queued');
+      const pendientes = await storage.getEnviosPendientes();
+      expect(pendientes).toHaveLength(1);
+      // El area encolada es la misma que fue al adapter (aunque el adapter
+      // no llegó a recibirla por el NetworkError). El dispatcher del retry
+      // usa esta area sin re-consultar storage (design.md `admission-area`
+      // spec: "el cliente conserva el admissionArea original entre intento,
+      // encolado y retry").
+      expect(pendientes[0].admissionArea).toBe('CIE');
+    });
+  });
+
   describe('identity ausente → SessionExpiredError defensivo', () => {
     it('IdentityStorage.read() === null → SessionExpiredError sin tocar el adapter', async () => {
       await identityStorage.clear();

@@ -167,6 +167,36 @@ describe('GuardarDraftUseCase', () => {
     });
   });
 
+  describe('admissionArea — propagación al DraftRequest', () => {
+    // Mismo patrón que EnviarSimulacroUseCase: getAdmissionArea con fallback
+    // DEFAULT_ADMISSION_AREA sin persistir (design.md D3 de
+    // `add-admission-area`).
+    it('area sembrada con seedAdmissionArea se propaga al DraftRequest', async () => {
+      storage.seedAdmissionArea('exam-1', 'APT');
+      api.willResolveDraft();
+
+      await useCase.execute({ examId: 'exam-1', count: 4 });
+
+      expect(api.draftCalls[0].admissionArea).toBe('APT');
+    });
+
+    it('sin sembrar → DraftRequest recibe GENERAL', async () => {
+      api.willResolveDraft();
+
+      await useCase.execute({ examId: 'exam-1', count: 4 });
+
+      expect(api.draftCalls[0].admissionArea).toBe('GENERAL');
+    });
+
+    it('el use case NUNCA invoca setAdmissionArea (default NO se persiste)', async () => {
+      api.willResolveDraft();
+
+      await useCase.execute({ examId: 'exam-1', count: 4 });
+
+      expect(storage.getOpsLog()).not.toContain('markings.setAdmissionArea');
+    });
+  });
+
   describe('Use case NO toca queue ni ack ni clear', () => {
     it('tras éxito, NO invoca enqueueEnvio ni setSubmissionAck ni clearMarcaciones', async () => {
       storage.seedMarcacion('exam-1', 1, 'A');
