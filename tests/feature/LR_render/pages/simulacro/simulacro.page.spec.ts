@@ -13,6 +13,7 @@ import {
   ProgramarAutoEnvioInput,
   ProgramarAutoEnvioUseCase,
 } from '../../../../../src/L2_application/use-cases/programar-auto-envio.use-case';
+import { SeleccionarAdmissionAreaUseCase } from '../../../../../src/L2_application/use-cases/seleccionar-admission-area.use-case';
 import { CLOCK, MARKINGS_STORAGE } from '../../../../../src/app.config';
 import { NoopDraftAutoSaveDispatcher, DraftAutoSaveDispatcher } from '../../../../../src/L3_periphery/envio/draft-auto-save-dispatcher.service';
 import { Exam } from '../../../../../src/L1_domain/entities/exam';
@@ -208,6 +209,12 @@ describe('SimulacroPage', () => {
         { provide: MarcarRespuestaUseCase, useValue: fakeMarcar },
         { provide: EnviarSimulacroUseCase, useValue: new FakeEnviarSimulacroUseCase() },
         { provide: ProgramarAutoEnvioUseCase, useValue: new FakeProgramarAutoEnvioUseCase() },
+        // Fake mínimo: los tests del page NO ejercitan seleccionarArea. Basta
+        // con satisfacer la DI del view-model — un execute que resuelve OK.
+        {
+          provide: SeleccionarAdmissionAreaUseCase,
+          useValue: { execute: async (): Promise<void> => undefined },
+        },
         { provide: CLOCK, useValue: fakeClock },
         { provide: MARKINGS_STORAGE, useValue: fakeMarkings },
         { provide: DraftAutoSaveDispatcher, useValue: new NoopDraftAutoSaveDispatcher() },

@@ -15,6 +15,11 @@ import {
   ProgramarAutoEnvioInput,
   ProgramarAutoEnvioUseCase,
 } from '../../../../src/L2_application/use-cases/programar-auto-envio.use-case';
+import {
+  SeleccionarAdmissionAreaInput,
+  SeleccionarAdmissionAreaUseCase,
+} from '../../../../src/L2_application/use-cases/seleccionar-admission-area.use-case';
+import { AdmissionArea } from '../../../../src/L1_domain/value-objects/admission-area';
 import { CLOCK, MARKINGS_STORAGE } from '../../../../src/app.config';
 import {
   DraftAutoSaveDispatcher,
@@ -116,9 +121,16 @@ class FakeClock implements Clock {
 class FakeMarkingsStorage implements MarkingsStorage {
   private store = new Map<string, AnswersMap>();
   private setCalls: { id: string; pregunta: number; alt: AlternativaValue }[] = [];
+  // Persistencia in-memory de admissionArea por examId. Al no seedear, retorna
+  // null — cae al DEFAULT_ADMISSION_AREA en la lógica del view-model.
+  private admissionAreaStore = new Map<string, AdmissionArea>();
 
   seedMarcaciones(examId: string, answers: AnswersMap): void {
     this.store.set(examId, { ...answers });
+  }
+
+  seedAdmissionArea(examId: string, area: AdmissionArea): void {
+    this.admissionAreaStore.set(examId, area);
   }
 
   getSetCalls(): readonly { id: string; pregunta: number; alt: AlternativaValue }[] {
@@ -159,14 +171,35 @@ class FakeMarkingsStorage implements MarkingsStorage {
   async dequeueEnvio(_examId: string): Promise<void> {
     /* no-op */
   }
-  async getAdmissionArea(_examId: string): Promise<null> {
-    return null;
+  async getAdmissionArea(examId: string): Promise<AdmissionArea | null> {
+    return this.admissionAreaStore.get(examId) ?? null;
   }
-  async setAdmissionArea(_examId: string, _area: unknown): Promise<void> {
-    /* no-op */
+  async setAdmissionArea(examId: string, area: AdmissionArea): Promise<void> {
+    this.admissionAreaStore.set(examId, area);
   }
   async wipeUserScope(): Promise<void> {
     /* no-op */
+  }
+}
+
+// Fake del SeleccionarAdmissionAreaUseCase: registra las llamadas para que
+// los tests verifiquen que el view-model delega correctamente. No hace
+// validación del set cerrado — eso lo cubre el spec del use case en L2.
+class FakeSeleccionarAdmissionAreaUseCase {
+  public callsWith: SeleccionarAdmissionAreaInput[] = [];
+  private failNext: Error | null = null;
+
+  willReject(err: Error): void {
+    this.failNext = err;
+  }
+
+  async execute(input: SeleccionarAdmissionAreaInput): Promise<void> {
+    this.callsWith.push(input);
+    if (this.failNext) {
+      const err = this.failNext;
+      this.failNext = null;
+      throw err;
+    }
   }
 }
 
@@ -299,6 +332,7 @@ describe('SimulacroPageViewModel', () => {
   let fakeEnviar: FakeEnviarSimulacroUseCase;
   let fakeProgramar: FakeProgramarAutoEnvioUseCase;
   let fakeDraftDispatcher: FakeDraftDispatcher;
+  let fakeSeleccionarArea: FakeSeleccionarAdmissionAreaUseCase;
 
   const createVm = (): SimulacroPageViewModel =>
     TestBed.runInInjectionContext(() => new SimulacroPageViewModel());
@@ -311,6 +345,7 @@ describe('SimulacroPageViewModel', () => {
     fakeEnviar = new FakeEnviarSimulacroUseCase();
     fakeProgramar = new FakeProgramarAutoEnvioUseCase();
     fakeDraftDispatcher = new FakeDraftDispatcher();
+    fakeSeleccionarArea = new FakeSeleccionarAdmissionAreaUseCase();
 
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
@@ -323,6 +358,7 @@ describe('SimulacroPageViewModel', () => {
         { provide: MarcarRespuestaUseCase, useValue: fakeMarcar },
         { provide: EnviarSimulacroUseCase, useValue: fakeEnviar },
         { provide: ProgramarAutoEnvioUseCase, useValue: fakeProgramar },
+        { provide: SeleccionarAdmissionAreaUseCase, useValue: fakeSeleccionarArea },
         { provide: CLOCK, useValue: fakeClock },
         { provide: MARKINGS_STORAGE, useValue: fakeMarkings },
         { provide: DraftAutoSaveDispatcher, useValue: fakeDraftDispatcher },
@@ -1043,6 +1079,7 @@ describe('SimulacroPageViewModel', () => {
           { provide: MarcarRespuestaUseCase, useValue: fakeMarcar },
           { provide: EnviarSimulacroUseCase, useValue: fakeEnviar },
           { provide: ProgramarAutoEnvioUseCase, useValue: fakeProgramar },
+          { provide: SeleccionarAdmissionAreaUseCase, useValue: fakeSeleccionarArea },
           { provide: CLOCK, useValue: fakeClock },
           { provide: MARKINGS_STORAGE, useValue: fakeMarkings },
           { provide: DraftAutoSaveDispatcher, useValue: noop },
@@ -1137,6 +1174,96 @@ describe('SimulacroPageViewModel', () => {
       // Y debería contener 5 (los 5 minutos legítimos).
       expect(restante).toMatch(/\b5\b|05/);
       vm.stop();
+    });
+  });
+
+  describe('admissionArea — hidratación y seleccionarArea()', () => {
+    // Scenario "Signal se hidrata desde storage al montar" del spec exam-marking.
+    it('start() hidrata el signal desde MarkingsStorage.getAdmissionArea', async () => {
+      const exam = buildExam('exam-1', 'in_progress');
+      fakeGetTodaysExams.willResolve([exam]);
+      fakeMarkings.seedAdmissionArea('exam-1', 'MAT');
+
+      const vm = createVm();
+      await vm.start('exam-1');
+
+      expect(vm.admissionArea()).toBe('MAT');
+      vm.stop();
+    });
+
+    // Scenario "Signal cae al default si storage retorna null" del spec exam-marking.
+    it('start() con storage vacío deja el signal en DEFAULT_ADMISSION_AREA (GENERAL)', async () => {
+      const exam = buildExam('exam-1', 'in_progress');
+      fakeGetTodaysExams.willResolve([exam]);
+      // Deliberadamente NO seedeamos admissionArea → getAdmissionArea → null.
+
+      const vm = createVm();
+      await vm.start('exam-1');
+
+      expect(vm.admissionArea()).toBe('GENERAL');
+      vm.stop();
+    });
+
+    // Scenario "`seleccionarArea` persiste, actualiza signal y notifica draft"
+    // del spec exam-marking. Cubre los tres efectos en un solo test para
+    // reflejar el ADR "notificarCambio con 2 args" del design.md.
+    it('seleccionarArea("A") invoca use case, actualiza signal y notifica dispatcher con (sessionId, count)', async () => {
+      const exam = buildExam('exam-1', 'in_progress', { count: 40 });
+      fakeGetTodaysExams.willResolve([exam]);
+
+      const vm = createVm();
+      await vm.start('exam-1');
+
+      // Antes de seleccionar: use case no invocado, signal en default.
+      expect(fakeSeleccionarArea.callsWith).toHaveLength(0);
+      expect(vm.admissionArea()).toBe('GENERAL');
+      // La hidratación del start() puede haber notificado por el flow de marcaciones,
+      // pero seleccionarArea NO. Tomamos snapshot para verificar delta exacto.
+      const notificarCallsBefore = fakeDraftDispatcher.notificarCalls.length;
+
+      await vm.seleccionarArea('A');
+
+      // 1) Use case invocado con { examId, area }.
+      expect(fakeSeleccionarArea.callsWith).toEqual([{ examId: 'exam-1', area: 'A' }]);
+      // 2) Signal actualizado.
+      expect(vm.admissionArea()).toBe('A');
+      // 3) Dispatcher.notificarCambio invocado con DOS args: (sessionId, count).
+      // Cubre la expectativa crítica del scenario del spec — el view-model debe
+      // usar el mismo hook que post-marcarRespuesta, no una firma distinta.
+      expect(fakeDraftDispatcher.notificarCalls.length).toBe(notificarCallsBefore + 1);
+      const last = fakeDraftDispatcher.notificarCalls[fakeDraftDispatcher.notificarCalls.length - 1];
+      expect(last).toEqual({ sessionId: 'exam-1', count: 40 });
+      vm.stop();
+    });
+
+    it('seleccionarArea() es no-op después de stop()', async () => {
+      const exam = buildExam('exam-1', 'in_progress', { count: 20 });
+      fakeGetTodaysExams.willResolve([exam]);
+
+      const vm = createVm();
+      await vm.start('exam-1');
+      vm.stop();
+
+      const notificarCallsBefore = fakeDraftDispatcher.notificarCalls.length;
+      await vm.seleccionarArea('A');
+
+      // Ni use case ni dispatcher.notificarCambio deben haber sido invocados
+      // tras el stop() — el view-model no debe empujar cambios cuando ya se
+      // desmontó la sesión.
+      expect(fakeSeleccionarArea.callsWith).toHaveLength(0);
+      expect(fakeDraftDispatcher.notificarCalls.length).toBe(notificarCallsBefore);
+    });
+
+    it('seleccionarArea() es no-op si no hay exam cargado (start no invocado)', async () => {
+      // Sin llamar start(): exam() === null. seleccionarArea debe abortar
+      // silenciosamente porque no hay sessionId ni count válidos para armar
+      // la llamada al dispatcher (invariante D7 del design de admission-area).
+      const vm = createVm();
+
+      await vm.seleccionarArea('A');
+
+      expect(fakeSeleccionarArea.callsWith).toHaveLength(0);
+      expect(fakeDraftDispatcher.notificarCalls).toHaveLength(0);
     });
   });
 });
