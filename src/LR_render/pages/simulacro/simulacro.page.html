@@ -28,6 +28,11 @@
       </div>
     }
 
+    <app-admission-area-picker
+      [admissionArea]="vm.admissionArea()"
+      (seleccion)="onAdmissionAreaSeleccion($event)"
+    />
+
     <section
       class="grilla"
       [class.grilla--disabled]="!vm.vigente()"

@@ -7,11 +7,16 @@ import {
   AutoEnvioHandle,
   ProgramarAutoEnvioUseCase,
 } from '../../L2_application/use-cases/programar-auto-envio.use-case';
+import { SeleccionarAdmissionAreaUseCase } from '../../L2_application/use-cases/seleccionar-admission-area.use-case';
 import { CLOCK, MARKINGS_STORAGE } from '../../app.config';
 import { DraftAutoSaveDispatcher } from '../../L3_periphery/envio/draft-auto-save-dispatcher.service';
 import { Exam } from '../../L1_domain/entities/exam';
 import { Alternativa } from '../../L1_domain/value-objects/alternativa';
 import { AlternativaValue, AnswersMap } from '../../L1_domain/ports/markings-storage';
+import {
+  AdmissionArea,
+  DEFAULT_ADMISSION_AREA,
+} from '../../L1_domain/value-objects/admission-area';
 import { SubmissionAck } from '../../L1_domain/value-objects/submission-ack';
 import { NetworkError } from '../../L1_domain/errors/network.error';
 import { SessionExpiredError } from '../../L1_domain/errors/session-expired.error';
@@ -81,6 +86,7 @@ export class SimulacroPageViewModel {
   private readonly marcarRespuesta = inject(MarcarRespuestaUseCase);
   private readonly enviarSimulacro = inject(EnviarSimulacroUseCase);
   private readonly programarAutoEnvio = inject(ProgramarAutoEnvioUseCase);
+  private readonly seleccionarAdmissionArea = inject(SeleccionarAdmissionAreaUseCase);
   private readonly markings = inject(MARKINGS_STORAGE);
   private readonly clock = inject(CLOCK);
   private readonly router = inject(Router);
@@ -107,6 +113,13 @@ export class SimulacroPageViewModel {
   // este signal para mostrar el chip flotante "Toca para cambiar" sobre
   // la fila editing.
   readonly editingRow = signal<number | null>(null);
+
+  // Área de POSTULACIÓN elegida por el alumno para este examen.
+  // Se hidrata desde storage en loadMarcaciones; si nunca se persistió,
+  // arranca en DEFAULT_ADMISSION_AREA (GENERAL) — pero el default NO se
+  // materializa en storage (design.md D3 de add-admission-area).
+  // NO confundir con `Exam.area` (curso: Letras/Ciencias/Números).
+  readonly admissionArea = signal<AdmissionArea>(DEFAULT_ADMISSION_AREA);
 
   // Signal opcional para UI futura. Hoy queda en 'idle' — el dispatcher no
   // expone ganchos para actualizarla. Change posterior los agregará cuando
@@ -384,6 +397,20 @@ export class SimulacroPageViewModel {
     this.exitEditing();
   }
 
+  // Persiste el área de POSTULACIÓN elegida por el alumno en el picker,
+  // actualiza el signal y notifica al dispatcher — mismo hook que post-
+  // `marcarRespuesta` (design.md D7 de add-admission-area). El use case
+  // revalida el input contra el set cerrado; si el picker emite algo
+  // inválido, propaga InvalidAdmissionAreaError.
+  async seleccionarArea(area: AdmissionArea): Promise<void> {
+    if (this.stopped) return;
+    const e = this.exam();
+    if (e === null) return;
+    await this.seleccionarAdmissionArea.execute({ examId: e.id, area });
+    this.admissionArea.set(area);
+    this.draftDispatcher.notificarCambio(this.sessionId, e.count);
+  }
+
   volver(): void {
     void this.router.navigate(['/home']);
   }
@@ -569,6 +596,13 @@ export class SimulacroPageViewModel {
       fullMap[String(i)] = stored[String(i)] ?? null;
     }
     this.marcaciones.set(fullMap);
+
+    // Hidratar admissionArea desde storage. `null` = el alumno nunca eligió
+    // expresamente para este examen → caemos al default (GENERAL). No
+    // persistimos el default en storage para mantener distinguibles "eligió
+    // GENERAL" vs "todavía no eligió nada" (design.md D3 de add-admission-area).
+    const persistedArea = await this.markings.getAdmissionArea(e.id);
+    this.admissionArea.set(persistedArea ?? DEFAULT_ADMISSION_AREA);
   }
 
   // El ticker solo refresca `nowTick` para que los signals derivados
