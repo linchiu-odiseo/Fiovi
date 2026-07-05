@@ -37,6 +37,7 @@ import { EnviarSimulacroUseCase } from './L2_application/use-cases/enviar-simula
 import { RetomarEnviosPendientesUseCase } from './L2_application/use-cases/retomar-envios-pendientes.use-case';
 import { ProgramarAutoEnvioUseCase } from './L2_application/use-cases/programar-auto-envio.use-case';
 import { GuardarDraftUseCase } from './L2_application/use-cases/guardar-draft.use-case';
+import { SeleccionarAdmissionAreaUseCase } from './L2_application/use-cases/seleccionar-admission-area.use-case';
 
 // L3 implementaciones de los puertos.
 import { HttpAuthRepository } from './L3_periphery/http/http-auth-repository';
@@ -202,6 +203,11 @@ export const appConfig: ApplicationConfig = {
       useFactory: (api: ExamsApi, markings: MarkingsStorage, identity: IdentityStorage) =>
         new GuardarDraftUseCase(api, markings, identity),
       deps: [EXAMS_API, MARKINGS_STORAGE, IDENTITY_STORAGE],
+    },
+    {
+      provide: SeleccionarAdmissionAreaUseCase,
+      useFactory: (markings: MarkingsStorage) => new SeleccionarAdmissionAreaUseCase(markings),
+      deps: [MARKINGS_STORAGE],
     },
     // Use-cases del tutor: fábricas puras que inyectan el puerto via TUTOR_EXAMS_API.
     // PR1 los registra aquí pero ninguna VM los inyecta todavía (compila, runtime-inert).
