@@ -1,0 +1,47 @@
+@if (!expanded()) {
+  <div class="area-summary" role="group" aria-label="Área elegida">
+    <span class="area-summary__label">Área:</span>
+    <button
+      type="button"
+      class="area-summary__pill"
+      aria-label="Cambiar área"
+      (pointerdown)="onPillPointerDown($event)"
+      (pointermove)="onPillPointerMove($event)"
+      (pointerup)="onPillPointerUpOrCancel()"
+      (pointercancel)="onPillPointerUpOrCancel()"
+    >
+      {{ admissionArea }}
+    </button>
+    <span class="area-summary__hint">
+      Mantén presionado<br />para cambiar
+    </span>
+  </div>
+}
+
+@if (expanded()) {
+  <section
+    class="area-picker area-picker--editing"
+    role="radiogroup"
+    aria-label="Selección de área"
+  >
+    <span class="row__chip" role="status" aria-live="polite">
+      <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+      Toca para cambiar
+    </span>
+    <div class="area-picker__grid">
+      @for (area of areas; track area) {
+        <button
+          type="button"
+          class="area-chip"
+          [class.area-chip--selected]="area === admissionArea"
+          [class.area-chip--wide-3]="area === 'GENERAL'"
+          [attr.aria-checked]="area === admissionArea"
+          role="radio"
+          (click)="onChipClick(area)"
+        >
+          {{ area }}
+        </button>
+      }
+    </div>
+  </section>
+}

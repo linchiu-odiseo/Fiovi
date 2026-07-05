@@ -11,6 +11,7 @@ import { NetworkError } from '../../../../src/L1_domain/errors/network.error';
 import { SimulacroCerradoError } from '../../../../src/L1_domain/errors/simulacro-cerrado.error';
 import { SimulacroNoAsignadoError } from '../../../../src/L1_domain/errors/simulacro-no-asignado.error';
 import { StudentNotEnrolledError } from '../../../../src/L1_domain/errors/student-not-enrolled.error';
+import { InvalidAdmissionAreaError } from '../../../../src/L1_domain/errors/invalid-admission-area.error';
 import { environment } from '../../../../src/environments/environment';
 
 // Cubre `HttpExamsApi.enviar()` (L3) según el spec
@@ -47,6 +48,7 @@ describe('HttpExamsApi.enviar (POST real)', () => {
   const validRequest = (): EnvioRequest => ({
     examId: SESSION_ID,
     code: '30303011',
+    admissionArea: 'GENERAL',
     responses: { P1: 'A', P2: 'C' },
     clientFinishedAt: '2026-06-17T15:29:54.000Z',
   });
@@ -68,11 +70,43 @@ describe('HttpExamsApi.enviar (POST real)', () => {
       const req = httpMock.expectOne(SUBMIT_URL);
       expect(req.request.method).toBe('POST');
       // Body exacto al contrato learnex: snake_case, sin claves extra.
+      // El orden fijo `code, admission_area, responses, client_finished_at`
+      // se testea con string match en el describe "orden fijo de keys".
       expect(req.request.body).toEqual({
         code: '30303011',
+        admission_area: 'GENERAL',
         responses: { P1: 'A', P2: 'C' },
         client_finished_at: '2026-06-17T15:29:54.000Z',
       });
+
+      req.flush({
+        id: 'ack-1',
+        submission_hash: VALID_HASH,
+        submitted_at: VALID_SUBMITTED_AT_ISO,
+      });
+      await pending;
+    });
+
+    // El design.md D8 de `add-admission-area` fija el orden de keys:
+    // `code, admission_area, responses, client_finished_at`. Aunque el orden
+    // en JSON no cambia el parseo del back, afecta la legibilidad de logs
+    // y el `submission_hash` si el back lo computa sobre JSON.stringify sin
+    // canonicalización. Comparamos con JSON.stringify contra un literal
+    // exacto para atrapar cualquier reordering silencioso.
+    it('body preserva orden fijo de keys (design D8): code, admission_area, responses, client_finished_at', async () => {
+      const pending = adapter.enviar({
+        examId: SESSION_ID,
+        code: '30303011',
+        admissionArea: 'A',
+        responses: { P1: 'A', P2: 'C' },
+        clientFinishedAt: '2026-06-17T15:29:54.000Z',
+      });
+
+      const req = httpMock.expectOne(SUBMIT_URL);
+      const bodyJson = JSON.stringify(req.request.body);
+      expect(bodyJson).toBe(
+        '{"code":"30303011","admission_area":"A","responses":{"P1":"A","P2":"C"},"client_finished_at":"2026-06-17T15:29:54.000Z"}',
+      );
 
       req.flush({
         id: 'ack-1',
@@ -144,6 +178,23 @@ describe('HttpExamsApi.enviar (POST real)', () => {
       const req = httpMock.expectOne(SUBMIT_URL);
       req.flush({ message: 'cualquier-cosa' }, { status: 400, statusText: 'Bad Request' });
       await expect(pending).rejects.toBeInstanceOf(InvalidPayloadError);
+    });
+
+    // El set SUBMIT_ERROR_MESSAGES incluye 'INVALID_ADMISSION_AREA' desde el
+    // change `add-admission-area`. 400 con ese message específico mapea a
+    // InvalidAdmissionAreaError (no al genérico InvalidPayloadError).
+    it('400 + body.message === "INVALID_ADMISSION_AREA" → InvalidAdmissionAreaError', async () => {
+      const pending = adapter.enviar(validRequest());
+      const req = httpMock.expectOne(SUBMIT_URL);
+      req.flush(
+        { message: 'INVALID_ADMISSION_AREA' },
+        { status: 400, statusText: 'Bad Request' },
+      );
+      const err = await pending.catch((e) => e as Error);
+      // Assert dura: es InvalidAdmissionAreaError, NO InvalidPayloadError.
+      // Si el clasificador cayera al default, el catch abajo probaría el bug.
+      expect(err).toBeInstanceOf(InvalidAdmissionAreaError);
+      expect(err).not.toBeInstanceOf(InvalidPayloadError);
     });
 
     it('403 + body.message === "STUDENT_NOT_ENROLLED" → StudentNotEnrolledError', async () => {

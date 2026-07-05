@@ -10,6 +10,7 @@ import { SimulacroCerradoError } from '../../../../src/L1_domain/errors/simulacr
 import { SimulacroNoAsignadoError } from '../../../../src/L1_domain/errors/simulacro-no-asignado.error';
 import { StudentNotEnrolledError } from '../../../../src/L1_domain/errors/student-not-enrolled.error';
 import { StudentNotLinkedError } from '../../../../src/L1_domain/errors/student-not-linked.error';
+import { InvalidAdmissionAreaError } from '../../../../src/L1_domain/errors/invalid-admission-area.error';
 import { environment } from '../../../../src/environments/environment';
 
 // Cubre `HttpExamsApi.guardarDraft()` (L3) según los scenarios del spec
@@ -28,6 +29,7 @@ describe('HttpExamsApi.guardarDraft (POST /draft)', () => {
   const validRequest = (): DraftRequest => ({
     examId: SESSION_ID,
     code: '30303011',
+    admissionArea: 'GENERAL',
     responses: 'A-C-',
   });
 
@@ -52,18 +54,42 @@ describe('HttpExamsApi.guardarDraft (POST /draft)', () => {
       await pending;
     });
 
-    it('body exacto: { code, responses: string } sin client_finished_at', async () => {
+    it('body exacto: { code, admission_area, responses: string } sin client_finished_at', async () => {
       const pending = adapter.guardarDraft(validRequest());
 
       const req = httpMock.expectOne(DRAFT_URL);
       // El responses viaja como STRING COMPACTO (no como Record).
+      // El orden fijo `code, admission_area, responses` se testea con string
+      // match en el describe "orden fijo de keys".
       expect(req.request.body).toEqual({
         code: '30303011',
+        admission_area: 'GENERAL',
         responses: 'A-C-',
       });
       expect(typeof (req.request.body as { responses: unknown }).responses).toBe('string');
       // client_finished_at NO debe estar en el body
       expect(req.request.body).not.toHaveProperty('client_finished_at');
+
+      req.flush(null, { status: 204, statusText: 'No Content' });
+      await pending;
+    });
+
+    // Design D8: orden fijo `code, admission_area, responses` (SIN
+    // client_finished_at — es exclusivo de /submit). Comparamos con
+    // JSON.stringify contra literal para atrapar reordering silencioso.
+    it('body preserva orden fijo de keys (design D8): code, admission_area, responses', async () => {
+      const pending = adapter.guardarDraft({
+        examId: SESSION_ID,
+        code: '30303011',
+        admissionArea: 'A',
+        responses: 'A-C-',
+      });
+
+      const req = httpMock.expectOne(DRAFT_URL);
+      const bodyJson = JSON.stringify(req.request.body);
+      expect(bodyJson).toBe(
+        '{"code":"30303011","admission_area":"A","responses":"A-C-"}',
+      );
 
       req.flush(null, { status: 204, statusText: 'No Content' });
       await pending;
@@ -108,6 +134,21 @@ describe('HttpExamsApi.guardarDraft (POST /draft)', () => {
       const req = httpMock.expectOne(DRAFT_URL);
       req.flush({ message: 'cualquier-cosa' }, { status: 400, statusText: 'Bad Request' });
       await expect(pending).rejects.toBeInstanceOf(InvalidPayloadError);
+    });
+
+    // Set DRAFT_ERROR_MESSAGES incluye 'INVALID_ADMISSION_AREA' desde el
+    // change `add-admission-area`. 400 con ese message específico mapea a
+    // InvalidAdmissionAreaError (no al genérico InvalidPayloadError).
+    it('400 + INVALID_ADMISSION_AREA → InvalidAdmissionAreaError', async () => {
+      const pending = adapter.guardarDraft(validRequest());
+      const req = httpMock.expectOne(DRAFT_URL);
+      req.flush(
+        { message: 'INVALID_ADMISSION_AREA' },
+        { status: 400, statusText: 'Bad Request' },
+      );
+      const err = await pending.catch((e) => e as Error);
+      expect(err).toBeInstanceOf(InvalidAdmissionAreaError);
+      expect(err).not.toBeInstanceOf(InvalidPayloadError);
     });
 
     it('403 + STUDENT_NOT_ENROLLED → StudentNotEnrolledError', async () => {

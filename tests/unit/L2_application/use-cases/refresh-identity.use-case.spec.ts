@@ -54,6 +54,12 @@ class FakeMarkings implements MarkingsStorage {
   async setSubmissionAck(): Promise<void> {
     return Promise.resolve();
   }
+  async getAdmissionArea(): Promise<null> {
+    return null;
+  }
+  async setAdmissionArea(): Promise<void> {
+    return Promise.resolve();
+  }
   async wipeUserScope(): Promise<void> {
     return Promise.resolve();
   }

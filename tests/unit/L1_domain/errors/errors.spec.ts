@@ -10,6 +10,7 @@ import { ExamsPermissionRevokedError } from '../../../../src/L1_domain/errors/ex
 import { StudentNotLinkedError } from '../../../../src/L1_domain/errors/student-not-linked.error';
 import { StudentNotEnrolledError } from '../../../../src/L1_domain/errors/student-not-enrolled.error';
 import { InvalidExamError } from '../../../../src/L1_domain/errors/invalid-exam.error';
+import { InvalidAdmissionAreaError } from '../../../../src/L1_domain/errors/invalid-admission-area.error';
 
 describe('Errores de dominio', () => {
   describe('InvalidCredentialsError', () => {
@@ -179,6 +180,18 @@ describe('Errores de dominio', () => {
 
     it('tiene name correcto', () => {
       expect(new InvalidExamError('algo').name).toBe('InvalidExamError');
+    });
+  });
+
+  describe('InvalidAdmissionAreaError', () => {
+    it('es instanceof Error y InvalidAdmissionAreaError', () => {
+      const err = new InvalidAdmissionAreaError();
+      expect(err).toBeInstanceOf(Error);
+      expect(err).toBeInstanceOf(InvalidAdmissionAreaError);
+    });
+
+    it('tiene name correcto', () => {
+      expect(new InvalidAdmissionAreaError().name).toBe('InvalidAdmissionAreaError');
     });
   });
 

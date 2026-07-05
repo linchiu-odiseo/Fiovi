@@ -13,6 +13,7 @@ import { Exam } from '../../L1_domain/entities/exam';
 import { ExamServerStatus } from '../../L1_domain/value-objects/exam-server-status';
 import { ServerTime } from '../../L1_domain/value-objects/server-time';
 import { SubmissionAck } from '../../L1_domain/value-objects/submission-ack';
+import { InvalidAdmissionAreaError } from '../../L1_domain/errors/invalid-admission-area.error';
 import { InvalidExamError } from '../../L1_domain/errors/invalid-exam.error';
 import { InvalidPayloadError } from '../../L1_domain/errors/invalid-payload.error';
 import { InvalidSubmissionTimeError } from '../../L1_domain/errors/invalid-submission-time.error';
@@ -54,10 +55,11 @@ interface SubmitResponseDto {
 
 // Enum cerrado de valores que el back emite en `body.message` para el POST
 // submit. Esta es la ÚNICA excepción documentada a la regla "nunca leer
-// message" — ver design.md D5 de `fase-3-exam-submit-learnex`. Cualquier
-// valor de `message` fuera de este set se trata como `NetworkError` y la
-// clasificación cae al default por status.
+// message" — ver design.md D5 de `fase-3-exam-submit-learnex` y D8 de
+// `add-admission-area`. Cualquier valor de `message` fuera de este set se
+// trata como `NetworkError` y la clasificación cae al default por status.
 type SubmitErrorMessage =
+  | 'INVALID_ADMISSION_AREA'
   | 'STUDENT_NOT_ENROLLED'
   | 'STUDENT_MISMATCH'
   | 'SESSION_NOT_ACTIVE'
@@ -65,6 +67,7 @@ type SubmitErrorMessage =
   | 'CLOCK_SKEW_TOO_FAR_FUTURE';
 
 const SUBMIT_ERROR_MESSAGES: ReadonlySet<SubmitErrorMessage> = new Set([
+  'INVALID_ADMISSION_AREA',
   'STUDENT_NOT_ENROLLED',
   'STUDENT_MISMATCH',
   'SESSION_NOT_ACTIVE',
@@ -73,13 +76,13 @@ const SUBMIT_ERROR_MESSAGES: ReadonlySet<SubmitErrorMessage> = new Set([
 ]);
 
 // Segundo set enumerado cerrado para el POST /draft. EXCEPCIÓN documentada a
-// la regla "nunca leer message" (design.md D5/D10 de `draft-auto-save`):
-// misma justificación que SUBMIT_ERROR_MESSAGES — son códigos de control
-// en mayúsculas snake_case, no i18n humano. Comparación por igualdad
-// ESTRICTA (===), jamás .includes() ni regex sobre message.
-// Valores: 'STUDENT_NOT_ENROLLED' | 'STUDENT_MISMATCH' | 'SESSION_NOT_FOUND'
-//          | 'STUDENT_BY_CODE_NOT_FOUND' | 'SESSION_NOT_ACTIVE'
+// la regla "nunca leer message" (design.md D5/D10 de `draft-auto-save` +
+// D8 de `add-admission-area`): misma justificación que SUBMIT_ERROR_MESSAGES —
+// son códigos de control en mayúsculas snake_case, no i18n humano.
+// Comparación por igualdad ESTRICTA (===), jamás .includes() ni regex sobre
+// message.
 type DraftErrorMessage =
+  | 'INVALID_ADMISSION_AREA'
   | 'STUDENT_NOT_ENROLLED'
   | 'STUDENT_MISMATCH'
   | 'SESSION_NOT_FOUND'
@@ -87,6 +90,7 @@ type DraftErrorMessage =
   | 'SESSION_NOT_ACTIVE';
 
 const DRAFT_ERROR_MESSAGES: ReadonlySet<DraftErrorMessage> = new Set([
+  'INVALID_ADMISSION_AREA',
   'STUDENT_NOT_ENROLLED',
   'STUDENT_MISMATCH',
   'SESSION_NOT_FOUND',
@@ -121,6 +125,8 @@ export class HttpExamsApi implements ExamsApi {
   // POST /t/{slug}/student/exam-sessions/{sessionId}/submit
   // `req.examId` ES el sessionId (confirmado por back en handoff de
   // `fase-3-exam-submit-learnex`). Body en snake_case según contrato.
+  // Orden fijo: `code, admission_area, responses, client_finished_at`
+  // (design.md D8 de `add-admission-area`).
   // `withCredentials` lo agrega el `credentials.interceptor` global —
   // NO lo seteamos acá.
   async enviar(req: EnvioRequest): Promise<EnvioResult> {
@@ -128,6 +134,7 @@ export class HttpExamsApi implements ExamsApi {
       const dto = await firstValueFrom(
         this.http.post<SubmitResponseDto>(apiPath.studentExamSubmit(req.examId), {
           code: req.code,
+          admission_area: req.admissionArea,
           responses: req.responses,
           client_finished_at: req.clientFinishedAt,
         }),
@@ -143,7 +150,8 @@ export class HttpExamsApi implements ExamsApi {
   // POST /t/{slug}/student/exam-sessions/{sessionId}/draft
   // Envía un snapshot completo del set de respuestas al server (Redis buffer).
   // El draft NO reemplaza al submit: es piso de recuperación para force-close.
-  // Body: { code, responses } — SIN client_finished_at (exclusivo de /submit).
+  // Body: { code, admission_area, responses } — SIN client_finished_at
+  // (exclusivo de /submit). Orden fijo (design.md D8).
   // `withCredentials` lo agrega el `credentials.interceptor` global — NO se
   // setea acá. Response: 204 No Content (void). Timeout: 10s.
   async guardarDraft(req: DraftRequest): Promise<void> {
@@ -152,6 +160,7 @@ export class HttpExamsApi implements ExamsApi {
         this.http
           .post<void>(apiPath.studentExamDraft(req.examId), {
             code: req.code,
+            admission_area: req.admissionArea,
             responses: req.responses,
           })
           .pipe(timeout(10_000)),
@@ -210,12 +219,13 @@ export class HttpExamsApi implements ExamsApi {
   // Clasificación del POST /student/exam-sessions/{id}/draft.
   //
   // EXCEPCIÓN documentada a la regla "nunca leer message" (design.md D5/D10
-  // de `draft-auto-save`): misma justificación que classifySubmitError — los
-  // valores del enum son códigos de control, no i18n humano. Comparación por
-  // igualdad ESTRICTA (===) contra el set `DRAFT_ERROR_MESSAGES`. Nunca se
-  // usa .includes(), .match() ni regex sobre message.
-  // Set: 'STUDENT_NOT_ENROLLED' | 'STUDENT_MISMATCH' | 'SESSION_NOT_FOUND'
-  //      | 'STUDENT_BY_CODE_NOT_FOUND' | 'SESSION_NOT_ACTIVE'
+  // de `draft-auto-save` + D8 de `add-admission-area`): misma justificación
+  // que classifySubmitError — los valores del enum son códigos de control,
+  // no i18n humano. Comparación por igualdad ESTRICTA (===) contra el set
+  // `DRAFT_ERROR_MESSAGES`. Nunca se usa .includes(), .match() ni regex
+  // sobre message.
+  // Set: 'INVALID_ADMISSION_AREA' | 'STUDENT_NOT_ENROLLED' | 'STUDENT_MISMATCH'
+  //      | 'SESSION_NOT_FOUND' | 'STUDENT_BY_CODE_NOT_FOUND' | 'SESSION_NOT_ACTIVE'
   //
   // 401 lo absorbe el credentials.interceptor (refresh + redirect login).
   private classifyDraftError(err: unknown): Error {
@@ -227,7 +237,10 @@ export class HttpExamsApi implements ExamsApi {
           ? (message as DraftErrorMessage)
           : null;
 
-      if (err.status === 400) return new InvalidPayloadError();
+      if (err.status === 400) {
+        if (knownMessage === 'INVALID_ADMISSION_AREA') return new InvalidAdmissionAreaError();
+        return new InvalidPayloadError();
+      }
       if (err.status === 403) {
         if (knownMessage === 'STUDENT_NOT_ENROLLED') return new StudentNotEnrolledError();
         // STUDENT_MISMATCH y otros 403 → NetworkError retryable con backoff (D5).
@@ -255,10 +268,13 @@ export class HttpExamsApi implements ExamsApi {
   // Clasificación del POST /student/exam-sessions/{id}/submit.
   //
   // EXCEPCIÓN documentada a la regla "nunca leer message" (design.md D5
-  // de `fase-3-exam-submit-learnex`): el back emite `body.message` con
-  // strings en mayúsculas snake_case como CONTRATO de control, no como
-  // i18n humano. Comparación por igualdad ESTRICTA contra el enum
-  // `SUBMIT_ERROR_MESSAGES`. Cualquier valor fuera del enum → NetworkError.
+  // de `fase-3-exam-submit-learnex` + D8 de `add-admission-area`): el back
+  // emite `body.message` con strings en mayúsculas snake_case como CONTRATO
+  // de control, no como i18n humano. Comparación por igualdad ESTRICTA
+  // contra el enum `SUBMIT_ERROR_MESSAGES`. Cualquier valor fuera del enum
+  // → NetworkError.
+  // Set: 'INVALID_ADMISSION_AREA' | 'STUDENT_NOT_ENROLLED' | 'STUDENT_MISMATCH'
+  //      | 'SESSION_NOT_ACTIVE' | 'CLOCK_SKEW_BEFORE_START' | 'CLOCK_SKEW_TOO_FAR_FUTURE'
   //
   // 401 lo absorbe el credentials.interceptor.
   private classifySubmitError(err: unknown): Error {
@@ -270,7 +286,10 @@ export class HttpExamsApi implements ExamsApi {
           ? (message as SubmitErrorMessage)
           : null;
 
-      if (err.status === 400) return new InvalidPayloadError();
+      if (err.status === 400) {
+        if (knownMessage === 'INVALID_ADMISSION_AREA') return new InvalidAdmissionAreaError();
+        return new InvalidPayloadError();
+      }
       if (err.status === 403) {
         if (knownMessage === 'STUDENT_NOT_ENROLLED') return new StudentNotEnrolledError();
         // STUDENT_MISMATCH y otros 403 → genérico (D6: el back pide

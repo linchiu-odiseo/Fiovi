@@ -1,0 +1,161 @@
+:host {
+  display: block;
+}
+
+// Estado colapsado — fila con label "Área:", pill del valor actual y hint
+// "Mantén presionado para cambiar". El pill es el único elemento
+// interactivo; el long-press vive en el .ts.
+.area-summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: 10px 14px; // fuera de escala pero calza con el mockup nativo
+  background: var(--color-surface-container-lowest);
+  border: 1px solid var(--color-outline-variant);
+  border-radius: var(--radius-md);
+  min-height: 62px;
+
+  &__label {
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-on-surface-variant);
+  }
+
+  &__pill {
+    min-height: 42px;
+    min-width: 56px;
+    padding: var(--space-xs) var(--space-lg);
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--color-primary);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    font-weight: 700;
+    font-size: 0.9375rem;
+    letter-spacing: 0.04em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    user-select: none;
+    // Evita el delay de 300ms en touch y el highlight gris de tap en móvil.
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+
+    &:focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+    }
+
+    &:active {
+      transform: scale(0.98);
+    }
+  }
+
+  &__hint {
+    margin-left: auto;
+    font-size: 0.6875rem;
+    color: var(--color-outline);
+    font-family: var(--font-mono);
+    text-align: right;
+    line-height: 1.35;
+  }
+}
+
+// Estado expandido — bloque grande, 3 filas × 6 columnas con borde de
+// acento (mismo lenguaje visual que .fila--editing de simulacro.page.scss).
+.area-picker {
+  position: relative; // ancla del .row__chip absolute
+  background: var(--color-surface-container-lowest);
+  border: 1px solid var(--color-outline-variant);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+
+  &--editing {
+    border-color: var(--color-primary);
+    background: rgb(0 36 83 / 0.04);
+    box-shadow: 0 0 0 2px rgb(0 36 83 / 0.12);
+  }
+
+  // Grid rígido 6-col — GENERAL en fila 3 usa span-3 para cerrar la
+  // retícula (design.md D6).
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 6px; // fuera de escala; tap targets legibles con este spacing
+  }
+}
+
+// Chip de opción del grid. Tap emite `seleccion` y colapsa el picker.
+.area-chip {
+  padding: 10px 6px; // fuera de escala; asegura tap target ~40px de alto
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--color-outline-variant);
+  background: var(--color-surface-container-lowest);
+  color: var(--color-on-surface);
+  font-weight: 700;
+  font-size: 0.8125rem;
+  letter-spacing: 0.03em;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    transform 60ms ease;
+  cursor: pointer;
+  user-select: none;
+  text-align: center;
+  line-height: 1;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  &:active {
+    transform: scale(0.96);
+  }
+
+  &--selected {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-on-primary);
+  }
+
+  // GENERAL vale por 3 columnas — cierra la fila 3 (APT · CIE · MAT · GENERAL×3 = 6).
+  &--wide-3 {
+    grid-column: span 3;
+  }
+}
+
+// Chip flotante "Toca para cambiar" — mismo estilo visual que
+// .row__chip de simulacro.page.scss, replicado localmente para mantener
+// la encapsulación del componente.
+// MANTENER SINCRONIZADO CON simulacro.page.scss `.row__chip`.
+.row__chip {
+  position: absolute;
+  // top -10px es intencional: el chip flota fuera del borde superior
+  // del picker para señalar "encima de esta zona".
+  top: -10px;
+  right: var(--space-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px var(--space-xs);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  border-radius: var(--radius-pill);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+
+  .material-symbols-outlined {
+    font-size: 0.75rem;
+    line-height: 1;
+  }
+}

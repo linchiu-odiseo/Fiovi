@@ -69,3 +69,7 @@ Auto-generado por `.claude/hooks/log-agent-usage.ps1` en cada PostToolUse del to
 | 2026-06-18 14:20:21 | test-engineer | Update tests for fixed-string contract | opus-4-7 | 102,223 | -- | -- | $0.3081 |
 | 2026-06-19 01:05:48 | sdd-verify | SDD verify draft-auto-save | opus-4-7 | 114,633 | -- | -- | $0.4378 |
 | 2026-06-19 01:15:25 | sdd-archive | SDD archive draft-auto-save | opus-4-7 | 101,246 | -- | -- | $0.3058 |
+| 2026-07-05 09:24:36 | test-engineer | Tests L1+L2+L3 para admission-area | opus-4-7 | 179,100 | -- | -- | $0.5116 |
+| 2026-07-05 09:31:17 | frontend-builder | AdmissionAreaPicker + view-model wiring | opus-4-7 | 109,229 | -- | -- | $0.2780 |
+| 2026-07-05 09:39:00 | test-engineer | Tests LR picker + view-model wiring | opus-4-7 | 116,712 | -- | -- | $0.3138 |
+| 2026-07-05 09:42:26 | hexagonal-guard | Auditar boundaries del change | opus-4-7 | 87,297 | -- | -- | $0.4711 |

@@ -63,6 +63,9 @@ describe('RetomarEnviosPendientesUseCase', () => {
       expect(calls[0]).toEqual({
         examId: 'sim-1',
         code: VALID_CODIGO,
+        // Entry sembrada SIN admissionArea (legacy pre-rollout) →
+        // el use case aplica DEFAULT_ADMISSION_AREA en el retry.
+        admissionArea: 'GENERAL',
         responses: { P1: 'A' },
         clientFinishedAt: '2026-06-11T08:55:00.000Z',
       });
@@ -211,6 +214,42 @@ describe('RetomarEnviosPendientesUseCase', () => {
         expect(warnSpy).toHaveBeenCalled();
       },
     );
+  });
+
+  describe('admissionArea — preserva del EnvioPendiente + fallback legacy', () => {
+    // Entries encoladas ANTES del rollout de `add-admission-area` no tienen
+    // el campo (opcional en EnvioPendiente). El use case aplica
+    // DEFAULT_ADMISSION_AREA como fallback sin persistir.
+    it('entry sembrada con admissionArea → el adapter recibe ese mismo valor', async () => {
+      storage.seedEnvio({
+        examId: 'sim-1',
+        code: VALID_CODIGO,
+        admissionArea: 'MAT',
+        answers: { '1': 'A' },
+        clientFinishedAt: '2026-06-11T08:55:00.000Z',
+      });
+      api.willResolveEnviar({ ack: buildAck() });
+
+      await useCase.execute();
+
+      expect(api.getEnviarCalls()[0].admissionArea).toBe('MAT');
+    });
+
+    it('entry legacy sin admissionArea → el adapter recibe GENERAL (fallback)', async () => {
+      storage.seedEnvio({
+        examId: 'sim-1',
+        code: VALID_CODIGO,
+        // admissionArea intencionalmente omitido — simula una entry encolada
+        // por una versión previa de la PWA (opcional en el shape del port).
+        answers: { '1': 'A' },
+        clientFinishedAt: '2026-06-11T08:55:00.000Z',
+      });
+      api.willResolveEnviar({ ack: buildAck() });
+
+      await useCase.execute();
+
+      expect(api.getEnviarCalls()[0].admissionArea).toBe('GENERAL');
+    });
   });
 
   describe('mix de resultados', () => {

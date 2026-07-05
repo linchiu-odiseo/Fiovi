@@ -1,8 +1,10 @@
 import { Component, DestroyRef, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AlternativaValue } from '../../../L1_domain/ports/markings-storage';
+import { AdmissionArea } from '../../../L1_domain/value-objects/admission-area';
 import { SimulacroPageViewModel } from '../../view-models/simulacro.view-model';
 import { SubmissionReceiptModalComponent } from '../../components/submission-receipt-modal/submission-receipt-modal.component';
+import { AdmissionAreaPickerComponent } from '../../components/admission-area-picker/admission-area-picker.component';
 
 const ALTERNATIVAS: readonly AlternativaValue[] = ['A', 'B', 'C', 'D', 'E'];
 
@@ -20,7 +22,7 @@ const LONG_PRESS_MOVE_THRESHOLD_PX = 10;
   selector: 'app-simulacro-page',
   templateUrl: './simulacro.page.html',
   styleUrl: './simulacro.page.scss',
-  imports: [SubmissionReceiptModalComponent],
+  imports: [SubmissionReceiptModalComponent, AdmissionAreaPickerComponent],
   providers: [SimulacroPageViewModel],
 })
 export class SimulacroPage {
@@ -129,5 +131,9 @@ export class SimulacroPage {
 
   protected onEnviarClick(): void {
     void this.vm.submit();
+  }
+
+  protected onAdmissionAreaSeleccion(area: AdmissionArea): void {
+    void this.vm.seleccionarArea(area);
   }
 }

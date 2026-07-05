@@ -6,6 +6,7 @@ import {
   MarkingsStorage,
 } from '../../L1_domain/ports/markings-storage';
 import { OutboxStoragePort } from '../../L1_domain/ports/outbox-storage.port';
+import { AdmissionArea, isAdmissionArea } from '../../L1_domain/value-objects/admission-area';
 import { SubmissionAck } from '../../L1_domain/value-objects/submission-ack';
 import { OfflineStorageUnavailableError } from '../../L1_domain/errors/offline-storage-unavailable.error';
 import { IDENTITY_STORAGE } from '../tokens';
@@ -15,10 +16,12 @@ const DB_VERSION = 1;
 const STORE = 'data';
 
 // Patrón de keys planas en un único object store. La key encapsula el
-// scope por usuario (`userEmail`) y la entidad (marcacion vs queue vs ack).
-//   marcacion: cartilla.<email>.simulacro.<examId>.<pregunta>
-//   queue:     cartilla.<email>.queue.<examId>
-//   ack:       cartilla.<email>.ack.<examId>
+// scope por usuario (`userEmail`) y la entidad (marcacion vs queue vs
+// ack vs admission-area).
+//   marcacion:      cartilla.<email>.simulacro.<examId>.<pregunta>
+//   queue:          cartilla.<email>.queue.<examId>
+//   ack:            cartilla.<email>.ack.<examId>
+//   admission-area: cartilla.<email>.admission-area.<examId>
 // El prefijo `cartilla.<email>.` permite que `wipeUserScope()` use un
 // rango de IDBKeyRange.bound(...) sin tocar datos de otros usuarios.
 //
@@ -63,6 +66,9 @@ export class IndexedDbMarkingsStorage implements MarkingsStorage, OutboxStorageP
     const db = await this.db();
     const prefix = `${KEY_ROOT}.${email}.simulacro.${examId}.`;
     await this.deleteRange(db, prefix);
+    // También borra el AdmissionArea para no dejar estado stale del examen
+    // anterior (design.md D3 de `add-admission-area`).
+    await this.delete(db, admissionAreaKey(email, examId));
   }
 
   async enqueueEnvio(envio: EnvioPendiente): Promise<void> {
@@ -109,6 +115,26 @@ export class IndexedDbMarkingsStorage implements MarkingsStorage, OutboxStorageP
     if (raw === undefined) return null;
     const stored = raw as { id: string; submissionHash: string; submittedAt: string };
     return new SubmissionAck(stored.id, stored.submissionHash, new Date(stored.submittedAt));
+  }
+
+  // Persistencia del área de POSTULACIÓN del alumno (ver AdmissionArea VO).
+  // Idempotente (última llamada gana). NO confundir con Exam.area (curso).
+  async setAdmissionArea(examId: string, area: AdmissionArea): Promise<void> {
+    const email = await this.requireUserEmail();
+    const db = await this.db();
+    await this.put(db, admissionAreaKey(email, examId), { area });
+  }
+
+  // Retorna null si el alumno nunca eligió expresamente para este examen.
+  // El use case interpreta null como DEFAULT_ADMISSION_AREA sin persistir
+  // (design.md D3). Guard defensivo contra shapes stale de IDB.
+  async getAdmissionArea(examId: string): Promise<AdmissionArea | null> {
+    const email = await this.requireUserEmail();
+    const db = await this.db();
+    const raw = await this.get(db, admissionAreaKey(email, examId));
+    if (raw === undefined) return null;
+    const stored = raw as { area?: unknown };
+    return isAdmissionArea(stored.area) ? stored.area : null;
   }
 
   // Sin identity → no-op (caso normal durante logout cuando el storage ya
@@ -253,6 +279,10 @@ function queueKey(email: string, examId: string): string {
 
 function ackKey(email: string, examId: string): string {
   return `${KEY_ROOT}.${email}.ack.${examId}`;
+}
+
+function admissionAreaKey(email: string, examId: string): string {
+  return `${KEY_ROOT}.${email}.admission-area.${examId}`;
 }
 
 // Rango "key starts with prefix" — IndexedDB ordena keys lexicográficamente,

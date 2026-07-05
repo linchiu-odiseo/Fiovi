@@ -1,4 +1,5 @@
 import { Exam } from '../entities/exam';
+import { AdmissionArea } from '../value-objects/admission-area';
 import { ServerTime } from '../value-objects/server-time';
 import { SubmissionAck } from '../value-objects/submission-ack';
 
@@ -8,12 +9,15 @@ export interface ExamsListResult {
 }
 
 // Body del POST de envío. `examId` es el `sessionId` del path; `code` es el
-// DNI del alumno (lo resuelve el use case desde IdentityStorage); `responses`
-// ya viene con keys `P<n>` y SIN nulls (filtrados en L2); `clientFinishedAt`
-// es ISO 8601 anclado al Clock server-anchored.
+// DNI del alumno (lo resuelve el use case desde IdentityStorage);
+// `admissionArea` es el área de POSTULACIÓN del alumno (NO confundir con
+// `Exam.area` que es curso — ver design.md D1 de `add-admission-area`);
+// `responses` ya viene con keys `P<n>` y SIN nulls (filtrados en L2);
+// `clientFinishedAt` es ISO 8601 anclado al Clock server-anchored.
 export interface EnvioRequest {
   examId: string;
   code: string;
+  admissionArea: AdmissionArea;
   responses: Record<string, 'A' | 'B' | 'C' | 'D' | 'E'>;
   clientFinishedAt: string;
 }
@@ -27,7 +31,9 @@ export interface EnvioResult {
 }
 
 // Body del POST de draft (auto-save progresivo). `examId` es el `sessionId`
-// del path (igual que en EnvioRequest); `code` es el DNI del alumno.
+// del path (igual que en EnvioRequest); `code` es el DNI del alumno;
+// `admissionArea` es el área de POSTULACIÓN del alumno (NO confundir con
+// `Exam.area` — ver design.md D1 de `add-admission-area`).
 //
 // `responses` es un STRING COMPACTO de longitud `exam.count`. Cada char (0-indexed)
 // corresponde a la pregunta P(i+1):
@@ -45,6 +51,7 @@ export interface EnvioResult {
 export interface DraftRequest {
   examId: string;
   code: string;
+  admissionArea: AdmissionArea;
   responses: string;
 }
 
@@ -60,8 +67,9 @@ export interface DraftRequest {
 //
 // Mapeo de errores POST /student/exam-sessions/{id}/submit (excepción
 // documentada a la regla "nunca leer message" — set enumerado cerrado, ver
-// design.md D5 de `fase-3-exam-submit-learnex`):
-//   - 400                                              → InvalidPayloadError
+// design.md D5 de `fase-3-exam-submit-learnex` y D8 de `add-admission-area`):
+//   - 400 + message "INVALID_ADMISSION_AREA"           → InvalidAdmissionAreaError
+//   - 400 (otros / ausente)                            → InvalidPayloadError
 //   - 403 + message "STUDENT_NOT_ENROLLED"             → StudentNotEnrolledError
 //   - 403 + message "STUDENT_MISMATCH" u otro          → NetworkError (genérico)
 //   - 404                                              → SimulacroNoAsignadoError
@@ -71,10 +79,12 @@ export interface DraftRequest {
 //
 // Mapeo de errores POST /student/exam-sessions/{id}/draft (excepción
 // documentada a la regla "nunca leer message" — segundo set enumerado cerrado,
-// ver design.md D5/D10 de `draft-auto-save`; misma justificación que submit):
+// ver design.md D5/D10 de `draft-auto-save` y D8 de `add-admission-area`):
 // Set DRAFT_ERROR_MESSAGES = { 'STUDENT_NOT_ENROLLED', 'STUDENT_MISMATCH',
-//   'SESSION_NOT_FOUND', 'STUDENT_BY_CODE_NOT_FOUND', 'SESSION_NOT_ACTIVE' }
-//   - 400                                                → InvalidPayloadError
+//   'SESSION_NOT_FOUND', 'STUDENT_BY_CODE_NOT_FOUND', 'SESSION_NOT_ACTIVE',
+//   'INVALID_ADMISSION_AREA' }
+//   - 400 + message "INVALID_ADMISSION_AREA"             → InvalidAdmissionAreaError
+//   - 400 (otros / ausente)                              → InvalidPayloadError
 //   - 401                                                → manejado por `credentials.interceptor`
 //   - 403 + message "STUDENT_NOT_ENROLLED"               → StudentNotEnrolledError
 //   - 403 + message "STUDENT_MISMATCH" u otro            → NetworkError (retryable con backoff)
