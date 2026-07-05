@@ -63,6 +63,9 @@ describe('RetomarEnviosPendientesUseCase', () => {
       expect(calls[0]).toEqual({
         examId: 'sim-1',
         code: VALID_CODIGO,
+        // Entry sembrada SIN admissionArea (legacy pre-rollout) →
+        // el use case aplica DEFAULT_ADMISSION_AREA en el retry.
+        admissionArea: 'GENERAL',
         responses: { P1: 'A' },
         clientFinishedAt: '2026-06-11T08:55:00.000Z',
       });

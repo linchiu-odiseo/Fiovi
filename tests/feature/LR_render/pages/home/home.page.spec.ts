@@ -169,6 +169,12 @@ class FakeMarkingsStorage implements MarkingsStorage {
   async dequeueEnvio(_examId: string): Promise<void> {
     throw new Error('not used in HomePage tests');
   }
+  async getAdmissionArea(_examId: string): Promise<null> {
+    return null;
+  }
+  async setAdmissionArea(_examId: string, _area: unknown): Promise<void> {
+    /* no-op */
+  }
   async wipeUserScope(): Promise<void> {
     throw new Error('not used in HomePage tests');
   }

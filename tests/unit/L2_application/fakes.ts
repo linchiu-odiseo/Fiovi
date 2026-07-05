@@ -21,6 +21,7 @@ import {
   ExamsApi,
   ExamsListResult,
 } from '../../../src/L1_domain/ports/exams-api';
+import { AdmissionArea } from '../../../src/L1_domain/value-objects/admission-area';
 import { ServerTime } from '../../../src/L1_domain/value-objects/server-time';
 import { SubmissionAck } from '../../../src/L1_domain/value-objects/submission-ack';
 
@@ -44,6 +45,10 @@ export class InMemoryMarkingsStorage implements MarkingsStorage {
   private marcaciones = new Map<string, AlternativaValue>();
   private queue = new Map<string, EnvioPendiente>();
   private acks = new Map<string, SubmissionAck>();
+  // Área de POSTULACIÓN por examId (ver AdmissionArea VO). null en get =
+  // "el alumno nunca eligió expresamente"; el use case resuelve el default
+  // sin persistir (design.md D3 de `add-admission-area`).
+  private admissionAreas = new Map<string, AdmissionArea>();
   private wipeShouldFail = false;
   private wipeCalls = 0;
   private opsLog: string[] = [];
@@ -82,8 +87,19 @@ export class InMemoryMarkingsStorage implements MarkingsStorage {
     this.acks.set(examId, ack);
   }
 
+  // Sembrar un AdmissionArea para verificar propagación al EnvioRequest/DraftRequest
+  // sin pasar por SeleccionarAdmissionAreaUseCase.
+  seedAdmissionArea(examId: string, area: AdmissionArea): void {
+    this.admissionAreas.set(examId, area);
+  }
+
   hasAnyState(): boolean {
-    return this.marcaciones.size > 0 || this.queue.size > 0 || this.acks.size > 0;
+    return (
+      this.marcaciones.size > 0 ||
+      this.queue.size > 0 ||
+      this.acks.size > 0 ||
+      this.admissionAreas.size > 0
+    );
   }
 
   // --- Puerto MarkingsStorage ---
@@ -114,6 +130,10 @@ export class InMemoryMarkingsStorage implements MarkingsStorage {
     for (const key of [...this.marcaciones.keys()]) {
       if (key.startsWith(prefix)) this.marcaciones.delete(key);
     }
+    // El adapter L3 también borra el AdmissionArea del examen (design D3
+    // + spec `admission-area`: "clearMarcaciones SHALL borrar también el
+    // area para no dejar estado stale post-envío").
+    this.admissionAreas.delete(examId);
   }
 
   async enqueueEnvio(envio: EnvioPendiente): Promise<void> {
@@ -139,6 +159,15 @@ export class InMemoryMarkingsStorage implements MarkingsStorage {
     return this.acks.get(examId) ?? null;
   }
 
+  async setAdmissionArea(examId: string, area: AdmissionArea): Promise<void> {
+    this.opsLog.push('markings.setAdmissionArea');
+    this.admissionAreas.set(examId, area);
+  }
+
+  async getAdmissionArea(examId: string): Promise<AdmissionArea | null> {
+    return this.admissionAreas.get(examId) ?? null;
+  }
+
   async wipeUserScope(): Promise<void> {
     this.opsLog.push('markings.wipeUserScope');
     this.wipeCalls++;
@@ -148,6 +177,7 @@ export class InMemoryMarkingsStorage implements MarkingsStorage {
     this.marcaciones.clear();
     this.queue.clear();
     this.acks.clear();
+    this.admissionAreas.clear();
   }
 }
 

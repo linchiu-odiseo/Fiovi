@@ -231,6 +231,9 @@ describe('EnviarSimulacroUseCase', () => {
       expect(pendientes[0]).toEqual({
         examId: 'exam-1',
         code: VALID_CODIGO,
+        // Sin seedAdmissionArea, el use case usa DEFAULT_ADMISSION_AREA
+        // (design.md D3 de `add-admission-area`).
+        admissionArea: 'GENERAL',
         answers: { '1': 'A', '2': 'B' },
         clientFinishedAt: SERVER_NOW_ISO,
       });

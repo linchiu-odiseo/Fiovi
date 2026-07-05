@@ -28,6 +28,7 @@ describe('HttpExamsApi.guardarDraft (POST /draft)', () => {
   const validRequest = (): DraftRequest => ({
     examId: SESSION_ID,
     code: '30303011',
+    admissionArea: 'GENERAL',
     responses: 'A-C-',
   });
 
@@ -52,13 +53,16 @@ describe('HttpExamsApi.guardarDraft (POST /draft)', () => {
       await pending;
     });
 
-    it('body exacto: { code, responses: string } sin client_finished_at', async () => {
+    it('body exacto: { code, admission_area, responses: string } sin client_finished_at', async () => {
       const pending = adapter.guardarDraft(validRequest());
 
       const req = httpMock.expectOne(DRAFT_URL);
       // El responses viaja como STRING COMPACTO (no como Record).
+      // El orden fijo `code, admission_area, responses` se testea con string
+      // match en el describe "orden fijo de keys".
       expect(req.request.body).toEqual({
         code: '30303011',
+        admission_area: 'GENERAL',
         responses: 'A-C-',
       });
       expect(typeof (req.request.body as { responses: unknown }).responses).toBe('string');

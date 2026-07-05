@@ -47,6 +47,7 @@ describe('HttpExamsApi.enviar (POST real)', () => {
   const validRequest = (): EnvioRequest => ({
     examId: SESSION_ID,
     code: '30303011',
+    admissionArea: 'GENERAL',
     responses: { P1: 'A', P2: 'C' },
     clientFinishedAt: '2026-06-17T15:29:54.000Z',
   });
@@ -68,8 +69,11 @@ describe('HttpExamsApi.enviar (POST real)', () => {
       const req = httpMock.expectOne(SUBMIT_URL);
       expect(req.request.method).toBe('POST');
       // Body exacto al contrato learnex: snake_case, sin claves extra.
+      // El orden fijo `code, admission_area, responses, client_finished_at`
+      // se testea con string match en el describe "orden fijo de keys".
       expect(req.request.body).toEqual({
         code: '30303011',
+        admission_area: 'GENERAL',
         responses: { P1: 'A', P2: 'C' },
         client_finished_at: '2026-06-17T15:29:54.000Z',
       });
