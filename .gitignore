@@ -54,3 +54,5 @@ Thumbs.db
 
 # personal files
 /.authentic
+/docs/sonar
+.scannerwork
