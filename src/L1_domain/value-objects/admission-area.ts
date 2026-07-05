@@ -7,8 +7,8 @@
 // `admission_area` (snake_case).
 // Ver design.md D1 de `add-admission-area`.
 //
-// Set fijo de 16 valores del sistema académico peruano (Vonex). Si en el
-// futuro crece → change explícito, no diseño dinámico (design.md D2).
+// Set fijo de 16 valores del sistema académico del tenant. Si en el futuro
+// crece → change explícito, no diseño dinámico (design.md D2).
 export type AdmissionArea =
   | 'A'
   | 'A1'
