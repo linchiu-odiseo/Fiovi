@@ -397,6 +397,84 @@ describe('IndexedDbMarkingsStorage', () => {
     });
   });
 
+  describe('AdmissionArea — get/set/clear + guard defensivo contra stale', () => {
+    // Área de POSTULACIÓN (NO Exam.area). Persiste en la misma DB con key
+    // `cartilla.<email>.admission-area.<examId>`. clearMarcaciones borra
+    // también el area del mismo examen (design.md D3 de `add-admission-area`).
+    it('getAdmissionArea retorna null sin persistencia previa', async () => {
+      expect(await adapter.getAdmissionArea('exam-X')).toBeNull();
+    });
+
+    it('setAdmissionArea + getAdmissionArea round-trip', async () => {
+      await adapter.setAdmissionArea('exam-X', 'MAT');
+      expect(await adapter.getAdmissionArea('exam-X')).toBe('MAT');
+    });
+
+    it('setAdmissionArea es idempotente (última llamada gana)', async () => {
+      await adapter.setAdmissionArea('exam-X', 'MAT');
+      await adapter.setAdmissionArea('exam-X', 'CIE');
+      await adapter.setAdmissionArea('exam-X', 'GENERAL');
+      expect(await adapter.getAdmissionArea('exam-X')).toBe('GENERAL');
+    });
+
+    it('clearMarcaciones(X) borra también el area de X', async () => {
+      await adapter.setMarcacion('exam-X', 1, 'A');
+      await adapter.setAdmissionArea('exam-X', 'MAT');
+
+      await adapter.clearMarcaciones('exam-X');
+
+      expect(await adapter.getMarcaciones('exam-X')).toEqual({});
+      expect(await adapter.getAdmissionArea('exam-X')).toBeNull();
+    });
+
+    it('clearMarcaciones(X) NO afecta el area de otro examen Y', async () => {
+      await adapter.setAdmissionArea('exam-X', 'MAT');
+      await adapter.setAdmissionArea('exam-Y', 'CIE');
+
+      await adapter.clearMarcaciones('exam-X');
+
+      expect(await adapter.getAdmissionArea('exam-X')).toBeNull();
+      expect(await adapter.getAdmissionArea('exam-Y')).toBe('CIE');
+    });
+
+    it('wipeUserScope limpia también el area (todos los examId del usuario)', async () => {
+      await adapter.setAdmissionArea('exam-X', 'MAT');
+      await adapter.setAdmissionArea('exam-Y', 'CIE');
+
+      await adapter.wipeUserScope();
+
+      expect(await adapter.getAdmissionArea('exam-X')).toBeNull();
+      expect(await adapter.getAdmissionArea('exam-Y')).toBeNull();
+    });
+
+    // Guard defensivo del adapter: si IDB devuelve una entry con `area`
+    // fuera del set (stale de una versión previa o corrupción), el getter
+    // retorna null en vez de propagar el valor inválido al dominio.
+    it('guard defensivo: entry con area stale ("VI" fuera del set) → getAdmissionArea retorna null', async () => {
+      // Escribimos directo en IDB con un shape stale, sin pasar por el setter.
+      const rawKey = `cartilla.alumno-a@vonex.edu.pe.admission-area.exam-stale`;
+      await new Promise<void>((resolve, reject) => {
+        const openReq = indexedDB.open(DB_NAME);
+        openReq.onsuccess = () => {
+          const db = openReq.result;
+          const tx = db.transaction(STORE, 'readwrite');
+          tx.objectStore(STORE).put({ area: 'VI' }, rawKey);
+          tx.oncomplete = () => {
+            db.close();
+            resolve();
+          };
+          tx.onerror = () => {
+            db.close();
+            reject(tx.error);
+          };
+        };
+        openReq.onerror = () => reject(openReq.error);
+      });
+
+      expect(await adapter.getAdmissionArea('exam-stale')).toBeNull();
+    });
+  });
+
   describe('key format en IDB sigue el patrón `cartilla.<email>.{simulacro|queue|ack}.<examId>`', () => {
     it('marcaciones se escriben con clave que contiene ".simulacro." literal', async () => {
       await adapter.setMarcacion('exam-key-test', 7, 'D');
