@@ -2,6 +2,7 @@ import { Clock } from '../../L1_domain/ports/clock';
 import { IdentityStorage } from '../../L1_domain/ports/identity-storage';
 import { AnswersMap, MarkingsStorage } from '../../L1_domain/ports/markings-storage';
 import { ExamsApi } from '../../L1_domain/ports/exams-api';
+import { DEFAULT_ADMISSION_AREA } from '../../L1_domain/value-objects/admission-area';
 import { SubmissionAck } from '../../L1_domain/value-objects/submission-ack';
 import { NetworkError } from '../../L1_domain/errors/network.error';
 import { SessionExpiredError } from '../../L1_domain/errors/session-expired.error';
@@ -70,11 +71,17 @@ export class EnviarSimulacroUseCase {
     const clientFinishedAt = ts.toISOString();
     const answers = await this.storage.getMarcaciones(input.examId);
     const responses = responsesFromAnswers(answers);
+    // Área de POSTULACIÓN: null en storage = alumno nunca eligió expresamente.
+    // El default vive acá — NO se persiste — para preservar la distinción
+    // (design.md D3 de `add-admission-area`).
+    const admissionArea =
+      (await this.storage.getAdmissionArea(input.examId)) ?? DEFAULT_ADMISSION_AREA;
 
     try {
       const result = await this.api.enviar({
         examId: input.examId,
         code,
+        admissionArea,
         responses,
         clientFinishedAt,
       });
@@ -86,6 +93,7 @@ export class EnviarSimulacroUseCase {
         await this.storage.enqueueEnvio({
           examId: input.examId,
           code,
+          admissionArea,
           answers,
           clientFinishedAt,
         });

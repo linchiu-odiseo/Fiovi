@@ -1,5 +1,6 @@
 import { MarkingsStorage } from '../../L1_domain/ports/markings-storage';
 import { ExamsApi } from '../../L1_domain/ports/exams-api';
+import { DEFAULT_ADMISSION_AREA } from '../../L1_domain/value-objects/admission-area';
 import { NetworkError } from '../../L1_domain/errors/network.error';
 import { responsesFromAnswers } from './enviar-simulacro.use-case';
 
@@ -28,6 +29,9 @@ export class RetomarEnviosPendientesUseCase {
         const result = await this.api.enviar({
           examId: envio.examId,
           code: envio.code,
+          // Fallback para entries legacy encoladas antes del rollout de
+          // admission-area — el campo es opcional en EnvioPendiente.
+          admissionArea: envio.admissionArea ?? DEFAULT_ADMISSION_AREA,
           responses: responsesFromAnswers(envio.answers),
           clientFinishedAt: envio.clientFinishedAt,
         });

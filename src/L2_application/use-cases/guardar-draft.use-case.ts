@@ -12,6 +12,7 @@
 import { IdentityStorage } from '../../L1_domain/ports/identity-storage';
 import { AnswersMap, MarkingsStorage } from '../../L1_domain/ports/markings-storage';
 import { DraftRequest, ExamsApi } from '../../L1_domain/ports/exams-api';
+import { DEFAULT_ADMISSION_AREA } from '../../L1_domain/value-objects/admission-area';
 import { SessionExpiredError } from '../../L1_domain/errors/session-expired.error';
 
 export class GuardarDraftUseCase {
@@ -32,8 +33,13 @@ export class GuardarDraftUseCase {
 
     const answers = await this.markingsStorage.getMarcaciones(examId);
     const responses = this.toResponsesString(answers, count);
+    // Área de POSTULACIÓN: null en storage = alumno nunca eligió expresamente.
+    // El default vive acá — NO se persiste — para preservar la distinción
+    // (design.md D3 de `add-admission-area`).
+    const admissionArea =
+      (await this.markingsStorage.getAdmissionArea(examId)) ?? DEFAULT_ADMISSION_AREA;
 
-    const req: DraftRequest = { examId, code, responses };
+    const req: DraftRequest = { examId, code, admissionArea, responses };
     await this.api.guardarDraft(req);
   }
 
