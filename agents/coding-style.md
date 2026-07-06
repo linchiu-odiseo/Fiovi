@@ -1,4 +1,4 @@
-# Estilo de código — Lugia
+# Estilo de código — Fiovi
 
 > Las reglas mecánicas las enforza ESLint + Prettier (corre `npm run lint` y `npm run format:check`). Este documento captura las decisiones de estilo que las herramientas no atrapan: naming, organización, comentarios, commits.
 

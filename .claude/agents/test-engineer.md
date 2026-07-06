@@ -4,7 +4,7 @@ description: Escribe tests Vitest para L1+L2 (puros, sin Angular) en tests/unit/
 tools: Read, Edit, Write, Bash
 ---
 
-Eres el **test-engineer** de Lugia. Tu trabajo es escribir tests Vitest que protegen el comportamiento, no la implementación. Cubres los escenarios listados en las specs del cambio activo (`openspec/changes/<active>/specs/<capability>/spec.md`).
+Eres el **test-engineer** de Fiovi. Tu trabajo es escribir tests Vitest que protegen el comportamiento, no la implementación. Cubres los escenarios listados en las specs del cambio activo (`openspec/changes/<active>/specs/<capability>/spec.md`).
 
 ## Contexto obligatorio antes de actuar
 

@@ -1,8 +1,8 @@
 services:
-  lugia:
+  fiovi:
     build: .
-    image: lugia:latest
-    container_name: lugia
+    image: fiovi:latest
+    container_name: fiovi
     ports:
       - "3006:80"
     restart: unless-stopped

@@ -24,7 +24,7 @@ Leé [`CONTRIBUTING.md`](CONTRIBUTING.md). Define las 4 reglas obligatorias del 
 ```bash
 # 1. Clonar e instalar
 git clone <repo-url>
-cd Lugia
+cd Fiovi
 npm install
 
 # 2. Configurar variables (ver tabla más abajo)
@@ -115,16 +115,16 @@ El repo ya está dockerizado. Producción corre como un único container nginx c
 
 | Archivo          | Rol                                                                                                                                              |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `Dockerfile`     | Multi-stage. Etapa 1 (`node:22-alpine`): `npm ci` + `npm run build`. Etapa 2 (`nginx:alpine`): copia `dist/lugia/browser` y `nginx.conf`. Sin Node en la imagen final. |
+| `Dockerfile`     | Multi-stage. Etapa 1 (`node:22-alpine`): `npm ci` + `npm run build`. Etapa 2 (`nginx:alpine`): copia `dist/fiovi/browser` y `nginx.conf`. Sin Node en la imagen final. |
 | `nginx.conf`     | SPA fallback (`try_files`), gzip, cache `immutable` 1y para assets hasheados, `no-cache` para `index.html`, `ngsw.json`, `ngsw-worker.js`.                              |
-| `compose.yml`    | Servicio `lugia` expuesto en **puerto 3006:80**, `restart: unless-stopped`.                                                                                  |
+| `compose.yml`    | Servicio `fiovi` expuesto en **puerto 3006:80**, `restart: unless-stopped`.                                                                                  |
 | `.dockerignore`  | Excluye `node_modules`, `tests/`, `docs/`, `openspec/`, etc. **Conserva `.env`** porque `build-env.mjs` lo necesita dentro del build.                          |
 
 ### Deploy manual (válido para staging o como referencia)
 
 ```bash
-git clone <repo-url> lugia
-cd lugia
+git clone <repo-url> fiovi
+cd fiovi
 cp .env.example .env
 # Editar .env con los valores REALES de prod (ver tabla "Variables de entorno")
 docker compose up -d --build

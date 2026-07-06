@@ -1,4 +1,4 @@
-# Agent activity log — Lugia
+# Agent activity log — Fiovi
 
 Auto-generado por `.claude/hooks/log-agent-usage.ps1` en cada PostToolUse del tool `Agent`.
 **Tokens reportados son del subagente**, no del orchestrator. Para el total de la sesión y costo combinado, usa `/cost` en Claude Code.

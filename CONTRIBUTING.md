@@ -1,4 +1,4 @@
-# CONTRIBUTING — Reglas de colaboración en Lugia
+# CONTRIBUTING — Reglas de colaboración en Fiovi
 
 > Este documento define el contrato mínimo que cualquier colaborador (humano o agente IA) debe cumplir para tocar este repo. No son sugerencias; son condiciones para que un cambio sea aceptado.
 >
@@ -60,7 +60,7 @@ Reglas concretas:
 
 ## Regla #2 — Respetar la arquitectura y los estilos del proyecto
 
-Lugia es **hexagonal estricta en 4 capas**. Romper boundaries no es deuda menor — es deuda arquitectónica que paga compuesto.
+Fiovi es **hexagonal estricta en 4 capas**. Romper boundaries no es deuda menor — es deuda arquitectónica que paga compuesto.
 
 ### Lo no negociable
 

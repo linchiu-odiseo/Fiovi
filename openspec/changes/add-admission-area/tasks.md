@@ -76,7 +76,7 @@
   - Signal `admissionArea: Signal<AdmissionArea>` con `DEFAULT_ADMISSION_AREA` inicial.
   - En el hook de mount, hidratar con `markingsStorage.getAdmissionArea(examId) ?? DEFAULT_ADMISSION_AREA`.
   - Método `seleccionarArea(area: AdmissionArea)`: invoca use case, actualiza signal, llama `this.draftDispatcher.notificarCambio(this.sessionId, exam.count)` — **dos args**, mismo patrón que `marcarRespuesta` en la línea 380 del archivo actual.
-- [ ] 11.2 Modificar `src/LR_render/pages/simulacro/simulacro.page.html` (o `.ts` si es standalone inline): renderizar `<lugia-admission-area-picker>` arriba de la grilla, debajo del sticky header. Bind `[admissionArea]` al signal y `(seleccion)` a `seleccionarArea`.
+- [ ] 11.2 Modificar `src/LR_render/pages/simulacro/simulacro.page.html` (o `.ts` si es standalone inline): renderizar `<app-admission-area-picker>` arriba de la grilla, debajo del sticky header. Bind `[admissionArea]` al signal y `(seleccion)` a `seleccionarArea`.
 
 ## 12. Tests LR view-model (Vitest + jsdom + TestBed)
 

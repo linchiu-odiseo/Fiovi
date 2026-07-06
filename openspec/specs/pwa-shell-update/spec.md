@@ -152,13 +152,13 @@ El sistema SHALL exponer un servicio Angular `PwaUpdateService` en `src/L3_perip
 
 ### Requirement: Modal de confirmación al tocar el banner
 
-`<app-update-banner>` SHALL emitir un evento al tocarse que abre `<app-update-confirm-modal>`. El modal MUST cubrir la página con un overlay semi-transparente. El título MUST ser `"Actualizar Lugia"`. El cuerpo MUST mostrar dos líneas: `"Versión actual: {{ pendingUpdate().fromVersion }}"` y `"Versión nueva: {{ pendingUpdate().toVersion }}"`. El texto explicativo MUST ser literal: `"La app se va a reiniciar para aplicar la nueva versión. Tus marcaciones están guardadas."`. PROHIBIDO incluir las frases `"se borrarán"`, `"vas a perder"`, `"se eliminarán"` o cualquier variante que implique pérdida de datos del alumno. El modal MUST exponer dos botones: `[Cancelar]` y `[Actualizar]`. `[Cancelar]` SHALL cerrar el modal sin efectos colaterales. `[Actualizar]` SHALL invocar `PwaUpdateService.applyUpdate()`.
+`<app-update-banner>` SHALL emitir un evento al tocarse que abre `<app-update-confirm-modal>`. El modal MUST cubrir la página con un overlay semi-transparente. El título MUST ser `"Actualizar Fiovi"`. El cuerpo MUST mostrar dos líneas: `"Versión actual: {{ pendingUpdate().fromVersion }}"` y `"Versión nueva: {{ pendingUpdate().toVersion }}"`. El texto explicativo MUST ser literal: `"La app se va a reiniciar para aplicar la nueva versión. Tus marcaciones están guardadas."`. PROHIBIDO incluir las frases `"se borrarán"`, `"vas a perder"`, `"se eliminarán"` o cualquier variante que implique pérdida de datos del alumno. El modal MUST exponer dos botones: `[Cancelar]` y `[Actualizar]`. `[Cancelar]` SHALL cerrar el modal sin efectos colaterales. `[Actualizar]` SHALL invocar `PwaUpdateService.applyUpdate()`.
 
 #### Scenario: Modal abre con versiones correctas
 
 - **GIVEN** `pendingUpdate() = { available: true, fromVersion: '1.0.0', toVersion: '1.1.0' }`
 - **WHEN** el alumno toca el banner
-- **THEN** el modal SHALL renderizarse con título `"Actualizar Lugia"`
+- **THEN** el modal SHALL renderizarse con título `"Actualizar Fiovi"`
 - **AND** el cuerpo SHALL contener `"Versión actual: 1.0.0"` y `"Versión nueva: 1.1.0"`
 - **AND** el texto explicativo SHALL ser literal `"La app se va a reiniciar para aplicar la nueva versión. Tus marcaciones están guardadas."`
 
@@ -189,13 +189,13 @@ El sistema SHALL exponer un servicio Angular `PwaUpdateService` en `src/L3_perip
 
 ### Requirement: Componente `<app-version-footer>` reutilizable
 
-El sistema SHALL exponer un componente standalone Angular `<app-version-footer>` en `src/LR_render/components/version-footer/`. El componente SHALL renderizar un `<footer>` con texto exacto `"Lugia · versión {{ environment.appVersion }}"`. El estilo MUST cumplir: color tenue (gris claro, usando token `--color-text-muted` o equivalente del design system), `font-size` ~11px, sin negrita, centrado horizontalmente. Si `environment.appVersion` es vacío o `undefined`, el componente NO MUST renderizar ningún texto (defensive).
+El sistema SHALL exponer un componente standalone Angular `<app-version-footer>` en `src/LR_render/components/version-footer/`. El componente SHALL renderizar un `<footer>` con texto exacto `"Fiovi · versión {{ environment.appVersion }}"`. El estilo MUST cumplir: color tenue (gris claro, usando token `--color-text-muted` o equivalente del design system), `font-size` ~11px, sin negrita, centrado horizontalmente. Si `environment.appVersion` es vacío o `undefined`, el componente NO MUST renderizar ningún texto (defensive).
 
 #### Scenario: Footer muestra versión
 
 - **GIVEN** `environment.appVersion === '1.1.0'`
 - **WHEN** se renderiza `<app-version-footer>`
-- **THEN** el DOM SHALL contener un `<footer>` con texto `"Lugia · versión 1.1.0"`
+- **THEN** el DOM SHALL contener un `<footer>` con texto `"Fiovi · versión 1.1.0"`
 
 #### Scenario: Footer oculto si versión vacía
 
@@ -211,7 +211,7 @@ El sistema SHALL exponer un componente standalone Angular `<app-version-footer>`
 
 - **GIVEN** la app fue cargada con `environment.appVersion === '1.1.0'`
 - **WHEN** se renderiza `HomePage` en cualquier estado (con o sin `pendingUpdate().available`)
-- **THEN** el DOM de `HomePage` SHALL contener `<app-version-footer>` con texto `"Lugia · versión 1.1.0"`
+- **THEN** el DOM de `HomePage` SHALL contener `<app-version-footer>` con texto `"Fiovi · versión 1.1.0"`
 
 ### Requirement: `APP_VERSION` en `.env` propagada por `build-env.mjs`
 

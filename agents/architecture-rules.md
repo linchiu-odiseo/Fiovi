@@ -1,4 +1,4 @@
-# Reglas de arquitectura — Lugia
+# Reglas de arquitectura — Fiovi
 
 > Hexagonal estricta sobre 4 capas. Las reglas se enforzan mecánicamente con ESLint (`import-x/no-restricted-paths` + `no-restricted-imports`) y se auditan periódicamente con el subagente `hexagonal-guard`. Romperlas no es un bug menor — es deuda arquitectónica que paga compuesto.
 

@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { Identity, Role } from '../../L1_domain/entities/identity';
 import { IdentityStorage } from '../../L1_domain/ports/identity-storage';
 
-const STORAGE_KEY = 'lugia.identity';
+const STORAGE_KEY = 'fiovi.identity';
 
 // Shape persistido. Coincide 1:1 con el constructor de `Identity`. Si el
 // shape cambia en el futuro (campo nuevo, tipo distinto), `read()` debe
@@ -20,7 +20,7 @@ interface PersistedShape {
 // Reemplaza al viejo `LocalStorageSessionStorage`. Cut-over duro: si en
 // `lugia.session` (clave vieja) hay datos del modelo Bearer, no se migran
 // — al primer arranque después del cut-over, el AppInitializer hará /me y
-// re-poblará `lugia.identity` con la cookie HttpOnly válida (si la hay).
+// re-poblará `fiovi.identity` con la cookie HttpOnly válida (si la hay).
 @Injectable({ providedIn: 'root' })
 export class LocalStorageIdentityStorage implements IdentityStorage {
   async read(): Promise<Identity | null> {

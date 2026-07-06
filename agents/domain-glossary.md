@@ -1,4 +1,4 @@
-# Glosario de dominio — Lugia
+# Glosario de dominio — Fiovi
 
 > Vocabulario compartido por código, tests y conversaciones del equipo.
 > Si un término no está acá, no es de dominio: probablemente es de framework, infraestructura o convención de código (ver `architecture-rules.md` / `coding-style.md`).
@@ -31,7 +31,7 @@
 
 **Usuario** — Persona autenticada contra learnex. Tiene **exactamente 1 rol**: `student` o `tutor` (admin/teacher pendientes — ver `UnsupportedRoleError`).
 
-**Identity** — Entidad de dominio (L1) que representa la identidad autenticada activa. Contiene `id, tenantId, email, codigo, roles[], permissions[], expiresAt`. **Invariante single-role**: el constructor lanza `InvalidIdentityError` si `roles.length !== 1`. Métodos: `role()`, `isExpired(now)`, `shouldRefresh(now, threshold)`, `hasPermission(perm)`. Persistida en `localStorage` bajo la clave `lugia.identity`.
+**Identity** — Entidad de dominio (L1) que representa la identidad autenticada activa. Contiene `id, tenantId, email, codigo, roles[], permissions[], expiresAt`. **Invariante single-role**: el constructor lanza `InvalidIdentityError` si `roles.length !== 1`. Métodos: `role()`, `isExpired(now)`, `shouldRefresh(now, threshold)`, `hasPermission(perm)`. Persistida en `localStorage` bajo la clave `fiovi.identity`.
 
 **Cookies HttpOnly** — `learnex_tenant_access` (TTL 15 min) y `learnex_tenant_refresh` (TTL 7 días). Seteadas por el back en login/refresh; invisibles al JS (`HttpOnly`). El browser las envía/recibe automáticamente con `withCredentials: true`. **Reemplazan completamente el modelo Bearer + X-API-Key de Fase 1+2.**
 
@@ -81,9 +81,9 @@
 
 ## Puertos nuevos en Fase 3 (learnex)
 
-**`IdentityStorage`** — Puerto L1 para persistencia local de la `Identity`. `read() / write(identity) / clear()`. Adapter L3: `LocalStorageIdentityStorage` (key `lugia.identity`). DI via `InjectionToken IDENTITY_STORAGE` en `src/L3_periphery/tokens.ts`.
+**`IdentityStorage`** — Puerto L1 para persistencia local de la `Identity`. `read() / write(identity) / clear()`. Adapter L3: `LocalStorageIdentityStorage` (key `fiovi.identity`). DI via `InjectionToken IDENTITY_STORAGE` en `src/L3_periphery/tokens.ts`.
 
-**`ProfileStorage`** — Puerto L1 para cache de `Profile` por rol. `read(role) / write(role, profile) / clear()`. Devuelve `CachedProfile {profile, cachedAt}`. La política de TTL la decide el use case (`GetProfileUseCase` con TTL 24h), no el storage. Adapter L3: `IndexedDbProfileStorage` (DB `lugia-profile`, store `profile`).
+**`ProfileStorage`** — Puerto L1 para cache de `Profile` por rol. `read(role) / write(role, profile) / clear()`. Devuelve `CachedProfile {profile, cachedAt}`. La política de TTL la decide el use case (`GetProfileUseCase` con TTL 24h), no el storage. Adapter L3: `IndexedDbProfileStorage` (DB `fiovi-profile`, store `profile`).
 
 **`OutboxStoragePort`** — Puerto L1 para la cola de envíos pendientes (extracción del adapter Markings). Solo expone `clear()` (usado en logout). El mismo `IndexedDbMarkingsStorage` implementa ambos ports (`useExisting` binding).
 

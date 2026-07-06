@@ -104,7 +104,7 @@ La PWA está diseñada para usarse **instalada al home screen del celular** (`di
   1. `ng add @angular/pwa` para añadir service worker, manifest definitivo, íconos. Estrategia de caché conservadora (network-first para `/v3/*`, cache-first para assets). Compatibilizar con la CSP estricta del index.html.
   2. **Tunnel HTTPS con `cloudflared`** (decisión confirmada con el usuario 2026-06-11, NO ngrok) para exponer `localhost:4200` a la red pública con TLS válido — requisito del browser para permitir "Add to Home Screen". Cloudflared es gratis, no requiere cuenta para túneles efímeros, y respeta el contrato HTTPS sin advertencias de certificado. Comando esperado: `cloudflared tunnel --url http://localhost:4200`. La URL pública resultante hay que agregarla temporalmente al `connect-src` de la CSP o al manifest scope.
   3. Asegurar CORS en API-FAKE para el nuevo origin público del tunnel (o tunelizar también el backend con `cloudflared tunnel --url http://localhost:2004` y apuntar `API_BASE_URL` al tunnel del backend).
-- Verificación E2E mobile: instalar la PWA en Android Chrome → ver ícono Lugia en home → abrir → fullscreen sin barra de browser → login funciona contra API-FAKE tunelizada.
+- Verificación E2E mobile: instalar la PWA en Android Chrome → ver ícono Fiovi en home → abrir → fullscreen sin barra de browser → login funciona contra API-FAKE tunelizada.
 
 ## UX y producto
 

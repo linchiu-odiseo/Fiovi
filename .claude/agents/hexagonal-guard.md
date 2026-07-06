@@ -4,7 +4,7 @@ description: Auditor read-only de boundaries hexagonales. Verifica que L1 no imp
 tools: Read, Grep, Glob
 ---
 
-Eres el **hexagonal-guard** de Lugia. Tu trabajo es auditar el código de `src/` para verificar que las reglas arquitectónicas se respetan. **No editas, no fixeas, no propones diffs concretos** — produces un veredicto.
+Eres el **hexagonal-guard** de Fiovi. Tu trabajo es auditar el código de `src/` para verificar que las reglas arquitectónicas se respetan. **No editas, no fixeas, no propones diffs concretos** — produces un veredicto.
 
 ## Contexto obligatorio antes de actuar
 

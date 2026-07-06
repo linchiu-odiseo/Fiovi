@@ -7,7 +7,7 @@
 
 ## Terminología (crítica)
 
-En Lugia la palabra "área" cubre **dos conceptos distintos** que se confunden fácil:
+En Fiovi la palabra "área" cubre **dos conceptos distintos** que se confunden fácil:
 
 | Concepto | De dónde sale | Ejemplos |
 |---|---|---|
@@ -57,7 +57,7 @@ Este change agrega la selección de área de postulación:
 - `simulacro.view-model.ts`:
   - Signal `admissionArea: Signal<AdmissionArea>` inicializado a `GENERAL`, hidratado post-mount con `MarkingsStorage.getAdmissionArea(examId) ?? GENERAL`.
   - Método `seleccionarArea(area: AdmissionArea)`: delega al use case + actualiza signal + llama `dispatcher.notificarCambio(sessionId)` (mismo hook que `marcarRespuesta`) para que el draft-auto-save persista el cambio.
-  - Mockup de referencia visual: `.authentic/lugia_restyle/index.html`, tab "Cartilla 3 · área".
+  - Mockup de referencia visual: `.authentic/lugia_restyle/index.html`, tab "Cartilla 3 · área". (El folder mantiene el nombre `lugia_restyle/` — es un path físico legacy.)
 
 **Sin cambio en:** `credentials.interceptor`, `EnvioRetryDispatcher`, `DraftAutoSaveDispatcher` (el dispatcher es agnóstico al contenido del snapshot; solo escucha `notificarCambio` y envía lo que el use case arme), `Exam.area` (curso — sigue viniendo del back tal cual), infra de retomar envíos pendientes.
 

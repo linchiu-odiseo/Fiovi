@@ -474,7 +474,7 @@ describe('HomePage', () => {
     });
 
     // 14.4 — tap en el banner → modal abierto con título exacto.
-    it('tap en el banner abre el modal con título "Actualizar Lugia"', async () => {
+    it('tap en el banner abre el modal con título "Actualizar Fiovi"', async () => {
       fakePwa.pendingUpdate.set({ available: true, fromVersion: '1.0.0', toVersion: '1.1.0' });
       const fixture = await mountHome();
       const el = fixture.nativeElement as HTMLElement;
@@ -485,7 +485,7 @@ describe('HomePage', () => {
       // así que lo buscamos en el host de la fixture.
       const host = fixture.debugElement.nativeElement as HTMLElement;
       const title = host.querySelector('[role="dialog"] .modal__title');
-      expect(title?.textContent).toContain('Actualizar Lugia');
+      expect(title?.textContent).toContain('Actualizar Fiovi');
     });
 
     // 14.5 — modal muestra versiones reales en los slots correspondientes.
@@ -574,13 +574,13 @@ describe('HomePage', () => {
       expect(forbidden.test(text)).toBe(false);
     });
 
-    // 14.10 — version-footer presente con el copy literal "Lugia · versión X.Y.Z".
-    it('renderiza el footer de versión con copy literal "Lugia · versión {appVersion}"', async () => {
+    // 14.10 — version-footer presente con el copy literal "Fiovi · versión X.Y.Z".
+    it('renderiza el footer de versión con copy literal "Fiovi · versión {appVersion}"', async () => {
       const fixture = await mountHome();
       const el = fixture.nativeElement as HTMLElement;
       const footer = el.querySelector('.version-footer');
       expect(footer).not.toBeNull();
-      expect(footer?.textContent?.trim()).toBe(`Lugia · versión ${environment.appVersion}`);
+      expect(footer?.textContent?.trim()).toBe(`Fiovi · versión ${environment.appVersion}`);
     });
   });
 });

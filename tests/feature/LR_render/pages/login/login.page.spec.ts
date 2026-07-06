@@ -211,7 +211,7 @@ describe('LoginPage', () => {
       const el = fixture.nativeElement as HTMLElement;
       const footer = el.querySelector('.version-footer');
       expect(footer).not.toBeNull();
-      expect(footer?.textContent?.trim()).toBe(`Lugia · versión ${environment.appVersion}`);
+      expect(footer?.textContent?.trim()).toBe(`Fiovi · versión ${environment.appVersion}`);
     });
 
     // 15.2 — El footer sigue visible aún con un error de form activo
@@ -234,7 +234,7 @@ describe('LoginPage', () => {
       // Y que el footer no fue desplazado/ocultado por el banner.
       const footer = el.querySelector('.version-footer');
       expect(footer).not.toBeNull();
-      expect(footer?.textContent?.trim()).toBe(`Lugia · versión ${environment.appVersion}`);
+      expect(footer?.textContent?.trim()).toBe(`Fiovi · versión ${environment.appVersion}`);
     });
   });
 });
