@@ -26,7 +26,7 @@ import { Identity } from '../../../../src/L1_domain/entities/identity';
 import { SubmissionAck } from '../../../../src/L1_domain/value-objects/submission-ack';
 import { OfflineStorageUnavailableError } from '../../../../src/L1_domain/errors/offline-storage-unavailable.error';
 
-const DB_NAME = 'lugia-cartilla';
+const DB_NAME = 'fiovi-cartilla';
 const STORE = 'data';
 
 // Hash sha256 válido para construir SubmissionAck en tests.

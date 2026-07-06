@@ -19,7 +19,7 @@ import { IndexedDbProfileStorage } from '../../../../src/L3_periphery/storage/in
 import { StudentProfile } from '../../../../src/L1_domain/value-objects/student-profile';
 import { TutorProfile } from '../../../../src/L1_domain/value-objects/tutor-profile';
 
-const DB_NAME = 'lugia-profile';
+const DB_NAME = 'fiovi-profile';
 const STORE = 'profile';
 
 const STUDENT: StudentProfile = {

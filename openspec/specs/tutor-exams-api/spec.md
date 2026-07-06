@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the tutor-side API boundary for virtual exam management in Lugia. Exposes a hexagonal port `TutorExamsApi` (L1), 6 pure use-cases (L2), the HTTP adapter `HttpTutorExamsApi` with status-based error classification (L3), and the read-models / domain errors introduced by the `tutor-exam-management` change. The student `ExamsApi` port is untouched. All tutor actions are online-only (no outbox, no IndexedDB).
+Defines the tutor-side API boundary for virtual exam management in Fiovi. Exposes a hexagonal port `TutorExamsApi` (L1), 6 pure use-cases (L2), the HTTP adapter `HttpTutorExamsApi` with status-based error classification (L3), and the read-models / domain errors introduced by the `tutor-exam-management` change. The student `ExamsApi` port is untouched. All tutor actions are online-only (no outbox, no IndexedDB).
 
 ## Requirements
 

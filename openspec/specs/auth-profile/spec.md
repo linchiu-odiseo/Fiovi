@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Capability nueva. Define cómo Lugia obtiene y cachea el perfil del usuario autenticado (alumno o tutor) desde los endpoints `GET /t/{slug}/student/me` y `GET /t/{slug}/tutor/me` de learnex. El perfil aporta nombre, apellido, código (DNI para alumno, código interno para tutor) y datos específicos del rol (área para alumno, aulas para tutor). El cache en IndexedDB con TTL 24h evita fetches repetitivos durante la sesión.
+Capability nueva. Define cómo Fiovi obtiene y cachea el perfil del usuario autenticado (alumno o tutor) desde los endpoints `GET /t/{slug}/student/me` y `GET /t/{slug}/tutor/me` de learnex. El perfil aporta nombre, apellido, código (DNI para alumno, código interno para tutor) y datos específicos del rol (área para alumno, aulas para tutor). El cache en IndexedDB con TTL 24h evita fetches repetitivos durante la sesión.
 
 ## Requirements
 

@@ -11,7 +11,7 @@ import { SubmissionAck } from '../../L1_domain/value-objects/submission-ack';
 import { OfflineStorageUnavailableError } from '../../L1_domain/errors/offline-storage-unavailable.error';
 import { IDENTITY_STORAGE } from '../tokens';
 
-const DB_NAME = 'lugia-cartilla';
+const DB_NAME = 'fiovi-cartilla';
 const DB_VERSION = 1;
 const STORE = 'data';
 

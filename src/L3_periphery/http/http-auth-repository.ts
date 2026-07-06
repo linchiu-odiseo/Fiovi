@@ -14,7 +14,7 @@ import { SessionExpiredError } from '../../L1_domain/errors/session-expired.erro
 import { UnsupportedRoleError } from '../../L1_domain/errors/unsupported-role.error';
 import { apiPath } from './api-paths';
 
-// Roles que Lugia soporta hoy. Cualquier otro (admin, teacher, custom)
+// Roles que Fiovi soporta hoy. Cualquier otro (admin, teacher, custom)
 // que devuelva el back se rechaza en el mapper con UnsupportedRoleError.
 // Cuando se agregue soporte, ampliar este set y el tipo `Role` en L1.
 const SUPPORTED_ROLES: ReadonlySet<Role> = new Set(['student', 'tutor']);

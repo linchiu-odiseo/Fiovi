@@ -7,7 +7,7 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "lugia": {
+    "fiovi": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -71,10 +71,10 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "lugia:build:production"
+              "buildTarget": "fiovi:build:production"
             },
             "development": {
-              "buildTarget": "lugia:build:development"
+              "buildTarget": "fiovi:build:development"
             }
           },
           "defaultConfiguration": "development"

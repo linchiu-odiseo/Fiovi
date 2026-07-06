@@ -1,4 +1,4 @@
-# Lugia — guía para Claude Code
+# Fiovi — guía para Claude Code
 
 > Esta nota la lee Claude Code al arrancar en este repo. Resume el proyecto, el stack y las reglas para que cualquier sesión (humana o agente) pueda colaborar sin pedir contexto desde cero.
 >
@@ -6,7 +6,7 @@
 
 ## Qué es esto
 
-**Lugia** es una PWA Angular para móviles que sirve como **cartilla virtual de marcaciones** para simulacros (exámenes de práctica). El alumno marca las alternativas A–E por pregunta en pantalla; el enunciado viene impreso en una hoja física que entrega el profesor. Backend: **learnex** (NestJS + Postgres, multi-tenant) en Docker. Auth via cookies HttpOnly + `withCredentials: true`.
+**Fiovi** es una PWA Angular para móviles que sirve como **cartilla virtual de marcaciones** para simulacros (exámenes de práctica). El alumno marca las alternativas A–E por pregunta en pantalla; el enunciado viene impreso en una hoja física que entrega el profesor. Backend: **learnex** (NestJS + Postgres, multi-tenant) en Docker. Auth via cookies HttpOnly + `withCredentials: true`.
 
 **Estado actual (2026-06-20): Fase 3 completada. Sin change activo.**
 
@@ -36,7 +36,7 @@ Changes archivados a la fecha (en `openspec/changes/archive/`):
 ## Estructura del repo
 
 ```
-Lugia/
+Fiovi/
 ├── src/
 │   ├── L1_domain/          dominio puro (entidades, value-objects, ports, errores)
 │   ├── L2_application/     use cases puros

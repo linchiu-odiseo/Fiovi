@@ -5,7 +5,7 @@ import { StudentProfile } from '../../L1_domain/value-objects/student-profile';
 import { TutorProfile } from '../../L1_domain/value-objects/tutor-profile';
 import { OfflineStorageUnavailableError } from '../../L1_domain/errors/offline-storage-unavailable.error';
 
-const DB_NAME = 'lugia-profile';
+const DB_NAME = 'fiovi-profile';
 const DB_VERSION = 1;
 const STORE = 'profile';
 

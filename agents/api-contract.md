@@ -1,4 +1,4 @@
-# learnex — Contrato consumido por Lugia
+# learnex — Contrato consumido por Fiovi
 
 > **Fuente de verdad para subagentes** (`frontend-builder`, `test-engineer`).
 > Cualquier adapter en `src/L3_periphery/http/` debe cumplir este contrato.

@@ -139,7 +139,7 @@ Cuando `LoginUseCase` resuelve exitosamente, `LoginViewModel` SHALL navegar a `/
 
 ### Requirement: `LoginPage` muestra footer de versión `<app-version-footer>`
 
-`LoginPage` SHALL embeber el componente reutilizable `<app-version-footer>` (definido en la capability `pwa-shell-update`) como último child del contenedor principal de la página. El footer SHALL ser visible siempre, sin condicional de estado de auth. El componente leerá `environment.appVersion` y renderizará `"Lugia · versión {{ env.appVersion }}"` con estilo tenue (gris claro, ~11px, sin negrita, centrado).
+`LoginPage` SHALL embeber el componente reutilizable `<app-version-footer>` (definido en la capability `pwa-shell-update`) como último child del contenedor principal de la página. El footer SHALL ser visible siempre, sin condicional de estado de auth. El componente leerá `environment.appVersion` y renderizará `"Fiovi · versión {{ env.appVersion }}"` con estilo tenue (gris claro, ~11px, sin negrita, centrado).
 
 Razón: consistencia visual con `HomePage` (también muestra el footer) y necesidad operativa — el alumno preuniversitario puede tener problemas de login y reportar al soporte qué versión tiene SIN haber iniciado sesión.
 
@@ -148,7 +148,7 @@ Razón: consistencia visual con `HomePage` (también muestra el footer) y necesi
 - **GIVEN** la app fue cargada con `environment.appVersion === '1.1.0'`
 - **AND** el usuario no está autenticado y ve `LoginPage`
 - **WHEN** se renderiza la página
-- **THEN** el DOM SHALL contener `<app-version-footer>` con texto `"Lugia · versión 1.1.0"`
+- **THEN** el DOM SHALL contener `<app-version-footer>` con texto `"Fiovi · versión 1.1.0"`
 
 #### Scenario: Footer presente en login con error
 

@@ -1,5 +1,5 @@
 // Tests del adapter L3 `LocalStorageIdentityStorage` — persistencia de
-// `Identity` bajo la key `lugia.identity`. Reemplaza al viejo
+// `Identity` bajo la key `fiovi.identity`. Reemplaza al viejo
 // `LocalStorageSessionStorage`.
 //
 // Cubre los scenarios del spec `session-storage`:
@@ -16,7 +16,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { LocalStorageIdentityStorage } from '../../../../src/L3_periphery/storage/local-storage-identity-storage';
 import { Identity } from '../../../../src/L1_domain/entities/identity';
 
-const STORAGE_KEY = 'lugia.identity';
+const STORAGE_KEY = 'fiovi.identity';
 const LEGACY_KEY = 'lugia.session';
 
 const VALID_PERSISTED = {
@@ -62,7 +62,7 @@ describe('LocalStorageIdentityStorage', () => {
       expect(restored?.role()).toBe('student');
     });
 
-    it('usa la clave exacta `lugia.identity`', async () => {
+    it('usa la clave exacta `fiovi.identity`', async () => {
       const identity = new Identity(
         'id',
         'tenant',
@@ -152,7 +152,7 @@ describe('LocalStorageIdentityStorage', () => {
         JSON.stringify({ bearerToken: '6|legacy', userEmail: 'old@panda.test' }),
       );
       // El storage nuevo ni lee ni toca esa key — sólo devuelve null porque
-      // `lugia.identity` no existe.
+      // `fiovi.identity` no existe.
       expect(await storage.read()).toBeNull();
       // Y la key legacy NO la tocamos (puede seguir ahí, no es nuestro problema).
       expect(localStorage.getItem(LEGACY_KEY)).not.toBeNull();

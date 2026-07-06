@@ -4,7 +4,7 @@
 
 ### Requirement ELIMINADO: Persistencia de la sesión activa entre recargas (basada en `Session`)
 
-La entidad `Session` y la key `lugia.session` dejan de existir. Reemplazados por `Identity` y la key `lugia.identity`.
+La entidad `Session` y la key `lugia.session` dejan de existir. Reemplazados por `Identity` y la key `fiovi.identity`.
 
 ### Requirement ELIMINADO: Almacenamiento aislado tras `SessionStorage`
 
@@ -30,7 +30,7 @@ El sistema SHALL definir el puerto `IdentityStorage` en L1 con los métodos:
 - `write(identity: Identity) → Promise<void>`
 - `clear() → Promise<void>`
 
-La implementación concreta (`LocalStorageIdentityStorage`) reside en L3 y usa la key `lugia.identity`. Ningún código en L1 o L2 SHALL referenciar `localStorage`, `sessionStorage`, `window` ni APIs equivalentes del navegador.
+La implementación concreta (`LocalStorageIdentityStorage`) reside en L3 y usa la key `fiovi.identity`. Ningún código en L1 o L2 SHALL referenciar `localStorage`, `sessionStorage`, `window` ni APIs equivalentes del navegador.
 
 #### Scenario: L1 y L2 no referencian APIs de browser
 
@@ -42,9 +42,9 @@ La implementación concreta (`LocalStorageIdentityStorage`) reside en L3 y usa l
 - **WHEN** se inspecciona el código de `LR_render/`
 - **THEN** cualquier acceso a la identity se hace inyectando `IdentityStorage` o use cases que lo orquestan
 
-### Requirement: `LocalStorageIdentityStorage` — key `lugia.identity`, shape `Identity`
+### Requirement: `LocalStorageIdentityStorage` — key `fiovi.identity`, shape `Identity`
 
-La implementación SHALL serializar `Identity` como JSON bajo la key exacta `lugia.identity`. Al leer:
+La implementación SHALL serializar `Identity` como JSON bajo la key exacta `fiovi.identity`. Al leer:
 
 1. Si la key no existe → devolver `null`.
 2. Si el JSON no se puede parsear → devolver `null` y eliminar la key.
@@ -58,31 +58,31 @@ La implementación SHALL serializar `Identity` como JSON bajo la key exacta `lug
 
 #### Scenario: Storage vacío devuelve null
 
-- **WHEN** `localStorage` no contiene la key `lugia.identity`
+- **WHEN** `localStorage` no contiene la key `fiovi.identity`
 - **THEN** `identityStorage.read()` devuelve `null`
 
 #### Scenario: JSON corrupto — null y limpieza
 
-- **WHEN** la key `lugia.identity` contiene texto no parseable como JSON
+- **WHEN** la key `fiovi.identity` contiene texto no parseable como JSON
 - **THEN** `identityStorage.read()` devuelve `null`
-- **AND** la key `lugia.identity` es eliminada del storage
+- **AND** la key `fiovi.identity` es eliminada del storage
 
 #### Scenario: Shape inválido — null y limpieza
 
-- **WHEN** la key `lugia.identity` contiene JSON válido pero sin `roles`, `expiresAt` u otros campos requeridos de `Identity`
+- **WHEN** la key `fiovi.identity` contiene JSON válido pero sin `roles`, `expiresAt` u otros campos requeridos de `Identity`
 - **THEN** `identityStorage.read()` devuelve `null`
-- **AND** la key `lugia.identity` es eliminada del storage
+- **AND** la key `fiovi.identity` es eliminada del storage
 
 #### Scenario: Key legacy `lugia.session` es ignorada
 
-- **WHEN** `localStorage` contiene la key `lugia.session` (dato de Fase 1/2) pero no `lugia.identity`
+- **WHEN** `localStorage` contiene la key `lugia.session` (dato de Fase 1/2) pero no `fiovi.identity`
 - **THEN** `identityStorage.read()` devuelve `null`
 - **AND** la key `lugia.session` NO es leída, migrada ni eliminada por este storage
 
-#### Scenario: Logout limpia `lugia.identity`
+#### Scenario: Logout limpia `fiovi.identity`
 
 - **WHEN** `identityStorage.clear()` es invocado
-- **THEN** la key `lugia.identity` es eliminada del storage
+- **THEN** la key `fiovi.identity` es eliminada del storage
 - **AND** `identityStorage.read()` devuelve `null` después
 
 ### Requirement: Puerto `ProfileStorage` en L1
