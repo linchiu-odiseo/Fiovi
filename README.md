@@ -1,6 +1,4 @@
-<h1 align="center">
-  <img src="public/img/lugia-banner.svg" alt="lugia" />
-</h1>
+<h1 align="center">Fiovi</h1>
 
 PWA Angular mobile-first: **cartilla virtual de marcaciones para simulacros** (exámenes de práctica). El alumno marca alternativas A–E por pregunta en pantalla; el enunciado viene impreso en una hoja física. Backend: **learnex** (NestJS + Postgres, multi-tenant) con auth por cookies HttpOnly.
 
