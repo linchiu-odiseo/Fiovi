@@ -74,4 +74,4 @@ La implementación del sistema de tokens SHALL ser CSS+SCSS puro. NO SHALL agreg
 #### Scenario: `angular.json` sin cambios en build pipeline
 
 - **WHEN** se compara `angular.json` antes y después del change
-- **THEN** la configuración de `styles`, `assets` y build options para el target `build` queda equivalente excepto por la entrada de `public/img/lugia.png` como asset (que también puede entrar implícito por `public/`)
+- **THEN** la configuración de `styles`, `assets` y build options para el target `build` queda equivalente excepto por la entrada de `public/img/fiovi.png` como asset (que también puede entrar implícito por `public/`)
