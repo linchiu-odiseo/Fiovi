@@ -98,28 +98,3 @@ Rationale: mantener el use case puro (single-responsibility: valida y persiste, 
 ### D8: Orden fijo de las keys del body — `code, admission_area, responses[, client_finished_at]`
 
 **Chosen.** El adapter construye el objeto literal en ese orden. El test de body match usa `JSON.stringify` y compara con string literal para asegurar orden.
-
-Alternativas: no fijar orden y comparar sólo por igualdad estructural en tests.
-
-Rationale: el usuario pidió explícitamente ese orden. En JSON el orden de keys no cambia el parseo del back (JSON.parse es orden-agnóstico), pero afecta legibilidad de logs y del `submission_hash` si el back lo computa sobre `JSON.stringify` sin canonicalización. Mejor fijarlo y testearlo.
-
-## Risks / Trade-offs
-
-| Riesgo | Prob | Mitigación |
-|---|---|---|
-| Alumno pierde caché o cambia de dispositivo → pierde selección; próximo draft manda `GENERAL` | Med | Aceptado. Mismo trade-off que las marcaciones. Documentado en proposal y design.md. |
-| Back no aceptó todavía el nuevo campo cuando merge la PWA → 400 `InvalidPayloadError` en producción | Baja | Regla operativa: **merge del PWA es posterior al deploy del back**. Sin flag. Confirmación humana en el handoff. |
-| Reviewer humano/agente confunde `Exam.area` (curso) con `admissionArea` (postulación) | Med | Naming distinto en L1 (D1), sección "Terminología" en proposal.md, memoria del proyecto `project_area-vs-postulation-area`, comentario inline en el VO. |
-| El componente picker rompe layout si el ancho de pantalla es <320px | Baja | Grid rígido 6-col con font-size 13px es holgado hasta 320px. Testeable con Chrome DevTools mobile presets. Fuera del scope del test suite. |
-| Interacción entre long-press del picker y long-press de las marcaciones (dos filas en la misma vista) | Baja | El servicio de long-press ya coordina "solo una fila en editing a la vez" (`exam-marking` spec, requirement "Solo una fila puede estar en edición"). El picker se trata como una fila más para el servicio. Test unitario del servicio ya cubre esta lógica. |
-| El dispatcher despacha un draft cada vez que el alumno cambia de área (podría spamear) | Baja | El dispatcher tiene debounce 3s + throttle 10s por sessionId (D3 del diseño de `draft-auto-save`). Cambiar de área 10 veces en 5s produce 1 solo POST con el snapshot final. No hace falta lógica adicional. |
-
-## Migration Plan
-
-1. Back deploya contrato aceptando `admission_area` en body de `/draft` y `/submit`, con enum cerrado en zod y `INVALID_ADMISSION_AREA` como `message` en 400.
-2. Frontend mergea el PR. Cero migración de datos: IDB agrega un campo por `examId`; ausencia = `GENERAL` resuelto en el use case.
-3. Rollback: `git revert` del merge commit. El change es aditivo — no hay estado a limpiar en IDB (los alumnos que hayan elegido área verán la fila desaparecer en la próxima carga; sus marcaciones no se afectan).
-
-## Open Questions
-
-Ninguna crítica al momento de escribir este design. Los tres puntos que estaban abiertos (naming del campo, obligatoriedad, ámbito) fueron cerrados en la conversación previa al proposal: `admission_area`, opcional con default `GENERAL`, por examen (no cross-exam ni cross-device).

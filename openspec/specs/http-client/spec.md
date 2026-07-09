@@ -66,7 +66,7 @@ Si la URL de la request original contiene `/auth/` (ej. `/auth/login`, `/auth/re
 
 ### Requirement: Clasificación de errores HTTP por `(status, endpoint, code)` — prohibido leer `message`
 
-El adapter SHALL clasificar errores HTTP usando exclusivamente `(status, endpoint, code)` donde `code` es el campo estructurado del response body (ej. `TENANT_AUTH_INVALID_CREDENTIALS`). El campo `message` del body es volátil, i18n del back, y SHALL ser ignorado para clasificación.
+El adapter SHALL clasificar errores HTTP usando exclusivamente `(status, endpoint, code)` donde `code` es el campo estructurado del response body (ej. `TENANT_AUTH_INVALID_CREDENTIALS`). El campo `message` del body es volátil, i18n del back, y SHALL ser ignorado para clasificación. Una excepción acotada y documentada aplica al endpoint `POST /student/exam-sessions/<id>/submit` (ver requirement "Excepción documentada a la regla 'nunca leer message'").
 
 | Status | Endpoint | `code` en body | Error de dominio |
 |---|---|---|---|
@@ -179,7 +179,8 @@ El adapter `HttpExamsApi.enviar` SHALL clasificar errores HTTP del endpoint `POS
 
 | Status | body.message | Error de dominio |
 |---|---|---|
-| 400 | (cualquiera) | `InvalidPayloadError` |
+| 400 | `INVALID_ADMISSION_AREA` | `InvalidAdmissionAreaError` |
+| 400 | otros / ausente | `InvalidPayloadError` |
 | 401 | (cualquiera) | manejado por `credentials.interceptor` (refresh + retry) |
 | 403 | `STUDENT_NOT_ENROLLED` | `StudentNotEnrolledError` |
 | 403 | `STUDENT_MISMATCH` | `NetworkError` (genérico, sin clase dedicada) |
@@ -193,6 +194,16 @@ El adapter `HttpExamsApi.enviar` SHALL clasificar errores HTTP del endpoint `POS
 | 429 | (cualquiera) | `NetworkError` |
 | 5xx | (cualquiera) | `NetworkError` |
 | 0 / transporte | — | `NetworkError` |
+
+#### Scenario: 400 INVALID_ADMISSION_AREA → InvalidAdmissionAreaError
+
+- **WHEN** POST submit responde 400 con `body: { message: "INVALID_ADMISSION_AREA" }`
+- **THEN** `enviar()` rechaza con `InvalidAdmissionAreaError`
+
+#### Scenario: 400 con message fuera del enum → InvalidPayloadError
+
+- **WHEN** POST submit responde 400 con `body: { message: "UNKNOWN" }` o sin body
+- **THEN** `enviar()` rechaza con `InvalidPayloadError`
 
 #### Scenario: 403 STUDENT_NOT_ENROLLED → StudentNotEnrolledError
 
@@ -222,7 +233,7 @@ El adapter `HttpExamsApi.enviar` SHALL clasificar errores HTTP del endpoint `POS
 
 ### Requirement: Excepción documentada a la regla "nunca leer message"
 
-La regla del proyecto "clasificar exclusivamente por `(status, endpoint, code)`" SHALL admitir una excepción acotada y enumerada para el endpoint `POST /student/exam-sessions/<id>/submit`: el adapter PUEDE leer `body.message` y compararlo por **igualdad estricta** contra el set cerrado `{"STUDENT_NOT_ENROLLED", "STUDENT_MISMATCH", "SESSION_NOT_ACTIVE", "CLOCK_SKEW_BEFORE_START", "CLOCK_SKEW_TOO_FAR_FUTURE"}`. Cualquier otro valor de `message` SHALL ser ignorado y la clasificación SHALL caer al default por status.
+La regla del proyecto "clasificar exclusivamente por `(status, endpoint, code)`" SHALL admitir una excepción acotada y enumerada para el endpoint `POST /student/exam-sessions/<id>/submit`: el adapter PUEDE leer `body.message` y compararlo por **igualdad estricta** contra el set cerrado `{"INVALID_ADMISSION_AREA", "STUDENT_NOT_ENROLLED", "STUDENT_MISMATCH", "SESSION_NOT_ACTIVE", "CLOCK_SKEW_BEFORE_START", "CLOCK_SKEW_TOO_FAR_FUTURE"}`. Cualquier otro valor de `message` SHALL ser ignorado y la clasificación SHALL caer al default por status.
 
 Razón: el back de learnex emite estos valores como código de control en mayúsculas snake_case, no como i18n humano. Son contrato explícito acordado en el handoff. La regla original ("nunca leer message") busca proteger contra acoplamiento a texto i18n; los valores acá no son i18n. La excepción está acotada — un comentario inline en el adapter referencia este Requirement.
 

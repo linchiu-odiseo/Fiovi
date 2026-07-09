@@ -73,3 +73,5 @@ Auto-generado por `.claude/hooks/log-agent-usage.ps1` en cada PostToolUse del to
 | 2026-07-05 09:31:17 | frontend-builder | AdmissionAreaPicker + view-model wiring | opus-4-7 | 109,229 | -- | -- | $0.2780 |
 | 2026-07-05 09:39:00 | test-engineer | Tests LR picker + view-model wiring | opus-4-7 | 116,712 | -- | -- | $0.3138 |
 | 2026-07-05 09:42:26 | hexagonal-guard | Auditar boundaries del change | opus-4-7 | 87,297 | -- | -- | $0.4711 |
+| 2026-07-08 22:16:38 | sdd-verify | Verify add-admission-area change | opus-4-7 | 122,915 | -- | -- | $0.2914 |
+| 2026-07-08 22:23:19 | sdd-archive | Archive add-admission-area change | opus-4-7 | 114,060 | -- | -- | $0.2591 |

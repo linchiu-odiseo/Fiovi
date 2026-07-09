@@ -1,7 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute } from '@angular/router';
-import { signal } from '@angular/core';
 import { TutorExamDetailViewModel } from '../../../../src/LR_render/view-models/tutor-exam-detail.view-model';
 import { TutorExamsStore } from '../../../../src/LR_render/state/tutor-exams.store';
 import { GetTutorExamsUseCase } from '../../../../src/L2_application/use-cases/get-tutor-exams.use-case';
@@ -17,8 +16,6 @@ import { ExamServerStatus } from '../../../../src/L1_domain/value-objects/exam-s
 import { NetworkError } from '../../../../src/L1_domain/errors/network.error';
 import { ExamConflictError } from '../../../../src/L1_domain/errors/exam-conflict.error';
 import { ExamPreconditionError } from '../../../../src/L1_domain/errors/exam-precondition.error';
-import { VirtualExamNotFoundError } from '../../../../src/L1_domain/errors/virtual-exam-not-found.error';
-import { TutorExamForbiddenError } from '../../../../src/L1_domain/errors/tutor-exam-forbidden.error';
 import { FinalizeResult } from '../../../../src/L1_domain/ports/tutor-exams-api';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────

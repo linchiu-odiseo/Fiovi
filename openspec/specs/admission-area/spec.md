@@ -1,9 +1,9 @@
-# Delta for admission-area
+# admission-area Specification
 
-> Esta capability es **NUEVA**. Todos los requirements debajo son ADDED.
-> Al archivar este change, este delta se promueve a `openspec/specs/admission-area/spec.md`.
+## Purpose
+Allows students to select their admission area (the career they are applying to) in the exam marking interface. The selection is persisted locally and transmitted with draft progress snapshots and exam submissions.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: `AdmissionArea` VO cerrado de 16 valores en L1
 
