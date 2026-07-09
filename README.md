@@ -1,4 +1,6 @@
-<h1 align="center">Fiovi</h1>
+<h1 align="center">
+  <img src="public/img/banner_fiovi.svg" alt="lugia" />
+</h1>
 
 PWA Angular mobile-first: **cartilla virtual de marcaciones para simulacros** (exámenes de práctica). El alumno marca alternativas A–E por pregunta en pantalla; el enunciado viene impreso en una hoja física. Backend: **learnex** (NestJS + Postgres, multi-tenant) con auth por cookies HttpOnly.
 
@@ -37,12 +39,6 @@ npm run dev
 # Abre http://localhost:4200/login
 ```
 
-**Credenciales seed de dev** (válidas mientras learnex esté con seed de Vonex):
-
-| Rol     | Email                       | Password   |
-| ------- | --------------------------- | ---------- |
-| Alumno  | `79507732@vonex.edu.pe`     | `79507732` |
-| Tutor   | `tutor1@vonex.pe`           | `tutor123` |
 
 ## Comandos
 
