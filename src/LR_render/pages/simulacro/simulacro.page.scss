@@ -362,3 +362,30 @@
     }
   }
 }
+
+// FAB dev-only para marcar aleatoriamente. Fixed bottom-right, por encima del
+// footer sticky. Sin token de color: el borde punteado señala "esto no es UI
+// de producción".
+.dev-fab {
+  position: fixed;
+  right: var(--space-lg);
+  bottom: calc(env(safe-area-inset-bottom, 0) + var(--space-lg));
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  border: 2px dashed var(--color-outline-variant);
+  background: var(--color-surface);
+  color: var(--color-on-surface);
+  font-size: 1.5rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 20;
+  box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.15);
+
+  &:active {
+    transform: scale(0.95);
+  }
+}
