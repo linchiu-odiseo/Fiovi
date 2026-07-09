@@ -2,6 +2,7 @@ import { Component, DestroyRef, ElementRef, inject, signal, viewChild } from '@a
 import { Router } from '@angular/router';
 import { LogoutUseCase } from '../../../L2_application/use-cases/logout.use-case';
 import { PwaUpdateService } from '../../../L3_periphery/pwa/pwa-update.service';
+import { environment } from '../../../environments/environment';
 import { UpdateBannerComponent } from '../../components/update-banner/update-banner.component';
 import { UpdateConfirmModalComponent } from '../../components/update-confirm-modal/update-confirm-modal.component';
 import { VersionFooterComponent } from '../../components/version-footer/version-footer.component';
@@ -29,6 +30,10 @@ export class HomePage {
 
   protected readonly isSigningOut = signal(false);
   protected readonly showConfirmModal = signal(false);
+  // Atajo a la ruta dev `/demo-sheet`. Gate por `environment.devTools` (flag
+  // `DEV_TOOLS` en `.env`). En un build de prod con `DEV_TOOLS=false` el
+  // template no lo renderiza.
+  protected readonly isDevTools = environment.devTools;
 
   // Estado del pull-to-refresh — todo visual; el dispatch del refresh ocurre
   // en touchend cuando se cruza el threshold.
@@ -60,6 +65,10 @@ export class HomePage {
     if (!card.clickable) return;
     if (this.vm.offlineStorageBlocked()) return;
     void this.router.navigate(['/simulacro', card.id]);
+  }
+
+  protected onDemoSheetClick(): void {
+    void this.router.navigate(['/demo-sheet']);
   }
 
   protected retry(): void {
