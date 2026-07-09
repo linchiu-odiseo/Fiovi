@@ -75,3 +75,13 @@ Auto-generado por `.claude/hooks/log-agent-usage.ps1` en cada PostToolUse del to
 | 2026-07-05 09:42:26 | hexagonal-guard | Auditar boundaries del change | opus-4-7 | 87,297 | -- | -- | $0.4711 |
 | 2026-07-08 22:16:38 | sdd-verify | Verify add-admission-area change | opus-4-7 | 122,915 | -- | -- | $0.2914 |
 | 2026-07-08 22:23:19 | sdd-archive | Archive add-admission-area change | opus-4-7 | 114,060 | -- | -- | $0.2591 |
+| 2026-07-09 09:56:37 | sdd-explore | Explore tutor restyle | opus-4-7 | 61,757 | -- | -- | $0.4414 |
+| 2026-07-09 10:00:22 | Explore | Locate cartilla marking flow | opus-4-7 | 34,056 | -- | -- | $0.1537 |
+| 2026-07-09 10:03:59 | sdd-propose | Propose restyle-tutor-pages | opus-4-7 | 41,516 | -- | -- | $0.2512 |
+| 2026-07-09 10:08:02 | sdd-spec | Spec restyle-tutor-pages | opus-4-7 | 39,958 | -- | -- | $0.1752 |
+| 2026-07-09 10:11:46 | sdd-design | Design restyle-tutor-pages | opus-4-7 | 43,500 | -- | -- | $0.2836 |
+| 2026-07-09 10:14:09 | Explore | Locate student home page header | opus-4-7 | 26,790 | -- | -- | $0.1254 |
+| 2026-07-09 10:15:09 | sdd-tasks | Tasks restyle-tutor-pages | opus-4-7 | 50,082 | -- | -- | $0.2289 |
+| 2026-07-09 11:14:21 | hexagonal-guard | Guard tutor restyle boundaries | opus-4-7 | 80,675 | -- | -- | $0.3845 |
+| 2026-07-09 11:26:33 | sdd-verify | Verify restyle-tutor-pages | opus-4-7 | 82,864 | -- | -- | $0.2246 |
+| 2026-07-09 11:36:08 | sdd-archive | Archive restyle-tutor-pages | opus-4-7 | 96,763 | -- | -- | $0.2819 |
