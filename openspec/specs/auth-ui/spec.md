@@ -185,3 +185,72 @@ Sigue vigente. Se extiende para incluir todos los textos nuevos: saludo del tuto
 - **WHEN** se inspeccionan los templates de `StudentHomePage` y `TutorHomePage`
 - **THEN** todos los textos visibles están en español (es-PE)
 - **AND** no se usan claves de i18n ni `$localize`
+
+---
+
+## ADDED Requirements — Google SSO Login (2026-07-09-add-google-sso-login)
+
+### Requirement: Botón "Continuar con Google" en LoginPage
+
+`LoginPage` SHALL renderizar un botón "Continuar con Google" con `data-testid="btn-google-sso"` arriba del formulario email/password cuando `environment.googleSsoEnabled === true` (default). Cuando el flag está `false`, el botón NOT SHALL aparecer en el DOM.
+
+Al clickear el botón, la página SHALL invocar `window.location.assign()` con la URL:
+
+```
+${environment.apiBaseUrl}/t/${environment.tenantSlug}/auth/google/start?app=pwa&returnTo=%2F
+```
+
+El parámetro `app=pwa` SHALL estar siempre presente (contrato con backend learnex: identifica a Fiovi como frontend destino; el backend redirige a `WEB_PWA_BASE_URL` post-callback en vez de a `WEB_TENANT_BASE_URL`). El `returnTo=/` SHALL delegar la ruta final al `AppInitializer` según role.
+
+El backend maneja el resto del flujo OAuth (state HMAC, callback, cookies HttpOnly). Fiovi solo dispara `/start` y espera el retorno con cookies seteadas por el interceptor `withCredentials: true`.
+
+#### Scenario: Botón visible por default
+
+- **GIVEN** `environment.googleSsoEnabled === true`
+- **WHEN** `LoginPage` renderiza
+- **THEN** existe `[data-testid="btn-google-sso"]` con texto `"Continuar con Google"`
+
+#### Scenario: Click dispara redirect al backend
+
+- **GIVEN** el botón es visible
+- **WHEN** el usuario clickea
+- **THEN** `window.location.assign` es invocado con `${apiBaseUrl}/t/${tenantSlug}/auth/google/start?app=pwa&returnTo=%2F`
+
+### Requirement: Mapeo de códigos SSO a mensajes es-PE
+
+`LoginPage` SHALL leer `?ssoError=<code>` del `ActivatedRoute.snapshot.queryParams` al montar (`ngOnInit`). Cuando el código está presente, SHALL setear un mensaje es-PE en `LoginViewModel.errorMessage()` según el mapeo definido por el contrato con backend learnex:
+
+| Código | Mensaje es-PE |
+|---|---|
+| `sso_disabled` | El login con Google no está disponible para tu institución. |
+| `google_error` | Google no autorizó tu ingreso. Intentá de nuevo. |
+| `missing_params` | Hubo un problema con Google. Intentá de nuevo. |
+| `state_invalid` | La sesión de login venció. Intentá de nuevo. |
+| `hosted_domain_mismatch` | Solo podés ingresar con tu correo institucional. |
+| `email_not_verified` | Tu correo de Google no está verificado. |
+| `user_not_found` | Tu cuenta de Google no está registrada. Contactá a tu tutor. |
+| `unknown` | No se pudo iniciar sesión con Google. Intentá de nuevo. |
+
+Cualquier código no reconocido SHALL usar el mensaje de `unknown` como fallback. Si el query param está ausente, el `errorMessage()` no se modifica.
+
+El helper `mapSsoErrorToMessage(code)` SHALL vivir en el page component `LoginPage`, no en el view-model — es traducción es-PE + presentación pura (mismo criterio que `statusLabel()` en tutor).
+
+El mensaje SHALL renderizarse en el mismo slot `<p class="error">` que ya usa `vm.errorMessage()` para errores de submit — sin agregar banner adicional.
+
+#### Scenario: Cada código conocido produce el mensaje esperado
+
+- **GIVEN** la URL es `/login?ssoError=<X>` para cada X en {sso_disabled, google_error, missing_params, state_invalid, hosted_domain_mismatch, email_not_verified, user_not_found, unknown}
+- **WHEN** `LoginPage` monta
+- **THEN** el elemento `.error` contiene el mensaje es-PE correspondiente
+
+#### Scenario: Código desconocido cae al fallback unknown
+
+- **GIVEN** la URL es `/login?ssoError=weird_new_code`
+- **WHEN** `LoginPage` monta
+- **THEN** el elemento `.error` contiene `"No se pudo iniciar sesión con Google. Intentá de nuevo."`
+
+#### Scenario: Sin ssoError, sin banner de error
+
+- **GIVEN** la URL es `/login` sin query params
+- **WHEN** `LoginPage` monta
+- **THEN** el elemento `.error` NO existe en el DOM
