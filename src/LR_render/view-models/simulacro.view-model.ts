@@ -397,6 +397,35 @@ export class SimulacroPageViewModel {
     this.exitEditing();
   }
 
+  // DEV-ONLY: sobreescribe todas las marcaciones con una elección aleatoria
+  // en {A, B, C, D, E, vacío} uniforme (1/6 c/u). Salta el guard `locked` de
+  // `marcar()` a propósito — la protección contra cambios accidentales no
+  // aplica a una acción explícita del desarrollador. La UI solo expone el
+  // botón cuando `environment.devTools` (flag `DEV_TOOLS` en `.env`) es true.
+  async marcarAleatorio(): Promise<void> {
+    if (this.stopped) return;
+    const e = this.exam();
+    if (e === null) return;
+    if (!this.vigente()) return;
+
+    const opciones: readonly AlternativaValue[] = ['A', 'B', 'C', 'D', 'E', null];
+    const nuevoMap: AnswersMap = {};
+
+    for (const pregunta of this.preguntas()) {
+      const proxima = opciones[Math.floor(Math.random() * opciones.length)] ?? null;
+      await this.marcarRespuesta.execute({
+        examId: e.id,
+        pregunta,
+        alternativa: Alternativa.fromString(proxima),
+      });
+      nuevoMap[String(pregunta)] = proxima;
+    }
+
+    this.marcaciones.set(nuevoMap);
+    this.draftDispatcher.notificarCambio(this.sessionId, e.count);
+    this.exitEditing();
+  }
+
   // Persiste el área de POSTULACIÓN elegida por el alumno en el picker,
   // actualiza el signal y notifica al dispatcher — mismo hook que post-
   // `marcarRespuesta` (design.md D7 de add-admission-area). El use case

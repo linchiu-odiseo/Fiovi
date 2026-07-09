@@ -20,7 +20,19 @@
 
   @if (vm.userEmail(); as e) {
     <header class="home__header">
-      <p class="home__welcome">Bienvenido</p>
+      <div class="home__welcome-row">
+        <p class="home__welcome">Bienvenido</p>
+        @if (isDevTools) {
+          <button
+            type="button"
+            class="demo-sheet-link"
+            (click)="onDemoSheetClick()"
+            aria-label="Ir a Demo sheet"
+          >
+            Demo sheet
+          </button>
+        }
+      </div>
       <h1 class="home__title">Hola, {{ vm.userName() ?? e }}</h1>
       <ul class="user-info">
         <li class="user-info__row">

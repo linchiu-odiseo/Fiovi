@@ -2,6 +2,7 @@ import { Component, DestroyRef, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { TutorExamDetailViewModel } from '../../view-models/tutor-exam-detail.view-model';
 import { ClassroomStudent } from '../../../L1_domain/value-objects/classroom-student';
+import { ExamServerStatusValue } from '../../../L1_domain/value-objects/exam-server-status';
 
 // Pantalla de gestión del examen virtual del tutor (/tutor/exams/:recordId).
 // El VM se provee localmente — cada montaje arranca limpio la secuencia D1.
@@ -31,6 +32,22 @@ export class TutorExamDetailPage {
   // del sistema para volver. NO usar history.back().
   onVolver(): void {
     void this.router.navigate(['/tutor/home']);
+  }
+
+  // Mapa de estado del backend → chip visible en la UI. Mismo patrón que
+  // `statusLabel(exam)` en el listado. Vive en el page component (no en el
+  // VM) porque es puramente presentación es-PE + clase CSS: no es orquestación
+  // ni dominio, y colocarlo en L2/VM crearía un DTO de presentación que
+  // rompería la separación de capas.
+  protected statusChip(status: ExamServerStatusValue): { label: string; modifier: string } {
+    switch (status) {
+      case 'scheduled':
+        return { label: 'Programado', modifier: 'scheduled' };
+      case 'in_progress':
+        return { label: 'En curso', modifier: 'in-progress' };
+      case 'finalized':
+        return { label: 'Finalizado', modifier: 'finalized' };
+    }
   }
 
   // Proxy a vm para que el template acceda a los guards sin llamar vm.vm.canIniciar().

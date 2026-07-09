@@ -1,20 +1,21 @@
+// Estilos de la demo sheet. Duplican deliberadamente las reglas de
+// simulacro.page.scss porque Angular scopea los estilos al componente y no
+// hay partial compartido; mantener las dos copias en sync manual es aceptable
+// mientras la demo permanezca dev-only y visualmente idéntica al real.
+
 :host {
   display: block;
   min-height: 100dvh;
   background: var(--color-bg);
   color: var(--color-on-surface);
-  // El padding-top se mueve al `.header` para que el sticky se pegue al
-  // borde superior real de la viewport sin un gap visible.
   padding: 0 var(--space-lg) var(--space-lg);
   box-sizing: border-box;
   font-family: var(--font-body);
 }
 
-.simulacro {
+.demo-sheet {
   max-width: 28rem;
   margin: 0 auto;
-  // Sin padding-block-start: el header se encarga del espacio superior y
-  // del sticky. Mantiene el padding inferior original.
   padding-block: 0 var(--space-md);
   display: flex;
   flex-direction: column;
@@ -30,8 +31,6 @@
   gap: var(--space-sm);
   padding-block: var(--space-lg) 0.9rem;
   border-bottom: 1px solid var(--color-outline-variant);
-  // Fijo en el top mientras el alumno scrolea la grilla. El background
-  // opaco evita que las filas de abajo se vean por transparencia.
   position: sticky;
   top: 0;
   z-index: 10;
@@ -41,11 +40,9 @@
     display: flex;
     flex-direction: column;
     gap: 0.15rem;
-    min-width: 0; // permite truncar __name si es muy largo
+    min-width: 0;
   }
 
-  // Label-caps del DS: 12 px / 700 / letter-spacing 0.05em. Indica curso /
-  // área arriba del título.
   &__area {
     margin: 0;
     font-size: 0.75rem;
@@ -64,9 +61,19 @@
     font-weight: 600;
     color: var(--color-on-surface);
     letter-spacing: -0.01em;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  }
+
+  &__pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.55rem;
+    border-radius: var(--radius-pill);
+    border: 1px dashed var(--color-outline-variant);
+    color: var(--color-on-surface-variant);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    flex-shrink: 0;
   }
 
   &__countdown {
@@ -78,8 +85,6 @@
     text-align: right;
   }
 
-  // Mini label-caps "Cierra a las HH:MM" — letter-spacing más ancho que el
-  // label-caps estándar para sensación de monitoreo/cronómetro.
   &__cierre {
     font-size: 0.6875rem;
     text-transform: uppercase;
@@ -88,9 +93,6 @@
     font-weight: 600;
   }
 
-  // Dígitos del countdown en JetBrains Mono — clave del DS: todo dato
-  // técnico (timers, ids, números de pregunta) usa la mono para enfatizar
-  // precisión y evitar saltos de ancho al cambiar el segundero.
   &__restante {
     font-family: var(--font-mono);
     font-size: 1rem;
@@ -100,20 +102,31 @@
   }
 }
 
+.simulacro-banner {
+  padding: 0.75rem 0.9rem;
+  margin-top: var(--space-md);
+  border-radius: var(--radius);
+  background: var(--color-warning-container);
+  border: 1px solid var(--color-warning);
+  color: var(--color-on-warning-container);
+
+  &__msg {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--color-on-warning-container);
+    line-height: 1.4;
+    text-align: center;
+  }
+}
+
 .grilla {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
-  // Le damos al scroll de la grilla un poco de respiro extra abajo para que
-  // la última pregunta no quede pegada al footer.
   padding-bottom: var(--space-xs);
 
-  // Estado no vigente (banner "café" o "tiempo agotado" arriba): las
-  // burbujas se atenúan visualmente y los clicks no aplican. Las marcas
-  // previas siguen visibles. El guard real vive en el view-model
-  // (`vigente()` en `marcar()`); pointer-events: none es defensa en
-  // profundidad — evita que el alumno espere reacción ante un tap muerto.
   &--disabled {
     opacity: 0.55;
     pointer-events: none;
@@ -121,7 +134,7 @@
 }
 
 .fila {
-  position: relative; // ancla del .row__chip absolute en --editing
+  position: relative;
   display: grid;
   grid-template-columns: 2.25rem 1fr;
   align-items: center;
@@ -131,16 +144,11 @@
   background: var(--color-surface-container-lowest);
   border: 1px solid var(--color-outline-variant);
   font-variant-numeric: tabular-nums;
-  // Transición suave entre estados locked/editing para que el cambio de
-  // protección se sienta intencional y no como un flash.
   transition:
     border-color 180ms ease,
     background 180ms ease,
     box-shadow 180ms ease;
 
-  // Número de pregunta en JetBrains Mono — del DS: todo dato numérico
-  // estructural (preguntas, IDs, countdown) usa mono para estabilidad
-  // visual de la columna.
   &__numero {
     text-align: right;
     font-family: var(--font-mono);
@@ -155,18 +163,6 @@
     gap: 0.4rem;
   }
 
-  // Anti-cambio accidental: fila ya marcada → bloqueada. Visualmente queda
-  // como el estado default (la burbuja marcada es el indicador suficiente);
-  // la protección se descubre cuando el alumno activa long-press y entra
-  // a `editing`.
-  &--locked {
-    // sin overrides — comportamiento default ya cubre.
-  }
-
-  // Modo edición activado por long-press. Borde de acento + tonal layer
-  // para que el alumno sepa que esta fila acepta cambios ahora mismo.
-  // Auto-cierra a los 5s o al aplicar el cambio. El chip "Toca para
-  // cambiar" lo renderiza la regla .row__chip más abajo.
   &--editing {
     border-color: var(--color-primary);
     background: rgb(0 36 83 / 0.04);
@@ -174,10 +170,6 @@
   }
 }
 
-// Chip flotante "Toca para cambiar" — reemplaza el toast one-shot inicial
-// y el hint inline debajo de las bubbles. Se ancla absolute en la esquina
-// superior derecha de la fila editing, comunicando la acción cada vez que
-// el gesto se completa (no es one-shot por sesión).
 .row__chip {
   position: absolute;
   top: -10px;
@@ -204,7 +196,6 @@
 
 .bubble {
   flex: 1;
-  // Targets táctiles cómodos: ~44px de altura efectiva en móvil.
   min-height: 2.6rem;
   padding: 0.4rem 0;
   border-radius: var(--radius-pill);
@@ -216,7 +207,6 @@
   letter-spacing: 0.04em;
   cursor: pointer;
   user-select: none;
-  // Evita el delay de 300ms en touch y el highlight gris de tap en móvil.
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
   transition:
@@ -238,85 +228,6 @@
     background: var(--color-primary);
     border-color: var(--color-primary);
     color: var(--color-on-primary);
-  }
-}
-
-.loading {
-  margin: 0;
-  color: var(--color-on-surface-variant);
-  text-align: center;
-  padding-top: var(--space-xl);
-}
-
-// Banner amarillo del header del simulacro. Se usa para dos estados
-// no-vigentes: `examenNoIniciado` ("tomando un café") y
-// `examenTiempoCumplido` ("tiempo agotado"). Ambos comparten estilo:
-// fondo warning + texto centrado + entrar/salir vía @if del template.
-.simulacro-banner {
-  padding: 0.75rem 0.9rem;
-  margin-top: var(--space-md);
-  border-radius: var(--radius);
-  background: var(--color-warning-container);
-  border: 1px solid var(--color-warning);
-  color: var(--color-on-warning-container);
-
-  &__msg {
-    margin: 0;
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: var(--color-on-warning-container);
-    line-height: 1.4;
-    text-align: center;
-  }
-}
-
-.queued-banner {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  padding: 0.75rem 0.9rem;
-  border-radius: var(--radius);
-  background: var(--color-warning-container);
-  border: 1px solid var(--color-warning);
-  color: var(--color-on-warning-container);
-
-  &__icon {
-    color: var(--color-warning);
-    font-size: 0.7rem;
-    line-height: 1;
-    // Pulso sutil para reforzar que algo está esperando red.
-    animation: queued-pulse 1.6s ease-in-out infinite;
-  }
-
-  &__copy {
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-    min-width: 0;
-  }
-
-  &__title {
-    margin: 0;
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--color-on-warning-container);
-  }
-
-  &__detail {
-    margin: 0;
-    font-size: 0.8rem;
-    color: var(--color-on-warning-container);
-    line-height: 1.3;
-  }
-}
-
-@keyframes queued-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.35;
   }
 }
 
@@ -363,9 +274,6 @@
   }
 }
 
-// FAB dev-only para marcar aleatoriamente. Fixed bottom-right, por encima del
-// footer sticky. Sin token de color: el borde punteado señala "esto no es UI
-// de producción".
 .dev-fab {
   position: fixed;
   right: var(--space-lg);
