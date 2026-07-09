@@ -62,6 +62,14 @@ if (missing.length) {
 // (ausente, 'false', '0') queda en false.
 const draftEnabled = (env['DRAFT_ENABLED'] ?? '').toLowerCase() === 'true';
 
+// DEV_TOOLS: habilita atajos de UI solo útiles para desarrollo (ej. botón dado
+// en la cartilla que marca aleatoriamente, atajo "Cartilla prueba" en /home).
+// Misma coerción que DRAFT_ENABLED: solo 'true' activa; ausente o cualquier otro
+// valor queda en false. Se inyecta en ambos environment.ts para que la señal
+// sobreviva a builds prod si alguien quiere hacer un smoke test con las herramientas
+// activas — pero en el build de release corresponde dejar DEV_TOOLS=false en .env.
+const devTools = (env['DEV_TOOLS'] ?? '').toLowerCase() === 'true';
+
 const envDir = resolve(repoRoot, 'src/environments');
 mkdirSync(envDir, { recursive: true });
 
@@ -83,6 +91,7 @@ writeFileSync(
     `  tenantSlug: ${tenantSlug},\n` +
     `  appVersion: ${appVersion},\n` +
     `  draftEnabled: ${draftEnabled},\n` +
+    `  devTools: ${devTools},\n` +
     `};\n`,
 );
 
@@ -94,6 +103,7 @@ writeFileSync(
     `  tenantSlug: ${tenantSlug},\n` +
     `  appVersion: ${appVersion},\n` +
     `  draftEnabled: ${draftEnabled},\n` +
+    `  devTools: ${devTools},\n` +
     `};\n`,
 );
 
