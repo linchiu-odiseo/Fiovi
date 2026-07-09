@@ -70,6 +70,16 @@ const draftEnabled = (env['DRAFT_ENABLED'] ?? '').toLowerCase() === 'true';
 // activas — pero en el build de release corresponde dejar DEV_TOOLS=false en .env.
 const devTools = (env['DEV_TOOLS'] ?? '').toLowerCase() === 'true';
 
+// GOOGLE_SSO_ENABLED: controla la visibilidad del botón "Continuar con Google"
+// en /login. A diferencia de DRAFT_ENABLED y DEV_TOOLS, este flag es opt-out:
+// el default (ausente en .env) es true — el botón se ve. Solo el string
+// literal 'false' (case-insensitive) lo apaga. Motivo: en dev, prod y todos
+// los ambientes normales queremos el botón visible; el flag existe para poder
+// desactivarlo puntualmente si el backend learnex de un ambiente no soporta
+// aún el flujo `?app=pwa` + `WEB_PWA_BASE_URL` y queremos evitar exponer un
+// botón que redirige mal.
+const googleSsoEnabled = (env['GOOGLE_SSO_ENABLED'] ?? 'true').toLowerCase() !== 'false';
+
 const envDir = resolve(repoRoot, 'src/environments');
 mkdirSync(envDir, { recursive: true });
 
@@ -92,6 +102,7 @@ writeFileSync(
     `  appVersion: ${appVersion},\n` +
     `  draftEnabled: ${draftEnabled},\n` +
     `  devTools: ${devTools},\n` +
+    `  googleSsoEnabled: ${googleSsoEnabled},\n` +
     `};\n`,
 );
 
@@ -104,6 +115,7 @@ writeFileSync(
     `  appVersion: ${appVersion},\n` +
     `  draftEnabled: ${draftEnabled},\n` +
     `  devTools: ${devTools},\n` +
+    `  googleSsoEnabled: ${googleSsoEnabled},\n` +
     `};\n`,
 );
 
