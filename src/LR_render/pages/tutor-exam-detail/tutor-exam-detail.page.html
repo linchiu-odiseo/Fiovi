@@ -8,26 +8,17 @@
       data-testid="btn-volver"
       (click)="onVolver()"
     >
-      ← Volver
+      <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+      Volver
     </button>
   </nav>
 
   <!-- Error de carga (D3 online-only) -->
   @if (vm.error()) {
-    <section
-      class="tutor-exam-detail__error"
-      role="alert"
-      data-testid="error-banner"
-    >
+    <section class="tutor-exam-detail__error" role="alert" data-testid="error-banner">
       @if (vm.error() === 'network') {
         <p>Sin conexión. Revisá tu red y reintentá.</p>
-        <button
-          type="button"
-          data-testid="btn-retry"
-          (click)="onRetry()"
-        >
-          Reintentar
-        </button>
+        <button type="button" data-testid="btn-retry" (click)="onRetry()">Reintentar</button>
       } @else if (vm.error() === 'notFound') {
         <p>Este examen ya no está disponible.</p>
       } @else if (vm.error() === 'forbidden') {
@@ -45,9 +36,14 @@
 
   <!-- Contenido principal (disponible tras carga exitosa) -->
   @if (vm.detail(); as detail) {
+    @let sc = statusChip(detail.status.value);
     <header class="tutor-exam-detail__header">
       <h1 class="tutor-exam-detail__name">{{ detail.name }}</h1>
-      <span class="tutor-exam-detail__status">{{ detail.status.value }}</span>
+      <span
+        class="tutor-exam-detail__status-chip tutor-exam-detail__status-chip--{{ sc.modifier }}"
+        data-testid="status-chip"
+        >{{ sc.label }}</span
+      >
     </header>
 
     <!-- Error de acción (iniciar / finalizar / habilitar) -->

@@ -22,16 +22,16 @@
   } @else {
     <section class="profile-card" data-testid="profile-card">
       <h1 class="tutor-exams-list__greeting">Hola, {{ vm.userName() }}</h1>
-      <dl class="profile-meta">
-        <div class="profile-meta__row">
-          <dt>Email</dt>
-          <dd>{{ vm.profileEmail() ?? vm.userEmail() }}</dd>
-        </div>
-        <div class="profile-meta__row">
-          <dt>DNI / Código</dt>
-          <dd class="profile-meta__mono">{{ vm.userCode() }}</dd>
-        </div>
-      </dl>
+      <ul class="user-info">
+        <li>
+          <span class="material-symbols-outlined" aria-hidden="true">mail</span>
+          <span>{{ vm.profileEmail() ?? vm.userEmail() }}</span>
+        </li>
+        <li>
+          <span class="material-symbols-outlined" aria-hidden="true">badge</span>
+          <span class="user-info__mono">{{ vm.userCode() }}</span>
+        </li>
+      </ul>
     </section>
 
     <!-- Mis aulas -->
@@ -46,9 +46,7 @@
             <li class="classroom-item" data-testid="classroom-item">
               <span class="classroom-item__name">{{ aula.name }}</span>
               <span class="classroom-item__cycle">{{ aula.cycleName }}</span>
-              <span class="classroom-item__meta">
-                {{ aula.modality }} · {{ aula.shift }}
-              </span>
+              <span class="classroom-item__meta"> {{ aula.modality }} · {{ aula.shift }} </span>
               <span class="classroom-item__students">{{ aula.studentCount }} alumnos</span>
             </li>
           }
@@ -82,12 +80,16 @@
       @for (exam of vm.exams(); track exam.recordId) {
         <li
           class="exam-card"
+          [class.exam-card--scheduled]="exam.serverStatus.value === 'scheduled'"
+          [class.exam-card--in-progress]="exam.serverStatus.value === 'in_progress'"
+          [class.exam-card--finalized]="exam.serverStatus.value === 'finalized'"
           data-testid="exam-card"
           (click)="onExamCardClick(exam)"
           (keydown.enter)="onExamCardClick(exam)"
           role="button"
           tabindex="0"
         >
+          <span class="exam-card__strip" aria-hidden="true"></span>
           <div class="exam-card__header">
             <h3 class="exam-card__name">{{ exam.name }}</h3>
             <span class="exam-card__status-badge" data-testid="status-badge">
@@ -96,9 +98,6 @@
           </div>
           <div class="exam-card__meta">
             <span class="exam-card__count">{{ countDisplay(exam) }} preguntas</span>
-            @if (exam.courseId) {
-              <span class="exam-card__course">{{ exam.courseId }}</span>
-            }
             <span class="exam-card__duration">{{ exam.duration }} min</span>
           </div>
         </li>
