@@ -85,3 +85,4 @@ Auto-generado por `.claude/hooks/log-agent-usage.ps1` en cada PostToolUse del to
 | 2026-07-09 11:14:21 | hexagonal-guard | Guard tutor restyle boundaries | opus-4-7 | 80,675 | -- | -- | $0.3845 |
 | 2026-07-09 11:26:33 | sdd-verify | Verify restyle-tutor-pages | opus-4-7 | 82,864 | -- | -- | $0.2246 |
 | 2026-07-09 11:36:08 | sdd-archive | Archive restyle-tutor-pages | opus-4-7 | 96,763 | -- | -- | $0.2819 |
+| 2026-07-09 12:46:30 | hexagonal-guard | Guard google-sso change | opus-4-7 | 35,397 | -- | -- | $0.1617 |
