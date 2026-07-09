@@ -47,6 +47,14 @@ export const routes: Routes = [
         (m) => m.TutorExamDetailPage,
       ),
   },
+  // Ruta dev-only: cartilla mock 100% en memoria, sin back ni auth. La visibilidad
+  // del atajo desde /home está gated por `environment.devTools`; la ruta en sí no
+  // tiene guard porque también sirve como demo pública si se comparte el link.
+  {
+    path: 'demo-sheet',
+    loadComponent: () =>
+      import('./pages/demo-sheet/demo-sheet.page').then((m) => m.DemoSheetPage),
+  },
   // Redirects legacy para bookmarks / instalaciones PWA existentes.
   { path: 'home', pathMatch: 'full', redirectTo: '/student/home' },
   { path: 'simulacro/:id', redirectTo: '/student/simulacro/:id' },

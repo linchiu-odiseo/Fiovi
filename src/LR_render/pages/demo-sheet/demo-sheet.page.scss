@@ -1,0 +1,299 @@
+// Estilos de la demo sheet. Duplican deliberadamente las reglas de
+// simulacro.page.scss porque Angular scopea los estilos al componente y no
+// hay partial compartido; mantener las dos copias en sync manual es aceptable
+// mientras la demo permanezca dev-only y visualmente idéntica al real.
+
+:host {
+  display: block;
+  min-height: 100dvh;
+  background: var(--color-bg);
+  color: var(--color-on-surface);
+  padding: 0 var(--space-lg) var(--space-lg);
+  box-sizing: border-box;
+  font-family: var(--font-body);
+}
+
+.demo-sheet {
+  max-width: 28rem;
+  margin: 0 auto;
+  padding-block: 0 var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-height: 100dvh;
+  box-sizing: border-box;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding-block: var(--space-lg) 0.9rem;
+  border-bottom: 1px solid var(--color-outline-variant);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--color-bg);
+
+  &__meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+  }
+
+  &__area {
+    margin: 0;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--color-on-surface-variant);
+  }
+
+  &__name {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1rem;
+    line-height: 1.25;
+    font-weight: 600;
+    color: var(--color-on-surface);
+    letter-spacing: -0.01em;
+  }
+
+  &__pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.55rem;
+    border-radius: var(--radius-pill);
+    border: 1px dashed var(--color-outline-variant);
+    color: var(--color-on-surface-variant);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    flex-shrink: 0;
+  }
+
+  &__countdown {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.1rem;
+    flex-shrink: 0;
+    text-align: right;
+  }
+
+  &__cierre {
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-on-surface-variant);
+    font-weight: 600;
+  }
+
+  &__restante {
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-primary);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.simulacro-banner {
+  padding: 0.75rem 0.9rem;
+  margin-top: var(--space-md);
+  border-radius: var(--radius);
+  background: var(--color-warning-container);
+  border: 1px solid var(--color-warning);
+  color: var(--color-on-warning-container);
+
+  &__msg {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--color-on-warning-container);
+    line-height: 1.4;
+    text-align: center;
+  }
+}
+
+.grilla {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding-bottom: var(--space-xs);
+
+  &--disabled {
+    opacity: 0.55;
+    pointer-events: none;
+  }
+}
+
+.fila {
+  position: relative;
+  display: grid;
+  grid-template-columns: 2.25rem 1fr;
+  align-items: center;
+  gap: 0.6rem;
+  padding: var(--space-xs) 0.6rem;
+  border-radius: var(--radius);
+  background: var(--color-surface-container-lowest);
+  border: 1px solid var(--color-outline-variant);
+  font-variant-numeric: tabular-nums;
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
+
+  &__numero {
+    text-align: right;
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    color: var(--color-on-surface-variant);
+    font-weight: 600;
+  }
+
+  &__bubbles {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.4rem;
+  }
+
+  &--editing {
+    border-color: var(--color-primary);
+    background: rgb(0 36 83 / 0.04);
+    box-shadow: 0 0 0 2px rgb(0 36 83 / 0.12);
+  }
+}
+
+.row__chip {
+  position: absolute;
+  top: -10px;
+  right: var(--space-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px var(--space-xs);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  border-radius: var(--radius-pill);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+
+  .material-symbols-outlined {
+    font-size: 0.75rem;
+    line-height: 1;
+  }
+}
+
+.bubble {
+  flex: 1;
+  min-height: 2.6rem;
+  padding: 0.4rem 0;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--color-outline-variant);
+  background: var(--color-surface-container-lowest);
+  color: var(--color-on-surface);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  user-select: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background 100ms ease,
+    border-color 100ms ease,
+    color 100ms ease,
+    transform 60ms ease;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  &:active {
+    transform: scale(0.96);
+  }
+
+  &--marked {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-on-primary);
+  }
+}
+
+.footer {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  padding-top: var(--space-xs);
+  border-top: 1px solid var(--color-outline-variant);
+}
+
+.btn {
+  width: 100%;
+  padding: 0.85rem var(--space-md);
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    opacity 120ms ease;
+
+  &--secondary {
+    background: transparent;
+    border: 1px solid var(--color-outline-variant);
+    color: var(--color-on-surface-variant);
+
+    &:hover {
+      background: var(--color-surface-container-low);
+      border-color: var(--color-primary);
+    }
+  }
+
+  &--primary {
+    background: var(--color-primary);
+    border: 1px solid var(--color-primary);
+    color: var(--color-on-primary);
+
+    &:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.dev-fab {
+  position: fixed;
+  right: var(--space-lg);
+  bottom: calc(env(safe-area-inset-bottom, 0) + var(--space-lg));
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  border: 2px dashed var(--color-outline-variant);
+  background: var(--color-surface);
+  color: var(--color-on-surface);
+  font-size: 1.5rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 20;
+  box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.15);
+
+  &:active {
+    transform: scale(0.95);
+  }
+}
