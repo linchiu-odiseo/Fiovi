@@ -40,6 +40,22 @@ export const routes: Routes = [
       import('./pages/tutor-exams-list/tutor-exams-list.page').then((m) => m.TutorExamsListPage),
   },
   {
+    path: 'tutor/aulas/:classroomId',
+    canActivate: [authGuard, roleGuard('tutor')],
+    loadComponent: () =>
+      import('./pages/tutor-aula-courses/tutor-aula-courses.page').then(
+        (m) => m.TutorAulaCoursesPage,
+      ),
+  },
+  {
+    path: 'tutor/aulas/:classroomId/curso/:course',
+    canActivate: [authGuard, roleGuard('tutor')],
+    loadComponent: () =>
+      import('./pages/tutor-aula-course-exams/tutor-aula-course-exams.page').then(
+        (m) => m.TutorAulaCourseExamsPage,
+      ),
+  },
+  {
     path: 'tutor/exams/:recordId',
     canActivate: [authGuard, roleGuard('tutor')],
     loadComponent: () =>

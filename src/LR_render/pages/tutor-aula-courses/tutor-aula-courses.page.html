@@ -1,0 +1,68 @@
+<main class="tutor-aula-courses">
+  <nav class="tutor-aula-courses__nav">
+    <button
+      type="button"
+      class="tutor-aula-courses__btn-volver"
+      data-testid="btn-volver"
+      (click)="onVolver()"
+    >
+      <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+      Volver
+    </button>
+  </nav>
+
+  <header class="tutor-aula-courses__header">
+    <p class="tutor-aula-courses__kicker">Aula</p>
+    <h1 class="tutor-aula-courses__title">
+      {{ vm.classroomName() ?? 'Aula sin nombre' }}
+    </h1>
+  </header>
+
+  @if (vm.loading()) {
+    <section class="tutor-aula-courses__loading" aria-busy="true">
+      <p>Cargando cursos…</p>
+    </section>
+  } @else if (vm.error() === 'network') {
+    <section class="tutor-aula-courses__error" role="alert">
+      <p>Sin conexión. Revisá tu red y reintentá.</p>
+      <button type="button" data-testid="btn-retry" (click)="onRetry()">Reintentar</button>
+    </section>
+  } @else if (vm.error() === 'notFound') {
+    <section class="tutor-aula-courses__error" role="alert">
+      <p>No encontramos esta aula en tu perfil.</p>
+    </section>
+  } @else {
+    <section class="tutor-aula-courses__section">
+      <h2 class="section-title">Cursos</h2>
+      @if (vm.hasCourses()) {
+        <ul class="tutor-aula-courses__list" data-testid="courses-list">
+          @for (course of vm.courses(); track course.name) {
+            <li
+              class="course-card"
+              data-testid="course-card"
+              (click)="onCourseClick(course)"
+              (keydown.enter)="onCourseClick(course)"
+              role="button"
+              tabindex="0"
+            >
+              <span class="course-card__strip" aria-hidden="true"></span>
+              <div class="course-card__body">
+                <h3 class="course-card__name">{{ course.name }}</h3>
+                <p class="course-card__meta">
+                  {{ course.examCount }} {{ course.examCount === 1 ? 'examen' : 'exámenes' }}
+                </p>
+              </div>
+              <span class="material-symbols-outlined course-card__chevron" aria-hidden="true">
+                chevron_right
+              </span>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="tutor-aula-courses__empty" data-testid="courses-empty">
+          Esta aula todavía no tiene exámenes.
+        </p>
+      }
+    </section>
+  }
+</main>
