@@ -1,0 +1,129 @@
+.tutor-aula-courses {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  max-width: 32rem;
+  margin: 0 auto;
+
+  &__nav {
+    display: flex;
+  }
+
+  &__btn-volver {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    appearance: none;
+    background: transparent;
+    border: none;
+    color: var(--color-on-surface-variant);
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  &__header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  &__kicker {
+    margin: 0;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-on-surface-variant);
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--color-on-surface);
+  }
+
+  &__loading,
+  &__error,
+  &__empty {
+    padding: var(--space-md);
+    text-align: center;
+    color: var(--color-on-surface-variant);
+    font-size: 0.9rem;
+  }
+
+  &__error button {
+    margin-top: var(--space-sm);
+    appearance: none;
+    border: 1px solid var(--color-outline);
+    background: transparent;
+    padding: 0.45rem 1rem;
+    border-radius: var(--radius-sm);
+    color: var(--color-on-surface);
+    cursor: pointer;
+  }
+
+  &__section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  &__list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+}
+
+.course-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-outline-variant);
+  background: var(--color-surface-container-lowest);
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary, #1a56db);
+    outline-offset: 2px;
+  }
+
+  &__strip {
+    width: 4px;
+    align-self: stretch;
+    border-radius: 4px;
+    background: var(--color-primary, #1a56db);
+  }
+
+  &__body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  &__name {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-on-surface);
+  }
+
+  &__meta {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--color-on-surface-variant);
+  }
+
+  &__chevron {
+    color: var(--color-on-surface-variant);
+  }
+}

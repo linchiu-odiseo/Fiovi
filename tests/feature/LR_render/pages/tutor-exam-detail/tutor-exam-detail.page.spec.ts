@@ -18,7 +18,8 @@ function buildDetail(
     recordId: 'rec-1',
     status: new ExamServerStatus('scheduled'),
     name: 'Examen de Matemáticas',
-    courseId: 'course-1',
+    course: 'Álgebra',
+    area: 'Matemáticas',
     count: 20,
     duration: 60,
     enabledStudentIds: ['s-1'],
@@ -53,14 +54,49 @@ class FakeTutorExamDetailViewModel {
   readonly enabledStudentIds: WritableSignal<readonly string[]> = signal([]);
   readonly isSaving: WritableSignal<boolean> = signal(false);
   readonly actionError: WritableSignal<string | null> = signal(null);
+  // Modal "editar duración antes de iniciar" con formato mm:ss.
+  readonly iniciarModalOpen: WritableSignal<boolean> = signal(false);
+  readonly pendingMinutes: WritableSignal<number | null> = signal(null);
+  readonly pendingSeconds: WritableSignal<number | null> = signal(null);
+  readonly durationError: WritableSignal<string | null> = signal(null);
+  readonly pendingTotalSeconds = () => {
+    const m = this.pendingMinutes();
+    const s = this.pendingSeconds();
+    if (m === null || s === null) return null;
+    return m * 60 + s;
+  };
+  // Modal "confirmar finalización antes de tiempo".
+  readonly finalizarModalOpen: WritableSignal<boolean> = signal(false);
+  // Contadores del panel de alumnos.
+  readonly enabledCount = () => this.enabledStudentIds().length;
+  readonly totalStudents = () => this.students().length;
 
   canIniciar = vi.fn().mockReturnValue(false);
   canFinalizar = vi.fn().mockReturnValue(false);
   isCheckboxDisabled = vi.fn().mockReturnValue(false);
 
+  openIniciarModal = vi.fn(() => {
+    this.iniciarModalOpen.set(true);
+  });
+  cancelIniciarModal = vi.fn(() => {
+    this.iniciarModalOpen.set(false);
+  });
+  confirmIniciarModal = vi.fn(async () => {
+    this.iniciarModalOpen.set(false);
+  });
+  openFinalizarModal = vi.fn(() => {
+    this.finalizarModalOpen.set(true);
+  });
+  cancelFinalizarModal = vi.fn(() => {
+    this.finalizarModalOpen.set(false);
+  });
+  confirmFinalizarModal = vi.fn(async () => {
+    this.finalizarModalOpen.set(false);
+  });
+
   async load(): Promise<void> { /* no-op */ }
   async retry(): Promise<void> { /* no-op */ }
-  async iniciar(): Promise<void> { /* no-op */ }
+  async iniciar(_newDuration?: number): Promise<void> { /* no-op */ }
   async finalizar(): Promise<void> { /* no-op */ }
   async toggleStudent(_studentId: string): Promise<void> { /* no-op */ }
 }

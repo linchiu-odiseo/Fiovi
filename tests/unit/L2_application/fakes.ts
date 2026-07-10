@@ -408,7 +408,11 @@ export class FakeTutorExamsApi implements TutorExamsApi {
     | { kind: 'resolve' }
     | { kind: 'reject'; error: Error }
     | null = null;
+  // `iniciarCalls` conserva la firma histórica (solo recordId) para no romper
+  // los tests existentes; `iniciarCallsFull` registra también el duration para
+  // los tests nuevos del override al iniciar.
   private iniciarCalls: string[] = [];
+  private iniciarCallsFull: { recordId: string; duration?: number }[] = [];
 
   willResolveIniciar(): void {
     this.nextIniciar = { kind: 'resolve' };
@@ -422,8 +426,13 @@ export class FakeTutorExamsApi implements TutorExamsApi {
     return this.iniciarCalls;
   }
 
-  async iniciar(recordId: string): Promise<void> {
+  getIniciarCallsFull(): readonly { recordId: string; duration?: number }[] {
+    return this.iniciarCallsFull;
+  }
+
+  async iniciar(recordId: string, duration?: number): Promise<void> {
     this.iniciarCalls.push(recordId);
+    this.iniciarCallsFull.push({ recordId, duration });
     if (!this.nextIniciar) {
       throw new Error('FakeTutorExamsApi: configurar willResolveIniciar o willRejectIniciar antes de llamar iniciar()');
     }

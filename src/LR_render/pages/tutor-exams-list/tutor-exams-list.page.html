@@ -34,79 +34,94 @@
       </ul>
     </section>
 
-    <!-- Mis aulas -->
-    <section class="stats-card" data-testid="classrooms-section">
+    <app-update-banner (tap)="onBannerTap()" />
+
+    <!-- Mis aulas: cards principales del home. Cada aula es la puerta de entrada
+         a la jerarquía Aula → Curso → Examen. -->
+    <section class="aulas-section" data-testid="classrooms-section">
       <h2 class="section-title">Mis aulas</h2>
       @if (vm.hasClassrooms()) {
-        <p class="stats-card__line" data-testid="classrooms-summary">
+        <p class="aulas-section__summary" data-testid="classrooms-summary">
           {{ vm.classroomCount() }} aulas · {{ vm.studentTotal() }} alumnos
         </p>
-        <ul class="classrooms-list">
+        <ul class="aulas-grid">
           @for (aula of vm.classrooms(); track aula.id) {
-            <li class="classroom-item" data-testid="classroom-item">
-              <span class="classroom-item__name">{{ aula.name }}</span>
-              <span class="classroom-item__cycle">{{ aula.cycleName }}</span>
-              <span class="classroom-item__meta"> {{ aula.modality }} · {{ aula.shift }} </span>
-              <span class="classroom-item__students">{{ aula.studentCount }} alumnos</span>
+            <li
+              class="aula-card"
+              data-testid="classroom-item"
+              (click)="onClassroomClick(aula.id)"
+              (keydown.enter)="onClassroomClick(aula.id)"
+              role="button"
+              tabindex="0"
+            >
+              <span class="aula-card__strip" aria-hidden="true"></span>
+              <div class="aula-card__body">
+                <h3 class="aula-card__name">{{ aula.name }}</h3>
+                <p class="aula-card__cycle">{{ aula.cycleName }}</p>
+                <p class="aula-card__meta">{{ aula.modality }} · {{ aula.shift }}</p>
+                <p class="aula-card__students">
+                  <span class="material-symbols-outlined" aria-hidden="true">group</span>
+                  {{ aula.studentCount }}
+                  {{ aula.studentCount === 1 ? 'alumno' : 'alumnos' }}
+                </p>
+              </div>
+              <span class="material-symbols-outlined aula-card__chevron" aria-hidden="true">
+                chevron_right
+              </span>
             </li>
           }
         </ul>
       } @else {
-        <p class="stats-card__empty" data-testid="classrooms-empty">
+        <p class="aulas-section__empty" data-testid="classrooms-empty">
           Aún no tenés aulas asignadas — contactá a tu administrador.
         </p>
       }
     </section>
   }
 
-  <!-- Exámenes -->
-  <section class="exams-section">
-    <h2 class="section-title">Exámenes</h2>
+  <!-- Exámenes en curso — solo los in_progress para acceso rápido; los
+       scheduled y finalized se ven adentro de cada aula/curso. -->
+  <section class="exams-in-progress-section" data-testid="exams-in-progress-section">
+    <h2 class="section-title">Exámenes en curso</h2>
 
     @if (vm.loading()) {
-      <section class="tutor-exams-list__loading" aria-busy="true">
-        <p>Cargando exámenes…</p>
-      </section>
-    }
-
-    @if (vm.error()) {
-      <section class="tutor-exams-list__error" role="alert">
+      <p class="exams-in-progress-section__loading" aria-busy="true">Cargando…</p>
+    } @else if (vm.error()) {
+      <div class="exams-in-progress-section__error" role="alert">
         <p>Sin conexión. Revisá tu red y reintentá.</p>
         <button type="button" (click)="vm.refresh()">Reintentar</button>
-      </section>
+      </div>
+    } @else if (!vm.hasExamsInProgress()) {
+      <p class="exams-in-progress-section__empty">No hay exámenes en curso ahora.</p>
+    } @else {
+      <ul class="tutor-exams-list__list" data-testid="exams-list">
+        @for (exam of vm.examsInProgress(); track exam.recordId) {
+          <li
+            class="exam-card exam-card--in-progress"
+            data-testid="exam-card"
+            (click)="onExamCardClick(exam)"
+            (keydown.enter)="onExamCardClick(exam)"
+            role="button"
+            tabindex="0"
+          >
+            <span class="exam-card__strip" aria-hidden="true"></span>
+            <div class="exam-card__header">
+              <h3 class="exam-card__name">{{ exam.name }}</h3>
+              <span class="exam-card__status-badge" data-testid="status-badge">
+                {{ statusLabel(exam) }}
+              </span>
+            </div>
+            <div class="exam-card__meta">
+              @if (exam.course) {
+                <span class="exam-card__course">{{ exam.course }}</span>
+              }
+              <span class="exam-card__count">{{ countDisplay(exam) }} preguntas</span>
+              <span class="exam-card__duration">{{ exam.durationInMinutes }} min</span>
+            </div>
+          </li>
+        }
+      </ul>
     }
-
-    <ul class="tutor-exams-list__list" data-testid="exams-list">
-      @for (exam of vm.exams(); track exam.recordId) {
-        <li
-          class="exam-card"
-          [class.exam-card--scheduled]="exam.serverStatus.value === 'scheduled'"
-          [class.exam-card--in-progress]="exam.serverStatus.value === 'in_progress'"
-          [class.exam-card--finalized]="exam.serverStatus.value === 'finalized'"
-          data-testid="exam-card"
-          (click)="onExamCardClick(exam)"
-          (keydown.enter)="onExamCardClick(exam)"
-          role="button"
-          tabindex="0"
-        >
-          <span class="exam-card__strip" aria-hidden="true"></span>
-          <div class="exam-card__header">
-            <h3 class="exam-card__name">{{ exam.name }}</h3>
-            <span class="exam-card__status-badge" data-testid="status-badge">
-              {{ statusLabel(exam) }}
-            </span>
-          </div>
-          <div class="exam-card__meta">
-            <span class="exam-card__count">{{ countDisplay(exam) }} preguntas</span>
-            <span class="exam-card__duration">{{ exam.duration }} min</span>
-          </div>
-        </li>
-      } @empty {
-        <li class="tutor-exams-list__empty">
-          <p>No tenés exámenes asignados.</p>
-        </li>
-      }
-    </ul>
   </section>
 
   <footer class="tutor-exams-list__footer">
@@ -123,4 +138,15 @@
       }
     </button>
   </footer>
+
+  <app-version-footer />
 </main>
+
+@if (showConfirmModal()) {
+  <app-update-confirm-modal
+    [fromVersion]="pwa.pendingUpdate().fromVersion"
+    [toVersion]="pwa.pendingUpdate().toVersion"
+    (dismiss)="onModalCancel()"
+    (accept)="onModalConfirm()"
+  />
+}

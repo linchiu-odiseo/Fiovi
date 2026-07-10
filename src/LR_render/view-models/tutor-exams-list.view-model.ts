@@ -49,6 +49,14 @@ export class TutorExamsListViewModel {
   );
   readonly hasClassrooms = computed(() => this.classrooms().length > 0);
 
+  // Solo exámenes en curso (in_progress). Los `scheduled` y `finalized` viven
+  // en la jerarquía Aula → Curso → Examen; acá el home resalta "qué está
+  // corriendo AHORA" para acceso rápido.
+  readonly examsInProgress = computed(() =>
+    this.exams().filter((e) => e.serverStatus.value === 'in_progress'),
+  );
+  readonly hasExamsInProgress = computed(() => this.examsInProgress().length > 0);
+
   // Logout
   readonly isSigningOut = signal(false);
 
@@ -119,22 +127,19 @@ export class TutorExamsListViewModel {
       this.profileEmail.set(profile.email);
       this.classrooms.set(profile.classrooms);
 
-      // Fallback email: usamos el del perfil; si no está disponible el
-      // GetIdentityUseCase provee el email de la identity (degraded state).
-      if (!this.userEmail()) {
+      // Email en el header: preferimos el del perfil. Cuando el `/me` viene
+      // con `email: null` (data-quality del back), caemos a Identity —
+      // que trae el email con el que el tutor inició sesión.
+      if (profile.email) {
         this.userEmail.set(profile.email);
+      } else {
+        await this.resolveEmailFromIdentity();
       }
     } catch (err) {
       if (err instanceof ProfileNotAvailableError) {
         // Tutor con identity válida pero sin fila en tutors — degradamos a email.
         this.profileUnavailable.set(true);
-        // Intentar obtener el email desde la identity para el estado degraded.
-        try {
-          const identity = await this.getIdentity.execute();
-          if (identity) this.userEmail.set(identity.email);
-        } catch {
-          // Si la identity tampoco está disponible, dejamos el email vacío.
-        }
+        await this.resolveEmailFromIdentity();
       } else if (err instanceof NetworkError) {
         // Sin perfil pero sesión OK — el header no muestra nombre.
       } else {
@@ -142,6 +147,16 @@ export class TutorExamsListViewModel {
       }
     } finally {
       this.profileLoading.set(false);
+    }
+  }
+
+  private async resolveEmailFromIdentity(): Promise<void> {
+    try {
+      const identity = await this.getIdentity.execute();
+      if (identity) this.userEmail.set(identity.email);
+    } catch {
+      // Identity tampoco disponible — dejamos el email vacío; el template
+      // usa @if para no renderizar la línea.
     }
   }
 

@@ -7,9 +7,25 @@ import { TutorExamsListViewModel } from '../../../../../src/LR_render/view-model
 import { TutorExam } from '../../../../../src/L1_domain/entities/tutor-exam';
 import { ExamServerStatus } from '../../../../../src/L1_domain/value-objects/exam-server-status';
 import { TutorClassroom } from '../../../../../src/L1_domain/value-objects/tutor-profile';
+import { PwaUpdateService } from '../../../../../src/L3_periphery/pwa/pwa-update.service';
+import { PendingUpdate } from '../../../../../src/L3_periphery/pwa/pwa-update.types';
+
+// Fake del PwaUpdateService consumido por el home tutor (UpdateBannerComponent +
+// modal). Espeja el patrón usado en home.page.spec.ts del alumno.
+class FakePwaUpdateService {
+  readonly pendingUpdate = signal<PendingUpdate>({
+    available: false,
+    fromVersion: '',
+    toVersion: '',
+  });
+  applyUpdate = vi.fn().mockResolvedValue(undefined);
+}
 
 @Component({ template: '' })
 class TutorExamDetailStub {}
+
+@Component({ template: '' })
+class TutorHomeStub {}
 
 function buildExam(
   recordId: string,
@@ -20,15 +36,15 @@ function buildExam(
     detailId: `det-${recordId}`,
     recordId,
     classroomId: 'cls-1',
-    entryId: 'entry-1',
     serverStatus: new ExamServerStatus(status),
     name: `Examen ${recordId}`,
-    courseId: 'course-1',
+    course: 'Álgebra',
+    area: 'Matemáticas',
     count: 20,
     duration: 60,
+    scheduled: new Date('2026-06-01T10:00:00Z'),
     startedAt: null,
     finishedAt: null,
-    createdAt: new Date('2026-06-01T10:00:00Z'),
     ...overrides,
   });
 }
@@ -75,6 +91,11 @@ class FakeTutorExamsListViewModel {
     this.classrooms().reduce((sum, c) => sum + c.studentCount, 0),
   );
   readonly hasClassrooms = computed(() => this.classrooms().length > 0);
+  // Filtro derivado que el home usa para su sección "Exámenes en curso".
+  readonly examsInProgress = computed(() =>
+    this.exams().filter((e) => e.serverStatus.value === 'in_progress'),
+  );
+  readonly hasExamsInProgress = computed(() => this.examsInProgress().length > 0);
   readonly isSigningOut: WritableSignal<boolean> = signal(false);
 
   signOutSpy = vi.fn().mockResolvedValue(undefined);
@@ -101,9 +122,11 @@ const flushPromises = async (iterations = 5): Promise<void> => {
 
 describe('TutorExamsListPage', () => {
   let fakeVm: FakeTutorExamsListViewModel;
+  let fakePwa: FakePwaUpdateService;
 
   beforeEach(async () => {
     fakeVm = new FakeTutorExamsListViewModel();
+    fakePwa = new FakePwaUpdateService();
 
     TestBed.resetTestingModule();
     await TestBed.configureTestingModule({
@@ -111,8 +134,14 @@ describe('TutorExamsListPage', () => {
       providers: [
         provideRouter([
           { path: 'tutor/exams/:recordId', component: TutorExamDetailStub },
-          { path: 'tutor/home', component: TutorExamsListPage },
+          // Placeholder para /tutor/home — la ruta real sería el propio page, pero
+          // referenciar el componente bajo test dentro de su propio Router puede
+          // disparar el auto-resolve de templateUrl antes de que TestBed complete
+          // compileComponents. Un stub evita ese círculo.
+          { path: 'tutor/home', component: TutorHomeStub },
+          { path: 'tutor/aulas/:classroomId', component: TutorHomeStub },
         ]),
+        { provide: PwaUpdateService, useValue: fakePwa },
       ],
     })
       // El page declara `providers: [TutorExamsListViewModel]` a nivel componente.
@@ -139,8 +168,11 @@ describe('TutorExamsListPage', () => {
     });
   });
 
-  describe('Scenario: Lista renderizada en el orden devuelto por el backend', () => {
-    it('renderiza una tarjeta por cada exam en orden', async () => {
+  describe('Scenario: Lista renderiza solo los in_progress', () => {
+    // El home tutor cambió: la lista "EXÁMENES" (todos los estados) se movió a
+    // la jerarquía Aula → Curso → Examen. Acá solo quedan los in_progress como
+    // acceso rápido a "qué está corriendo AHORA".
+    it('renderiza solo los exámenes en curso (scheduled y finalized quedan afuera)', async () => {
       const examA = buildExam('rec-A', 'scheduled');
       const examB = buildExam('rec-B', 'in_progress');
       const examC = buildExam('rec-C', 'finalized');
@@ -153,13 +185,15 @@ describe('TutorExamsListPage', () => {
 
       const el = fixture.nativeElement as HTMLElement;
       const cards = el.querySelectorAll('[data-testid="exam-card"]');
-      expect(cards).toHaveLength(3);
+      expect(cards).toHaveLength(1);
+      expect(cards[0].textContent).toContain('Examen rec-B');
     });
   });
 
   describe('Scenario: count null renderiza "—"', () => {
     it('count === null → la tarjeta muestra "—"', async () => {
-      const exam = buildExam('rec-1', 'scheduled', { count: null });
+      // Solo in_progress porque el home ya no muestra scheduled/finalized.
+      const exam = buildExam('rec-1', 'in_progress', { count: null });
       fakeVm.exams.set([exam]);
 
       const fixture = TestBed.createComponent(TutorExamsListPage);
@@ -172,20 +206,9 @@ describe('TutorExamsListPage', () => {
     });
   });
 
-  describe('Scenario: badges por estado', () => {
-    it('scheduled → badge muestra "Programado"', async () => {
-      fakeVm.exams.set([buildExam('rec-1', 'scheduled')]);
-
-      const fixture = TestBed.createComponent(TutorExamsListPage);
-      fixture.detectChanges();
-      await fixture.whenStable();
-      fixture.detectChanges();
-
-      const el = fixture.nativeElement as HTMLElement;
-      const badge = el.querySelector('[data-testid="status-badge"]');
-      expect(badge?.textContent?.trim()).toBe('Programado');
-    });
-
+  describe('Scenario: badge del único estado visible (in_progress)', () => {
+    // Los estados scheduled/finalized se ven adentro de la jerarquía Aula →
+    // Curso → Examen; el home tutor solo muestra "En curso".
     it('in_progress → badge muestra "En curso"', async () => {
       fakeVm.exams.set([buildExam('rec-1', 'in_progress')]);
 
@@ -199,8 +222,11 @@ describe('TutorExamsListPage', () => {
       expect(badge?.textContent?.trim()).toBe('En curso');
     });
 
-    it('finalized → badge muestra "Finalizado"', async () => {
-      fakeVm.exams.set([buildExam('rec-1', 'finalized')]);
+    it('los scheduled y finalized quedan fuera del home (no aparecen cards)', async () => {
+      fakeVm.exams.set([
+        buildExam('rec-s', 'scheduled'),
+        buildExam('rec-f', 'finalized'),
+      ]);
 
       const fixture = TestBed.createComponent(TutorExamsListPage);
       fixture.detectChanges();
@@ -208,14 +234,15 @@ describe('TutorExamsListPage', () => {
       fixture.detectChanges();
 
       const el = fixture.nativeElement as HTMLElement;
-      const badge = el.querySelector('[data-testid="status-badge"]');
-      expect(badge?.textContent?.trim()).toBe('Finalizado');
+      const cards = el.querySelectorAll('[data-testid="exam-card"]');
+      expect(cards).toHaveLength(0);
     });
   });
 
   describe('Scenario: Tap en tarjeta navega a /tutor/exams/:recordId', () => {
     it('click en una tarjeta con recordId="rec-1" → router navega a /tutor/exams/rec-1', async () => {
-      fakeVm.exams.set([buildExam('rec-1', 'scheduled')]);
+      // El home solo muestra in_progress, así que el card clickeable tiene ese estado.
+      fakeVm.exams.set([buildExam('rec-1', 'in_progress')]);
 
       const fixture = TestBed.createComponent(TutorExamsListPage);
       fixture.detectChanges();
@@ -436,7 +463,8 @@ describe('TutorExamsListPage', () => {
       fakeVm.userName.set('Carlos Mendoza');
       fakeVm.profileLoading.set(false);
       fakeVm.profileUnavailable.set(false);
-      fakeVm.exams.set([buildExam('rec-1', 'scheduled')]);
+      // Un examen in_progress para que el <ul data-testid="exams-list"> se renderice.
+      fakeVm.exams.set([buildExam('rec-1', 'in_progress')]);
 
       const fixture = TestBed.createComponent(TutorExamsListPage);
       fixture.detectChanges();
@@ -461,7 +489,7 @@ describe('TutorExamsListPage', () => {
       fakeVm.profileLoading.set(false);
       fakeVm.profileUnavailable.set(false);
       fakeVm.classrooms.set([CLASSROOM_A]);
-      fakeVm.exams.set([buildExam('rec-1', 'scheduled')]);
+      fakeVm.exams.set([buildExam('rec-1', 'in_progress')]);
 
       const fixture = TestBed.createComponent(TutorExamsListPage);
       fixture.detectChanges();

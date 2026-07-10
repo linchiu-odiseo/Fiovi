@@ -14,21 +14,22 @@ import { environment } from '../../../../src/environments/environment';
 
 const BASE = `${environment.apiBaseUrl}/t/${environment.tenantSlug}`;
 
-// DTO builders
+// DTO builders — reflejan el shape actual del back: sin entryId/courseId/createdAt
+// en la lista del tutor; con `course`, `area` snapshot y `scheduled`.
 function listItemDto(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     id: 'det-1',
     recordId: 'rec-1',
     classroomId: 'cls-1',
-    entryId: 'ent-1',
     status: 'scheduled',
     name: 'Examen Lengua',
-    courseId: 'c-1',
+    course: 'ÁLGEBRA',
+    area: 'Matemáticas',
     count: null,
     duration: 3600,
+    scheduled: '2026-06-01T10:00:00Z',
     startedAt: null,
     finishedAt: null,
-    createdAt: '2026-06-01T10:00:00Z',
     ...overrides,
   };
 }
@@ -39,7 +40,8 @@ function detailDto(overrides: Partial<Record<string, unknown>> = {}) {
     recordId: 'rec-1',
     status: 'scheduled',
     name: 'Examen Lengua',
-    courseId: null,
+    course: null,
+    area: null,
     count: null,
     duration: 3600,
     enabledStudentIds: ['s-1', 's-2'],
@@ -87,15 +89,15 @@ describe('HttpTutorExamsApi', () => {
             id: 'det-1',
             recordId: 'rec-1',
             classroomId: 'cls-1',
-            entryId: 'ent-1',
             status: 'scheduled',
             name: 'Examen Lengua',
-            courseId: 'c-1',
+            course: 'ÁLGEBRA',
+            area: 'Matemáticas',
             count: null,
             duration: 3600,
+            scheduled: '2026-06-01T10:00:00Z',
             startedAt: null,
             finishedAt: null,
-            createdAt: '2026-06-01T10:00:00Z',
           }),
         ],
       });
@@ -108,9 +110,11 @@ describe('HttpTutorExamsApi', () => {
       expect(exam.classroomId).toBe('cls-1');
       expect(exam.serverStatus.value).toBe('scheduled');
       expect(exam.count).toBeNull();
-      expect(exam.courseId).toBe('c-1');
+      expect(exam.course).toBe('ÁLGEBRA');
+      expect(exam.area).toBe('Matemáticas');
       expect(exam.startedAt).toBeNull();
-      expect(exam.createdAt).toBeInstanceOf(Date);
+      expect(exam.scheduled).toBeInstanceOf(Date);
+      expect(exam.scheduled.toISOString()).toBe('2026-06-01T10:00:00.000Z');
     });
 
     it('count: null en DTO → tutorExam.count === null (no undefined)', async () => {
@@ -122,13 +126,14 @@ describe('HttpTutorExamsApi', () => {
       expect((result[0] as TutorExam).count).toBeNull();
     });
 
-    it('courseId: null en DTO → tutorExam.courseId === null', async () => {
+    it('course + area null en DTO → tutorExam.course === null y tutorExam.area === null', async () => {
       const pending = adapter.getTutorExams();
       const req = httpMock.expectOne(`${BASE}/tutor/virtual-exams`);
-      req.flush({ items: [listItemDto({ courseId: null })] });
+      req.flush({ items: [listItemDto({ course: null, area: null })] });
 
       const result = await pending;
-      expect((result[0] as TutorExam).courseId).toBeNull();
+      expect((result[0] as TutorExam).course).toBeNull();
+      expect((result[0] as TutorExam).area).toBeNull();
     });
 
     it('startedAt como string ISO → instancia de Date', async () => {
@@ -350,13 +355,23 @@ describe('HttpTutorExamsApi', () => {
   // iniciar()
   // ===========================================================================
   describe('iniciar()', () => {
-    it('hace POST a <base>/virtual-exams/rec-1/start sin body', async () => {
+    it('hace POST a <base>/virtual-exams/rec-1/start sin body cuando no hay override', async () => {
       const pending = adapter.iniciar('rec-1');
 
       const req = httpMock.expectOne(`${BASE}/virtual-exams/rec-1/start`);
       expect(req.request.method).toBe('POST');
-      // Sin body — el adapter no debe enviar payload
+      // Sin duration → body null; el back mantiene la duración de creación.
       expect(req.request.body).toBeNull();
+      req.flush(null, { status: 204, statusText: 'No Content' });
+      await pending;
+    });
+
+    it('envía { duration } en el body cuando el tutor sobrescribe al iniciar', async () => {
+      const pending = adapter.iniciar('rec-1', 1800);
+
+      const req = httpMock.expectOne(`${BASE}/virtual-exams/rec-1/start`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ duration: 1800 });
       req.flush(null, { status: 204, statusText: 'No Content' });
       await pending;
     });
@@ -383,6 +398,17 @@ describe('HttpTutorExamsApi', () => {
       req.flush({ message: 'unprocessable' }, { status: 422, statusText: 'Unprocessable' });
 
       await expect(pending).rejects.toBeInstanceOf(ExamPreconditionError);
+    });
+
+    it('HTTP 400 (duración fuera de rango) → rechaza con InvalidPayloadError', async () => {
+      const pending = adapter.iniciar('rec-1', 30);
+      const req = httpMock.expectOne(`${BASE}/virtual-exams/rec-1/start`);
+      req.flush(
+        { message: 'duration out of range' },
+        { status: 400, statusText: 'Bad Request' },
+      );
+
+      await expect(pending).rejects.toBeInstanceOf(InvalidPayloadError);
     });
   });
 

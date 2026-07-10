@@ -24,15 +24,15 @@ interface TutorVirtualExamListItemDto {
   id: string;
   recordId: string;
   classroomId: string;
-  entryId: string;
   status: string;
   name: string;
-  courseId: string | null;
+  course: string | null;
+  area: string | null;
   count: number | null;
   duration: number;
+  scheduled: string;
   startedAt: string | null;
   finishedAt: string | null;
-  createdAt: string;
 }
 
 interface TutorVirtualExamListResponseDto {
@@ -44,7 +44,8 @@ interface VirtualExamDetailDto {
   recordId: string;
   status: string;
   name: string;
-  courseId: string | null;
+  course: string | null;
+  area: string | null;
   count: number | null;
   duration: number;
   enabledStudentIds: string[];
@@ -142,12 +143,15 @@ export class HttpTutorExamsApi implements TutorExamsApi {
     }
   }
 
-  // POST /t/:slug/virtual-exams/:recordId/start — sin body. Respuesta: 204 void.
-  async iniciar(recordId: string): Promise<void> {
+  // POST /t/:slug/virtual-exams/:recordId/start
+  // Body opcional `{ duration }` en segundos cuando el tutor sobrescribió la
+  // duración desde el modal antes de iniciar. Respuesta: 204 void.
+  async iniciar(recordId: string, duration?: number): Promise<void> {
+    const body = duration !== undefined ? { duration } : null;
     try {
       await firstValueFrom(
         this.http
-          .post<void>(apiPath.virtualExamStart(recordId), null)
+          .post<void>(apiPath.virtualExamStart(recordId), body)
           .pipe(timeout(10_000)),
       );
     } catch (err) {
@@ -212,15 +216,15 @@ export class HttpTutorExamsApi implements TutorExamsApi {
       detailId: dto.id,
       recordId: dto.recordId,
       classroomId: dto.classroomId,
-      entryId: dto.entryId,
       serverStatus: new ExamServerStatus(dto.status),
       name: dto.name,
-      courseId: dto.courseId,
+      course: dto.course,
+      area: dto.area,
       count: dto.count,
       duration: dto.duration,
+      scheduled: new Date(dto.scheduled),
       startedAt: this.parseNullableDate(dto.startedAt),
       finishedAt: this.parseNullableDate(dto.finishedAt),
-      createdAt: new Date(dto.createdAt),
     });
   }
 
@@ -230,7 +234,8 @@ export class HttpTutorExamsApi implements TutorExamsApi {
       recordId: dto.recordId,
       status: new ExamServerStatus(dto.status),
       name: dto.name,
-      courseId: dto.courseId,
+      course: dto.course,
+      area: dto.area,
       count: dto.count,
       duration: dto.duration,
       enabledStudentIds: dto.enabledStudentIds,
