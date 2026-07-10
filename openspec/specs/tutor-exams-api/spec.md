@@ -15,7 +15,7 @@ getTutorExams(): Promise<readonly TutorExam[]>
 getExamDetail(recordId: string): Promise<TutorExamDetail>
 listClassroomStudents(req: { classroomId: string; virtualExamDetailId: string }): Promise<readonly ClassroomStudent[]>
 updateEnabledStudents(req: { recordId: string; enabledStudentIds: readonly string[] }): Promise<void>
-iniciar(recordId: string): Promise<void>
+iniciar(recordId: string, duration?: number): Promise<void>
 finalizar(recordId: string): Promise<FinalizeResult>
 ```
 
@@ -38,13 +38,14 @@ El puerto `ExamsApi` (alumno) SHALL NOT ser extendido ni modificado. Un comentar
 ### Requirement: Read-models TutorExam, TutorExamDetail, ClassroomStudent y FinalizeResult en L1
 
 **`TutorExam`** (`src/L1_domain/entities/tutor-exam.ts`) SHALL ser una clase con:
-- Campos: `detailId: string`, `recordId: string`, `classroomId: string`, `entryId: string`, `serverStatus: ExamServerStatus`, `name: string`, `courseId: string | null`, `count: number | null`, `duration: number`, `startedAt: Date | null`, `finishedAt: Date | null`, `createdAt: Date`.
+- Campos: `detailId: string`, `recordId: string`, `classroomId: string`, `serverStatus: ExamServerStatus`, `name: string`, `course: string | null`, `area: string | null`, `count: number | null`, `duration: number` (segundos), `scheduled: Date`, `startedAt: Date | null`, `finishedAt: Date | null`.
+- Getter derivado: `durationInMinutes: number` — retorna `Math.round(duration / 60)`.
 - Helpers: `puedeIniciar(): boolean` (retorna `serverStatus.is('scheduled')`), `puedeFinalizar(): boolean` (retorna `serverStatus.is('in_progress')`), `estaFinalizado(): boolean` (retorna `serverStatus.is('finalized')` o `esTerminal()`).
 - Reusar `ExamServerStatus` (`src/L1_domain/value-objects/exam-server-status.ts`) sin modificarlo.
 
 **`TutorExamDetail`** (`src/L1_domain/value-objects/tutor-exam-detail.ts`) SHALL ser un tipo/clase con:
-- Campos: `id: string` (detailId), `recordId: string`, `status: ExamServerStatus`, `name: string`, `courseId: string | null`, `count: number | null`, `duration: number`, `enabledStudentIds: readonly string[]`, `startedAt: Date | null`, `finishedAt: Date | null`, `createdAt: Date`.
-- NOT incluye `classroomId` ni `entryId` (el backend no los devuelve en el detalle).
+- Campos: `id: string` (detailId), `recordId: string`, `status: ExamServerStatus`, `name: string`, `course: string | null`, `area: string | null`, `count: number | null`, `duration: number`, `enabledStudentIds: readonly string[]`, `startedAt: Date | null`, `finishedAt: Date | null`, `createdAt: Date`.
+- NOT incluye `classroomId` (el backend no lo devuelve en el detalle).
 
 **`ClassroomStudent`** (`src/L1_domain/value-objects/classroom-student.ts`) SHALL ser un tipo/clase con:
 - Campos: `studentId: string`, `studentCode: string`, `firstName: string`, `lastName: string`, `enabled: boolean`, `hasSubmitted: boolean`.
@@ -89,17 +90,35 @@ Reusar (sin modificar): `NetworkError`, `InvalidPayloadError`.
 - **WHEN** se invoca `estaFinalizado()`
 - **THEN** retorna `true`
 
-#### Scenario: count null y courseId null son tipos válidos
+#### Scenario: count null y course/area null son tipos válidos
 
-- **GIVEN** un `TutorExam` construido con `count: null` y `courseId: null`
+- **GIVEN** un `TutorExam` construido con `count: null`, `course: null` y `area: null`
 - **WHEN** se inspecciona el tipo
 - **THEN** TypeScript compila sin error — `number | null` y `string | null` son parte del contrato
 
-#### Scenario: TutorExamDetail NOT incluye classroomId
+#### Scenario: TutorExam.durationInMinutes redondea desde segundos
+
+- **GIVEN** un `TutorExam` con `duration: 3600`
+- **WHEN** se lee `tutorExam.durationInMinutes`
+- **THEN** retorna `60`
+
+- **GIVEN** un `TutorExam` con `duration: 90`
+- **WHEN** se lee `tutorExam.durationInMinutes`
+- **THEN** retorna `2` (`Math.round(90 / 60) === 2`)
+
+#### Scenario: TutorExam NO expone entryId ni createdAt (schema post-migración)
+
+- **WHEN** se inspecciona la clase `TutorExam`
+- **THEN** no existe la propiedad `entryId`
+- **AND** no existe la propiedad `createdAt`
+- **AND** sí existe `scheduled: Date`
+
+#### Scenario: TutorExamDetail NOT incluye classroomId ni courseId
 
 - **WHEN** se inspecciona la interfaz/clase `TutorExamDetail`
 - **THEN** no existe el campo `classroomId`
-- **AND** no existe el campo `entryId`
+- **AND** no existe el campo `courseId`
+- **AND** sí existen `course: string | null` y `area: string | null`
 - **AND** sí existe `enabledStudentIds: readonly string[]`
 
 #### Scenario: ExamServerStatus se reutiliza sin modificar
@@ -115,15 +134,17 @@ Reusar (sin modificar): `NetworkError`, `InvalidPayloadError`.
 - `dto.id` → `detailId`
 - `dto.recordId` → `recordId`
 - `dto.classroomId` → `classroomId`
-- `dto.entryId` → `entryId`
 - `dto.status` → `new ExamServerStatus(dto.status)`
 - `dto.name` → `name`
-- `dto.courseId` → `courseId` (null si ausente)
+- `dto.course` → `course` (null si ausente)
+- `dto.area` → `area` (null si ausente)
 - `dto.count` → `count` (null si ausente)
 - `dto.duration` → `duration`
+- `dto.scheduled` → `new Date(dto.scheduled)`
 - `dto.startedAt` → `new Date(dto.startedAt)` si no null, else null
 - `dto.finishedAt` → `new Date(dto.finishedAt)` si no null, else null
-- `dto.createdAt` → `new Date(dto.createdAt)`
+
+El DTO NO trae `entryId`, `courseId` ni `createdAt` (obsoletos post-migración a snapshots plain-text).
 
 `withCredentials` lo agrega el `credentials.interceptor` global — el adapter NOT SHALL setearlo manualmente. Timeout: 10 s.
 
@@ -133,19 +154,22 @@ Reusar (sin modificar): `NetworkError`, `InvalidPayloadError`.
 - **WHEN** se invoca `getTutorExams()`
 - **THEN** la URL del request es `"http://api.example.com/t/vonex/tutor/virtual-exams"`
 
-#### Scenario: Mapping camelCase → TutorExam con valores nominales
+#### Scenario: Mapping camelCase → TutorExam con snapshots plain-text
 
 - **GIVEN** el backend responde HTTP 200 con:
   ```json
-  { "items": [{ "id": "det-1", "recordId": "rec-1", "classroomId": "cls-1", "entryId": "ent-1",
-    "status": "scheduled", "name": "Examen Lengua", "courseId": "c-1", "count": null,
-    "duration": 3600, "startedAt": null, "finishedAt": null, "createdAt": "2026-06-01T10:00:00Z" }] }
+  { "items": [{ "id": "det-1", "recordId": "rec-1", "classroomId": "cls-1",
+    "status": "scheduled", "name": "Examen Aritmética", "course": "Aritmética",
+    "area": "Matemáticas", "count": 20, "duration": 3600,
+    "scheduled": "2026-06-01T10:00:00Z", "startedAt": null, "finishedAt": null }] }
+  ```
 - **WHEN** `getTutorExams()` resuelve
 - **THEN** retorna un array con 1 `TutorExam` donde:
   - `detailId === "det-1"`, `recordId === "rec-1"`, `classroomId === "cls-1"`
-  - `count === null`, `courseId === "c-1"`
+  - `course === "Aritmética"`, `area === "Matemáticas"`, `count === 20`
   - `serverStatus.value === "scheduled"`
-  - `startedAt === null`, `createdAt` es instancia de `Date`
+  - `scheduled` es instancia de `Date`
+  - NO existe `entryId`, `courseId`, ni `createdAt`
 
 #### Scenario: count null en la lista → campo null (no undefined)
 
@@ -153,11 +177,11 @@ Reusar (sin modificar): `NetworkError`, `InvalidPayloadError`.
 - **WHEN** se mapea al `TutorExam`
 - **THEN** `tutorExam.count === null` (no `undefined`)
 
-#### Scenario: courseId null en la lista → campo null
+#### Scenario: course y area null se preservan
 
-- **GIVEN** el backend devuelve `courseId: null` en un item
+- **GIVEN** el backend devuelve `course: null` y `area: null` en un item
 - **WHEN** se mapea al `TutorExam`
-- **THEN** `tutorExam.courseId === null`
+- **THEN** `tutorExam.course === null` y `tutorExam.area === null`
 
 #### Scenario: startedAt como string ISO → Date
 
@@ -178,8 +202,12 @@ Reusar (sin modificar): `NetworkError`, `InvalidPayloadError`.
 - `dto.id` → `id` (detailId)
 - `dto.recordId` → `recordId`
 - `dto.status` → `new ExamServerStatus(dto.status)` (puede incluir `'archived'` — ExamServerStatus SOLO valida `scheduled|in_progress|finalized`; si llega `archived` deberá ser ignorado o guardado como raw; este edge case es fuera de scope por filtro server-side)
-- Los campos escalares se mapean igual que en la lista (mismos nullables, mismo `string → Date`)
+- `dto.course` → `course` (null si ausente)
+- `dto.area` → `area` (null si ausente)
+- Los campos escalares restantes se mapean igual que en la lista (mismos nullables, mismo `string → Date`)
 - `dto.enabledStudentIds` → `enabledStudentIds`
+
+El DTO NO trae `courseId` (obsoleto post-migración a snapshots plain-text).
 
 #### Scenario: URL usa encodeURIComponent sobre recordId
 
@@ -271,19 +299,33 @@ Reusar (sin modificar): `NetworkError`, `InvalidPayloadError`.
 
 ### Requirement: Contrato HTTP — POST /virtual-exams/:recordId/start
 
-`HttpTutorExamsApi.iniciar(recordId)` SHALL emitir `POST` a `apiPath.virtualExamStart(recordId)` SIN body. La respuesta esperada es HTTP 204 sin body. El método SHALL resolver con `void`.
+`HttpTutorExamsApi.iniciar(recordId, duration?)` SHALL emitir `POST` a `apiPath.virtualExamStart(recordId)`. Cuando `duration` viene definido (segundos), el body es `{ duration: <número> }`; cuando es `undefined`, el body es `null` — el back mantiene la duración con la que se creó el examen. La respuesta esperada es HTTP 204 sin body. El método SHALL resolver con `void`.
 
-#### Scenario: URL del POST start, sin body
+Rango válido del back: `60 ≤ duration ≤ 7200` segundos. El cliente valida antes de invocar (defensa en profundidad); el back rechaza con 400 (`InvalidPayloadError`) si viene fuera de rango.
+
+#### Scenario: iniciar sin duration — body null
 
 - **GIVEN** `recordId = "rec-1"`
-- **WHEN** se invoca `iniciar("rec-1")`
+- **WHEN** se invoca `iniciar("rec-1")` sin segundo argumento
 - **THEN** la request es `POST <base>/virtual-exams/rec-1/start`
-- **AND** el body de la request está vacío o ausente
+- **AND** el body del request es `null` (no `{ duration: ... }`)
+
+#### Scenario: iniciar con duration override — body { duration }
+
+- **GIVEN** `recordId = "rec-1"`
+- **WHEN** se invoca `iniciar("rec-1", 1800)`
+- **THEN** la request es `POST <base>/virtual-exams/rec-1/start`
+- **AND** el body del request es `{ "duration": 1800 }`
 
 #### Scenario: 204 resuelve void
 
 - **WHEN** el backend responde HTTP 204 sin body
 - **THEN** `iniciar()` resuelve con `undefined`
+
+#### Scenario: 400 en iniciar → InvalidPayloadError (duration fuera de rango)
+
+- **WHEN** el backend responde HTTP 400 (duración < 60 o > 7200)
+- **THEN** `iniciar()` rechaza con `InvalidPayloadError`
 
 #### Scenario: 409 en iniciar → ExamConflictError
 
@@ -412,7 +454,7 @@ Los 6 use-cases de L2 (`src/L2_application/`) SHALL:
 | `GetTutorExamsUseCase` | `execute(): Promise<readonly TutorExam[]>` | lista |
 | `GetTutorExamDetailUseCase` | `execute({ recordId: string }): Promise<TutorExamDetail>` | detalle |
 | `ListClassroomStudentsUseCase` | `execute({ classroomId: string; virtualExamDetailId: string }): Promise<readonly ClassroomStudent[]>` | alumnos |
-| `IniciarExamenUseCase` | `execute({ recordId: string }): Promise<void>` | void |
+| `IniciarExamenUseCase` | `execute({ recordId: string; duration?: number }): Promise<void>` | void — propaga `duration` (segundos) al puerto |
 | `FinalizarExamenUseCase` | `execute({ recordId: string }): Promise<FinalizeResult>` | resultado |
 | `ActualizarAlumnosHabilitadosUseCase` | `execute({ recordId: string; enabledStudentIds: readonly string[] }): Promise<void>` | void |
 
@@ -433,6 +475,17 @@ Los 6 use-cases de L2 (`src/L2_application/`) SHALL:
 - **GIVEN** `TutorExamsApi.iniciar("rec-1")` rechaza con `ExamPreconditionError`
 - **WHEN** `IniciarExamenUseCase.execute({ recordId: "rec-1" })` es invocado
 - **THEN** rechaza con `ExamPreconditionError` directamente (sin wrapping)
+
+#### Scenario: IniciarExamenUseCase pasa duration al port
+
+- **GIVEN** un stub de `TutorExamsApi` que espía `iniciar`
+- **WHEN** `IniciarExamenUseCase.execute({ recordId: "rec-1", duration: 1800 })` es invocado
+- **THEN** `TutorExamsApi.iniciar` es llamado con `("rec-1", 1800)`
+
+#### Scenario: IniciarExamenUseCase sin duration pasa undefined
+
+- **WHEN** `IniciarExamenUseCase.execute({ recordId: "rec-1" })` es invocado sin `duration`
+- **THEN** `TutorExamsApi.iniciar` es llamado con `("rec-1", undefined)`
 
 #### Scenario: Use-cases NO tocan outbox ni IndexedDB
 
