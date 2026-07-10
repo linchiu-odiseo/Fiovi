@@ -31,4 +31,16 @@ describe('IniciarExamenUseCase', () => {
     // IndexedDB que causarían errores en el entorno de test puro.
     expect(api.getIniciarCalls()).toHaveLength(1);
   });
+
+  it('propaga la duración opcional al puerto (override al iniciar)', async () => {
+    api.willResolveIniciar();
+    await useCase.execute({ recordId: 'rec-1', duration: 1800 });
+    expect(api.getIniciarCallsFull()).toEqual([{ recordId: 'rec-1', duration: 1800 }]);
+  });
+
+  it('no envía duration cuando no se pasa (mantiene la duración de creación)', async () => {
+    api.willResolveIniciar();
+    await useCase.execute({ recordId: 'rec-1' });
+    expect(api.getIniciarCallsFull()).toEqual([{ recordId: 'rec-1', duration: undefined }]);
+  });
 });
