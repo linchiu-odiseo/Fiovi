@@ -54,11 +54,15 @@ export interface TutorExamsApi {
     enabledStudentIds: readonly string[];
   }): Promise<void>;
 
-  // POST /t/:slug/virtual-exams/:recordId/start — sin body. Respuesta: 204 void.
-  // Errores posibles: ExamConflictError (409 — ya iniciado),
+  // POST /t/:slug/virtual-exams/:recordId/start
+  // Body opcional: `{ duration?: number }` en segundos (60..7200). Cuando el
+  // tutor sobrescribe la duración al iniciar, viaja acá; ausencia mantiene la
+  // duración con la que se creó el examen. Respuesta: 204 void.
+  // Errores posibles: InvalidPayloadError (400 — duración fuera de rango),
+  //                   ExamConflictError (409 — ya iniciado),
   //                   ExamPreconditionError (422 — 0 alumnos habilitados o claves no configuradas),
   //                   NetworkError.
-  iniciar(recordId: string): Promise<void>;
+  iniciar(recordId: string, duration?: number): Promise<void>;
 
   // POST /t/:slug/virtual-exams/:recordId/finalize — sin body.
   // Respuesta: 200 (NO 202 ni 204) con body { transitioned, jobId? } — ver design.md R2.
