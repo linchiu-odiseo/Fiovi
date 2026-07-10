@@ -217,10 +217,269 @@
     margin-left: auto;
   }
 
+  &__title-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+  }
+
+  &__meta {
+    list-style: none;
+    padding: 0;
+    margin: var(--space-sm) 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.9rem;
+    color: var(--color-on-surface-variant);
+
+    li {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .material-symbols-outlined {
+      font-size: 1.05rem;
+      line-height: 1;
+      color: var(--color-on-surface-variant);
+    }
+
+    strong {
+      font-weight: 700;
+      color: var(--color-on-surface);
+    }
+  }
+
   &__no-students {
     padding: var(--space-md);
     text-align: center;
     color: var(--color-on-surface-variant);
     font-size: 0.875rem;
+  }
+
+  &__modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    display: grid;
+    place-items: end center;
+    padding: var(--space-md);
+    z-index: 20;
+
+    // En pantallas ≥ 480px lo centramos (desktop / tablet); en móvil se ancla
+    // al inferior para quedar cerca del pulgar del usuario.
+    @media (min-width: 30rem) {
+      place-items: center;
+    }
+  }
+
+  &__modal {
+    background: var(--color-surface-container-high);
+    color: var(--color-on-surface);
+    border-radius: var(--radius);
+    padding: var(--space-lg) var(--space-md);
+    max-width: 26rem;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
+    box-sizing: border-box;
+  }
+
+  &__modal--iniciar {
+    padding-block: var(--space-lg);
+  }
+
+  &__modal-title {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+  }
+
+  &__modal-hint {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--color-on-surface-variant);
+    line-height: 1.45;
+  }
+
+  &__modal-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.85rem;
+    color: var(--color-on-surface-variant);
+
+    input {
+      appearance: none;
+      background: var(--color-surface-container-lowest);
+      border: 1px solid var(--color-outline-variant);
+      border-radius: var(--radius-sm);
+      padding: 0.6rem 0.75rem;
+      font-size: 1rem;
+      color: var(--color-on-surface);
+    }
+  }
+
+  // Grupo de dos inputs para "minutos : segundos". Layout centrado; los inputs
+  // son grandes (targets táctiles) y el ":" central los agrupa visualmente.
+  &__mmss {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 0.6rem;
+  }
+
+  &__mmss-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    flex: 1;
+    max-width: 8rem;
+
+    input {
+      appearance: none;
+      background: var(--color-surface-container-lowest);
+      border: 1px solid var(--color-outline-variant);
+      border-radius: var(--radius);
+      padding: 0.9rem 0.75rem;
+      font-size: 1.75rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+      color: var(--color-on-surface);
+      min-height: 3.5rem;
+      box-sizing: border-box;
+
+      &:focus-visible {
+        border-color: var(--color-primary, #1a56db);
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(26, 86, 219, 0.25);
+      }
+    }
+  }
+
+  &__mmss-label {
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    text-align: center;
+    color: var(--color-on-surface-variant);
+  }
+
+  &__mmss-separator {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--color-on-surface-variant);
+    padding-bottom: 0.85rem;
+    line-height: 1;
+  }
+
+  &__mmss-total {
+    margin: 0;
+    text-align: center;
+    font-size: 1rem;
+    color: var(--color-on-surface);
+
+    strong {
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+    }
+  }
+
+  &__mmss-hint {
+    display: block;
+    margin-top: 0.15rem;
+    font-size: 0.75rem;
+    color: var(--color-on-surface-variant);
+  }
+
+  &__modal-error {
+    margin: 0;
+    color: var(--color-error, #b00020);
+    font-size: 0.85rem;
+    text-align: center;
+  }
+
+  &__modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-sm);
+    margin-top: var(--space-xs);
+  }
+
+  // Stacked: botones apilados verticalmente. Primary primero, con acción
+  // esperada al pulgar. Cancelar debajo, secundario.
+  &__modal-actions--stacked {
+    flex-direction: column;
+    justify-content: stretch;
+    gap: 0.6rem;
+  }
+
+  &__modal-cancel,
+  &__modal-confirm {
+    appearance: none;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 0.55rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+
+  &__modal-cancel {
+    background: transparent;
+    color: var(--color-on-surface-variant);
+  }
+
+  &__modal-confirm {
+    background: var(--color-primary, #1a56db);
+    color: #fff;
+  }
+
+  // Variantes "large" para móviles: tap targets ≥ 48px, tipografía grande,
+  // full-width para agarrar bien con el pulgar.
+  &__modal-confirm--large,
+  &__modal-cancel--large {
+    width: 100%;
+    min-height: 3rem;
+    font-size: 1rem;
+    padding: 0.9rem 1rem;
+    border-radius: var(--radius);
+  }
+
+  &__modal-cancel--large {
+    border: 1px solid var(--color-outline-variant);
+  }
+
+  &__modal-confirm--danger {
+    background: var(--color-error, #b91c1c);
+  }
+
+  &__students-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+    margin-bottom: var(--space-xs);
+
+    h2 {
+      margin: 0;
+    }
+  }
+
+  &__students-counter {
+    font-size: 0.85rem;
+    color: var(--color-on-surface-variant);
+    font-variant-numeric: tabular-nums;
   }
 }

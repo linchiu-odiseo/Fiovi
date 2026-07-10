@@ -10,15 +10,15 @@ function buildTutorExam(id: string): TutorExam {
     detailId: id,
     recordId: `rec-${id}`,
     classroomId: 'cls-1',
-    entryId: 'ent-1',
     serverStatus: new ExamServerStatus('scheduled'),
     name: `Examen ${id}`,
-    courseId: null,
+    course: null,
+    area: null,
     count: null,
     duration: 3600,
+    scheduled: new Date('2026-06-01T10:00:00Z'),
     startedAt: null,
     finishedAt: null,
-    createdAt: new Date('2026-06-01T10:00:00Z'),
   });
 }
 

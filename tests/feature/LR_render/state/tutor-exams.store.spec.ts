@@ -9,15 +9,15 @@ function buildExam(overrides: Partial<ConstructorParameters<typeof TutorExam>[0]
     detailId: 'det-1',
     recordId: 'rec-1',
     classroomId: 'cls-1',
-    entryId: 'entry-1',
     serverStatus: new ExamServerStatus('scheduled'),
     name: 'Examen de Matemáticas',
-    courseId: 'course-1',
+    course: 'Álgebra',
+    area: 'Matemáticas',
     count: 20,
     duration: 60,
+    scheduled: new Date('2026-06-01T10:00:00Z'),
     startedAt: null,
     finishedAt: null,
-    createdAt: new Date('2026-06-01T10:00:00Z'),
     ...overrides,
   });
 }

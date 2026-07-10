@@ -86,58 +86,43 @@ SHALL existir un store compartido de la lista (`src/LR_render/tutor/tutor-exams.
 
 ### Requirement: Tarjetas con 3 estados via Signals
 
-`TutorExamsListPage` SHALL renderizar una tarjeta por cada `TutorExam` en `exams()`. Cada tarjeta SHALL reflejar el estado del examen según `serverStatus.value`:
-- `'scheduled'` → visual "Programado" (badge + strip con `var(--color-outline)` + card opacity 0.7).
-- `'in_progress'` → visual "En curso" (badge + strip con `var(--color-success)`).
-- `'finalized'` → visual "Finalizado" (badge + strip distinto según token).
+`TutorExamsListPage` SHALL renderizar en su sección principal **solo los exámenes con `serverStatus.value === 'in_progress'`** (accesible vía `vm.examsInProgress()`). Los exámenes `scheduled` y `finalized` NO SHALL aparecer en el listado del home tutor — viven bajo la jerarquía Aula → Curso → Examen (capability `tutor-aula-navigation`).
+
+Cada tarjeta in-progress SHALL renderizar:
+- Nombre, badge de estado con texto `"En curso"`, strip lateral con `var(--color-success)`.
+- Nombre de curso si `exam.course` no es null.
 - `count === null` → renderizar `"—"` en lugar del número.
-- `courseId` SHALL NOT ser expuesto en el DOM — el elemento `<span class="exam-card__course">` está prohibido.
+- Duración en minutos usando `exam.durationInMinutes`.
+- `course` como plain-text; NUNCA UUIDs.
 
-(Previously: courseId podía renderizarse en `<span class="exam-card__course">{{ exam.courseId }}</span>`; no había strip lateral de color.)
+Cuando `hasExamsInProgress()` es false, la sección muestra el copy `"No hay exámenes en curso ahora."`.
 
-#### Scenario: Lista renderizada en el orden devuelto por el backend
+(Previously: la lista mostraba TODOS los exámenes con 3 estados visuales y no había filtro por status; se exponía `courseId` UUID en `<span class="exam-card__course">`.)
 
-- **GIVEN** `GetTutorExamsUseCase.execute()` resuelve con `[examA, examB, examC]` (en ese orden)
+#### Scenario: Solo exámenes in_progress aparecen en el DOM
+
+- **GIVEN** el back devuelve 3 exámenes: uno `scheduled`, uno `in_progress`, uno `finalized`
 - **WHEN** `TutorExamsListPage` renderiza
-- **THEN** las tarjetas aparecen en el orden `[examA, examB, examC]` sin reordenamiento por la UI
+- **THEN** `[data-testid="exams-list"]` contiene exactamente 1 `[data-testid="exam-card"]`
+- **AND** ese card corresponde al examen `in_progress`
+
+#### Scenario: Empty state cuando no hay exámenes in_progress
+
+- **GIVEN** el back devuelve solo exámenes `scheduled` o `finalized`
+- **WHEN** `TutorExamsListPage` renderiza
+- **THEN** el DOM contiene el copy `"No hay exámenes en curso ahora."`
 
 #### Scenario: count null renderiza "—"
 
-- **GIVEN** un `TutorExam` con `count === null`
+- **GIVEN** un `TutorExam` in-progress con `count === null`
 - **WHEN** la tarjeta se renderiza
 - **THEN** el campo de número de preguntas muestra `"—"` (no `null`, no `undefined`, no `0`)
 
-#### Scenario: Tarjeta scheduled
-
-- **GIVEN** un `TutorExam` con `serverStatus.value === 'scheduled'`
-- **WHEN** la tarjeta se renderiza
-- **THEN** el badge/estado muestra "Programado" o equivalente visual
-
-#### Scenario: Tarjeta in_progress
-
-- **GIVEN** un `TutorExam` con `serverStatus.value === 'in_progress'`
-- **WHEN** la tarjeta se renderiza
-- **THEN** el badge/estado muestra "En curso" o equivalente visual
-
-#### Scenario: Tarjeta finalized
-
-- **GIVEN** un `TutorExam` con `serverStatus.value === 'finalized'`
-- **WHEN** la tarjeta se renderiza
-- **THEN** el badge/estado muestra "Finalizado" o equivalente visual
-
 #### Scenario: courseId UUID no aparece en el DOM
 
-- **GIVEN** el backend devuelve un exam con `courseId = "0b1e8c0c-041a-4893-b7b9-593592fa6a70"`
-- **WHEN** la exam-card se renderiza
-- **THEN** el `textContent` de la tarjeta NO contiene el string `"0b1e8c0c"`
-- **AND** no existe ningún elemento hijo con clase `exam-card__course`
-
-#### Scenario: Strip scheduled — color outline y card semitransparente
-
-- **GIVEN** un `TutorExam` con `serverStatus.value === 'scheduled'`
-- **WHEN** la exam-card se renderiza
-- **THEN** el elemento `.card__strip` tiene `background` con `var(--color-outline)`
-- **AND** la tarjeta aplica `opacity: 0.7` al contenedor de la card
+- **WHEN** cualquier exam-card se renderiza
+- **THEN** el `textContent` de la tarjeta NO contiene UUIDs
+- **AND** no existe ningún elemento hijo con clase `exam-card__course` que exponga un identificador crudo
 
 #### Scenario: Strip in_progress — color success
 
@@ -173,9 +158,15 @@ La configuración de rutas SHALL mantener `/tutor/home` cargando `TutorExamsList
 - Fila `.user-info` con ícono+texto para email y código — implementado como `<ul class="user-info">` con Material Symbols (`mail`, `badge`).
 - La estructura anterior basada en `<dl>` SHALL ser reemplazada por `.user-info`.
 
-La sección de aulas, la lista de exámenes y el botón de logout siguen presentes con los mismos `data-testid`.
+**Aulas clickeables:** cada `[data-testid="classroom-item"]` SHALL tener `role="button"`, `tabindex="0"`, `(click)` y `(keydown.enter)` handlers. Al activarse, navegar a `/tutor/aulas/:classroomId` vía `Router.navigate` (capability `tutor-aula-navigation`).
 
-(Previously: la jerarquía visual usaba `<dl>` para el profile-card sin kicker ni jerarquía tipográfica del sistema Native Excellence.)
+**Fallback de email:** cuando `profile.email` viene `null` desde el back, o cuando `GetProfileUseCase` rechaza con `ProfileNotAvailableError`, el VM SHALL llamar a `GetIdentityUseCase` y usar `identity.email` para el header. Si Identity tampoco está disponible, el header omite la línea de email.
+
+**Integración PWA:** `TutorExamsListPage` SHALL importar y renderizar `<app-update-banner>`, `<app-update-confirm-modal>` (condicional al tap del banner) y `<app-version-footer>` — mismos componentes que ya usa el home del alumno.
+
+La sección de aulas, la lista de exámenes en curso y el botón de logout siguen presentes con los mismos `data-testid`.
+
+(Previously: la jerarquía visual usaba `<dl>` para el profile-card sin kicker ni jerarquía tipográfica del sistema Native Excellence. Las aulas no eran clickeables. El fallback de email solo cubría `ProfileNotAvailableError`. No había integración con `pwa-shell-update`.)
 
 El VM SHALL inyectar `GetProfileUseCase('tutor')` y exponer:
 - `classrooms: Signal<readonly TutorClassroom[]>` — lista de aulas del perfil.
@@ -273,6 +264,32 @@ El VM SHALL también inyectar `LogoutUseCase` y `GetIdentityUseCase` (fallback d
 
 - **WHEN** se inspecciona el template después del restyle
 - **THEN** los data-testid `profile-card`, `profile-card-degraded`, `profile-skeleton`, `classrooms-summary`, `classroom-item`, `classrooms-empty`, `classrooms-section`, `exams-list`, `exam-card`, `status-badge`, `btn-logout` existen en los mismos elementos raíz con la misma semántica assertable que antes del restyle
+
+#### Scenario: Aula clickeable navega al detalle
+
+- **GIVEN** el tutor tiene un aula con `id = "cls-1"` en su profile
+- **WHEN** el usuario clickea `[data-testid="classroom-item"]`
+- **THEN** `Router.navigate` es llamado con `['/tutor/aulas', 'cls-1']`
+
+#### Scenario: Aula responde a keydown.enter (a11y)
+
+- **GIVEN** un `[data-testid="classroom-item"]` renderizado
+- **WHEN** el usuario dispara `keydown.enter`
+- **THEN** `Router.navigate` es llamado con `['/tutor/aulas', <classroomId>]`
+
+#### Scenario: profile.email null → email del Identity
+
+- **GIVEN** `GetProfileUseCase` resuelve con `profile.email = null`
+- **AND** `GetIdentityUseCase` resuelve con `identity.email = "tutor1@vonex.pe"`
+- **WHEN** `TutorExamsListPage` renderiza el header
+- **THEN** el email visible es `"tutor1@vonex.pe"`
+
+#### Scenario: PWA update banner integrado
+
+- **WHEN** se inspecciona el template de `TutorExamsListPage`
+- **THEN** existe un `<app-update-banner>`
+- **AND** existe un `<app-version-footer>`
+- **AND** existe un `<app-update-confirm-modal>` en el árbol condicional
 
 ---
 
