@@ -32,7 +32,7 @@ export class FakeTutorExamsApi implements TutorExamsApi {
     return;
   }
 
-  async iniciar(_recordId: string): Promise<void> {
+  async iniciar(_recordId: string, _duration?: number): Promise<void> {
     return;
   }
 
