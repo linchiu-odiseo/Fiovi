@@ -203,78 +203,158 @@
   }
 }
 
-.stats-card {
-  padding: var(--space-md) 1.1rem;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-outline-variant);
-  background: var(--color-surface-container-lowest);
+// Sección "Mis aulas": cada aula es una card grande, clickable, con chevron —
+// el patrón visual espeja las cards de examen del alumno para que el tutor
+// perciba la aula como "puerta de entrada" y no como texto informativo.
+.aulas-section {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: var(--space-xs);
 
-  &__line {
+  &__summary {
     margin: 0;
-    font-size: 1rem;
-    color: var(--color-on-surface);
+    font-size: 0.85rem;
+    color: var(--color-on-surface-variant);
     font-variant-numeric: tabular-nums;
   }
 
   &__empty {
     margin: 0;
+    padding: var(--space-md);
+    text-align: center;
     font-size: 0.9rem;
-    line-height: 1.45;
     color: var(--color-on-surface-variant);
+    border-radius: var(--radius-md);
+    border: 1px dashed var(--color-outline-variant);
   }
 }
 
-.classrooms-list {
+.aulas-grid {
   list-style: none;
   padding: 0;
   margin: var(--space-xs) 0 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
+  gap: 0.75rem;
 }
 
-.classroom-item {
+.aula-card {
+  position: relative;
   display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  padding: var(--space-xs) 0;
-  border-bottom: 1px solid var(--color-outline-variant);
+  align-items: center;
+  gap: 0.75rem;
+  padding: var(--space-md) 1.1rem var(--space-md) 1.25rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-outline-variant);
+  background: var(--color-surface-container-lowest);
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    transform 80ms ease;
 
-  &:last-child {
-    border-bottom: none;
+  &:hover,
+  &:focus-visible {
+    background: var(--color-surface-container-low);
+    border-color: var(--color-primary);
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+
+  &__strip {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--color-primary);
+  }
+
+  &__body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
   }
 
   &__name {
-    font-size: 0.95rem;
-    font-weight: 600;
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
     color: var(--color-on-surface);
   }
 
   &__cycle {
-    font-size: 0.8rem;
+    margin: 0;
+    font-size: 0.85rem;
     color: var(--color-on-surface-variant);
   }
 
   &__meta {
+    margin: 0;
     font-size: 0.75rem;
     color: var(--color-on-surface-variant);
     text-transform: capitalize;
   }
 
   &__students {
+    margin: 0.25rem 0 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
     font-size: 0.8rem;
     font-variant-numeric: tabular-nums;
+    color: var(--color-on-surface-variant);
+
+    .material-symbols-outlined {
+      font-size: 1rem;
+      line-height: 1;
+    }
+  }
+
+  &__chevron {
     color: var(--color-on-surface-variant);
   }
 }
 
-.exams-section {
+.exams-in-progress-section {
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+
+  &__loading,
+  &__empty {
+    margin: 0;
+    padding: var(--space-md);
+    text-align: center;
+    font-size: 0.9rem;
+    color: var(--color-on-surface-variant);
+    border-radius: var(--radius-md);
+    border: 1px dashed var(--color-outline-variant);
+  }
+
+  &__error {
+    padding: var(--space-md);
+    text-align: center;
+    color: var(--color-error);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-error);
+
+    button {
+      margin-top: var(--space-sm);
+      appearance: none;
+      border: 1px solid currentColor;
+      background: transparent;
+      color: inherit;
+      padding: 0.4rem 1rem;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+    }
+  }
 }
 
 // Card con strip lateral de color por estado — mismo patrón que
