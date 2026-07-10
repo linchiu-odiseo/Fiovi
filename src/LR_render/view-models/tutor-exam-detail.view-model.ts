@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { GetTutorExamsUseCase } from '../../L2_application/use-cases/get-tutor-exams.use-case';
 import { GetTutorExamDetailUseCase } from '../../L2_application/use-cases/get-tutor-exam-detail.use-case';
@@ -57,6 +57,40 @@ export class TutorExamDetailViewModel {
   // Copy en español del último error de acción (iniciar/finalizar/habilitar).
   // null si no hay error activo.
   readonly actionError = signal<string | null>(null);
+
+  // Modal para editar la duración al iniciar. `iniciarModalOpen()` gobierna
+  // la visibilidad. La duración se edita como minutos + segundos (más humano
+  // que segundos crudos) y se envía al back convertida a segundos.
+  // Rango válido: 60s (1:00) .. 7200s (120:00) — mismo que el back.
+  readonly iniciarModalOpen = signal(false);
+  readonly pendingMinutes = signal<number | null>(null);
+  readonly pendingSeconds = signal<number | null>(null);
+  readonly durationError = signal<string | null>(null);
+  static readonly DURATION_MIN_SECONDS = 60;
+  static readonly DURATION_MAX_SECONDS = 7200;
+
+  /**
+   * Total en segundos derivado de mm+ss para display en el modal ("Total: 3:30").
+   * Retorna null cuando los inputs no son enteros válidos.
+   */
+  readonly pendingTotalSeconds = computed<number | null>(() => {
+    const m = this.pendingMinutes();
+    const s = this.pendingSeconds();
+    if (m === null || s === null) return null;
+    if (!Number.isFinite(m) || !Number.isFinite(s)) return null;
+    if (!Number.isInteger(m) || !Number.isInteger(s)) return null;
+    return m * 60 + s;
+  });
+
+  // Modal de confirmación para finalizar. Requerido por UX: cerrar antes de
+  // tiempo es una acción irreversible que congela el enabled set y dispara el
+  // grader; el tutor confirma explícitamente.
+  readonly finalizarModalOpen = signal(false);
+
+  // Cuenta de alumnos habilitados en tiempo real (lo que el tutor ve en la
+  // lista con checkboxes). Total = alumnos del aula.
+  readonly enabledCount = computed(() => this.enabledStudentIds().length);
+  readonly totalStudents = computed(() => this.students().length);
 
   // ── Derived state helpers (para los guards de D5) ───────────────────────────
 
@@ -132,8 +166,71 @@ export class TutorExamDetailViewModel {
 
   // ── Actions ─────────────────────────────────────────────────────────────────
 
+  // Abre el modal de "iniciar examen" precargando la duración actual del
+  // detail como minutos + segundos. El tutor puede aceptar como está o editar.
+  openIniciarModal(): void {
+    if (!this.canIniciar()) return;
+    const d = this.detail();
+    if (!d) return;
+    this.pendingMinutes.set(Math.floor(d.duration / 60));
+    this.pendingSeconds.set(d.duration % 60);
+    this.durationError.set(null);
+    this.iniciarModalOpen.set(true);
+  }
+
+  cancelIniciarModal(): void {
+    this.iniciarModalOpen.set(false);
+    this.pendingMinutes.set(null);
+    this.pendingSeconds.set(null);
+    this.durationError.set(null);
+  }
+
+  // Confirma el modal: valida los minutos y segundos, arma el total en segundos,
+  // y dispara `iniciar()` con el override si el tutor cambió el valor original.
+  async confirmIniciarModal(): Promise<void> {
+    const m = this.pendingMinutes();
+    const s = this.pendingSeconds();
+    const min = TutorExamDetailViewModel.DURATION_MIN_SECONDS;
+    const max = TutorExamDetailViewModel.DURATION_MAX_SECONDS;
+
+    if (m === null || s === null || !Number.isInteger(m) || !Number.isInteger(s)) {
+      this.durationError.set('Ingresá minutos y segundos como números enteros.');
+      return;
+    }
+    if (s < 0 || s > 59) {
+      this.durationError.set('Los segundos deben estar entre 0 y 59.');
+      return;
+    }
+    if (m < 0) {
+      this.durationError.set('Los minutos no pueden ser negativos.');
+      return;
+    }
+
+    const totalSeconds = m * 60 + s;
+    if (totalSeconds < min || totalSeconds > max) {
+      const minMm = Math.floor(min / 60);
+      const maxMm = Math.floor(max / 60);
+      this.durationError.set(
+        `La duración debe estar entre ${minMm}:00 y ${maxMm}:00.`,
+      );
+      return;
+    }
+
+    const currentDuration = this.detail()?.duration ?? null;
+    const override = totalSeconds === currentDuration ? undefined : totalSeconds;
+
+    this.iniciarModalOpen.set(false);
+    this.durationError.set(null);
+    this.pendingMinutes.set(null);
+    this.pendingSeconds.set(null);
+
+    await this.iniciar(override);
+  }
+
   // Inicia el examen (scheduled → in_progress). Guard D5: solo si canIniciar().
-  async iniciar(): Promise<void> {
+  // `newDuration` opcional en segundos (60..7200). Cuando viene, el back lo
+  // persiste atómicamente junto con la transición de estado.
+  async iniciar(newDuration?: number): Promise<void> {
     if (!this.canIniciar()) return;
 
     const recordId = this.route.snapshot.paramMap.get('recordId') ?? '';
@@ -141,7 +238,7 @@ export class TutorExamDetailViewModel {
     this.isSaving.set(true);
 
     try {
-      await this.iniciarExamen.execute({ recordId });
+      await this.iniciarExamen.execute({ recordId, duration: newDuration });
       // Reload detail y upsert store (R4: list reflects new status immediately).
       await this.reloadDetail(recordId);
     } catch (err) {
@@ -149,6 +246,22 @@ export class TutorExamDetailViewModel {
     } finally {
       this.isSaving.set(false);
     }
+  }
+
+  // Abre el modal de confirmación antes de finalizar. Guard D5: solo si el
+  // examen está in_progress.
+  openFinalizarModal(): void {
+    if (!this.canFinalizar()) return;
+    this.finalizarModalOpen.set(true);
+  }
+
+  cancelFinalizarModal(): void {
+    this.finalizarModalOpen.set(false);
+  }
+
+  async confirmFinalizarModal(): Promise<void> {
+    this.finalizarModalOpen.set(false);
+    await this.finalizar();
   }
 
   // Finaliza el examen (in_progress → finalized). Guard D5: solo si canFinalizar().
@@ -229,23 +342,24 @@ export class TutorExamDetailViewModel {
     this.enabledStudentIds.set(detail.enabledStudentIds);
 
     // Upsert en el store con el nuevo status (R4 mitigation).
-    // Construimos un TutorExam mínimo desde el detail — el classroomId lo
-    // obtenemos del store (ya lo teníamos en el warm path o tras el refetch).
+    // Construimos un TutorExam mínimo desde el detail — el classroomId y el
+    // `scheduled` los obtenemos del store (ya los teníamos en el warm path o
+    // tras el refetch); el detail sí trae course + area actualizados.
     const existingExam = this.store.findByRecordId(recordId);
     if (existingExam) {
       const updatedExam = new TutorExam({
         detailId: detail.id,
         recordId: detail.recordId,
         classroomId: existingExam.classroomId,
-        entryId: existingExam.entryId,
         serverStatus: detail.status,
         name: detail.name,
-        courseId: detail.courseId,
+        course: detail.course,
+        area: detail.area,
         count: detail.count,
         duration: detail.duration,
+        scheduled: existingExam.scheduled,
         startedAt: detail.startedAt,
         finishedAt: detail.finishedAt,
-        createdAt: detail.createdAt,
       });
       this.store.upsert(updatedExam);
     }

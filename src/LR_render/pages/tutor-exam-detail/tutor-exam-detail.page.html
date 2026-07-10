@@ -38,12 +38,49 @@
   @if (vm.detail(); as detail) {
     @let sc = statusChip(detail.status.value);
     <header class="tutor-exam-detail__header">
-      <h1 class="tutor-exam-detail__name">{{ detail.name }}</h1>
-      <span
-        class="tutor-exam-detail__status-chip tutor-exam-detail__status-chip--{{ sc.modifier }}"
-        data-testid="status-chip"
-        >{{ sc.label }}</span
-      >
+      <div class="tutor-exam-detail__title-row">
+        <h1 class="tutor-exam-detail__name">{{ detail.name }}</h1>
+        <span
+          class="tutor-exam-detail__status-chip tutor-exam-detail__status-chip--{{ sc.modifier }}"
+          data-testid="status-chip"
+          >{{ sc.label }}</span
+        >
+      </div>
+
+      <ul class="tutor-exam-detail__meta" data-testid="exam-meta">
+        @if (detail.area) {
+          <li>
+            <span class="material-symbols-outlined" aria-hidden="true">category</span>
+            <span>Área: <strong>{{ detail.area }}</strong></span>
+          </li>
+        }
+        @if (detail.course) {
+          <li>
+            <span class="material-symbols-outlined" aria-hidden="true">menu_book</span>
+            <span>Curso: <strong>{{ detail.course }}</strong></span>
+          </li>
+        }
+        <li>
+          <span class="material-symbols-outlined" aria-hidden="true">quiz</span>
+          <span>{{ countLabel(detail) }}</span>
+        </li>
+        <li>
+          <span class="material-symbols-outlined" aria-hidden="true">timer</span>
+          <span>Duración: <strong>{{ durationMinutes(detail) }} min</strong></span>
+        </li>
+        @if (detail.startedAt) {
+          <li>
+            <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>
+            <span>Iniciado: <strong>{{ formatDateTime(detail.startedAt) }}</strong></span>
+          </li>
+        }
+        @if (detail.finishedAt) {
+          <li>
+            <span class="material-symbols-outlined" aria-hidden="true">flag</span>
+            <span>Finalizado: <strong>{{ formatDateTime(detail.finishedAt) }}</strong></span>
+          </li>
+        }
+      </ul>
     </header>
 
     <!-- Error de acción (iniciar / finalizar / habilitar) -->
@@ -84,9 +121,139 @@
       }
     </section>
 
+    <!-- Modal: confirmar finalización antes de tiempo -->
+    @if (vm.finalizarModalOpen()) {
+      <div
+        class="tutor-exam-detail__modal-backdrop"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="finalizar-modal-title"
+        data-testid="finalizar-modal"
+      >
+        <div class="tutor-exam-detail__modal">
+          <h2 id="finalizar-modal-title" class="tutor-exam-detail__modal-title">
+            Finalizar examen
+          </h2>
+          <p class="tutor-exam-detail__modal-hint">
+            ¿Seguro que querés cerrar el examen antes de tiempo? Los alumnos
+            no podrán seguir marcando y se enviará a procesar.
+          </p>
+          <div class="tutor-exam-detail__modal-actions tutor-exam-detail__modal-actions--stacked">
+            <button
+              type="button"
+              class="tutor-exam-detail__modal-confirm tutor-exam-detail__modal-confirm--danger tutor-exam-detail__modal-confirm--large"
+              data-testid="btn-confirm-finalizar"
+              [disabled]="vm.isSaving()"
+              (click)="onConfirmFinalizarModal()"
+            >
+              Sí, finalizar
+            </button>
+            <button
+              type="button"
+              class="tutor-exam-detail__modal-cancel tutor-exam-detail__modal-cancel--large"
+              data-testid="btn-cancel-finalizar"
+              [disabled]="vm.isSaving()"
+              (click)="onCancelFinalizarModal()"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Modal: editar duración antes de iniciar (formato mm:ss, mobile-first) -->
+    @if (vm.iniciarModalOpen()) {
+      <div
+        class="tutor-exam-detail__modal-backdrop"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="iniciar-modal-title"
+        data-testid="iniciar-modal"
+      >
+        <div class="tutor-exam-detail__modal tutor-exam-detail__modal--iniciar">
+          <h2 id="iniciar-modal-title" class="tutor-exam-detail__modal-title">
+            Iniciar examen
+          </h2>
+          <p class="tutor-exam-detail__modal-hint">
+            Confirmá o ajustá el tiempo antes de iniciar. Los alumnos verán esta duración.
+          </p>
+
+          <div class="tutor-exam-detail__mmss">
+            <label class="tutor-exam-detail__mmss-field">
+              <span class="tutor-exam-detail__mmss-label">Minutos</span>
+              <input
+                type="number"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                min="0"
+                max="120"
+                step="1"
+                data-testid="minutes-input"
+                [value]="vm.pendingMinutes()"
+                (input)="onMinutesInput($event)"
+              />
+            </label>
+            <span class="tutor-exam-detail__mmss-separator" aria-hidden="true">:</span>
+            <label class="tutor-exam-detail__mmss-field">
+              <span class="tutor-exam-detail__mmss-label">Segundos</span>
+              <input
+                type="number"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                min="0"
+                max="59"
+                step="1"
+                data-testid="seconds-input"
+                [value]="vm.pendingSeconds()"
+                (input)="onSecondsInput($event)"
+              />
+            </label>
+          </div>
+
+          <p class="tutor-exam-detail__mmss-total" data-testid="duration-total">
+            Total: <strong>{{ formatMmSs(vm.pendingTotalSeconds()) }}</strong>
+            <span class="tutor-exam-detail__mmss-hint">(mín. 1:00 · máx. 120:00)</span>
+          </p>
+
+          @if (vm.durationError()) {
+            <p class="tutor-exam-detail__modal-error" role="alert">
+              {{ vm.durationError() }}
+            </p>
+          }
+
+          <div class="tutor-exam-detail__modal-actions tutor-exam-detail__modal-actions--stacked">
+            <button
+              type="button"
+              class="tutor-exam-detail__modal-confirm tutor-exam-detail__modal-confirm--large"
+              data-testid="btn-confirm-iniciar"
+              [disabled]="vm.isSaving()"
+              (click)="onConfirmIniciarModal()"
+            >
+              Iniciar examen
+            </button>
+            <button
+              type="button"
+              class="tutor-exam-detail__modal-cancel tutor-exam-detail__modal-cancel--large"
+              data-testid="btn-cancel-iniciar"
+              [disabled]="vm.isSaving()"
+              (click)="onCancelIniciarModal()"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
     <!-- Lista de alumnos con checkboxes (D5: hasSubmitted + finalized → disabled) -->
     <section class="tutor-exam-detail__students">
-      <h2>Alumnos del aula</h2>
+      <div class="tutor-exam-detail__students-header">
+        <h2>Alumnos del aula</h2>
+        <span class="tutor-exam-detail__students-counter" data-testid="students-counter">
+          {{ vm.enabledCount() }} habilitados de {{ vm.totalStudents() }}
+        </span>
+      </div>
       <ul class="tutor-exam-detail__student-list">
         @for (student of vm.students(); track student.studentId) {
           <li class="tutor-exam-detail__student-item" data-testid="student-item">
