@@ -108,7 +108,7 @@
   }
 
   &__error {
-    color: var(--color-error, #dc2626);
+    color: var(--color-error);
   }
 
   &__list {
@@ -166,37 +166,40 @@
   }
 }
 
-.profile-meta {
-  margin: var(--space-xs) 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-
-  &__row {
+// Fila ícono+texto dentro del profile-card. Espeja el patrón del home del
+// alumno (`home.page.scss .user-info`) para que la jerarquía visual sea
+// idéntica entre alumno y tutor. Encapsulada por Angular al scoparse desde
+// `.profile-card` — no colisiona con estilos globales.
+.profile-card {
+  .user-info {
+    list-style: none;
+    margin: var(--space-xs) 0 0;
+    padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.15rem;
+    gap: 0.25rem;
+    color: var(--color-on-surface-variant);
+    font-size: 0.875rem;
 
-    dt {
-      margin: 0;
-      font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
+    li {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .material-symbols-outlined {
+      font-size: 1rem;
+      line-height: 1;
       color: var(--color-on-surface-variant);
     }
 
-    dd {
-      margin: 0;
-      font-size: 0.95rem;
-      color: var(--color-on-surface);
+    // Marca el DNI/código en mono para hacerlo visualmente identificable
+    // como dato técnico (mismo criterio que el home del alumno).
+    &__mono {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      letter-spacing: 0.02em;
     }
-  }
-
-  &__mono {
-    font-family: var(--font-mono);
-    letter-spacing: 0.02em;
   }
 }
 
@@ -230,14 +233,14 @@
   margin: var(--space-xs) 0 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--space-xs);
 }
 
 .classroom-item {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
-  padding: 0.5rem 0;
+  padding: var(--space-xs) 0;
   border-bottom: 1px solid var(--color-outline-variant);
 
   &:last-child {
@@ -274,18 +277,61 @@
   gap: var(--space-xs);
 }
 
+// Card con strip lateral de color por estado — mismo patrón que
+// `home.page.scss .card`. El `<span class="exam-card__strip">` es absolute,
+// ocupa el alto completo del <li> y su color se decide desde los
+// modificadores `--scheduled|--in-progress|--finalized`.
 .exam-card {
-  background: var(--color-card-bg, #fff);
-  border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: var(--radius-md, 8px);
-  padding: var(--space-md, 1rem);
+  position: relative;
+  padding: var(--space-md) 1.1rem var(--space-md) 1.25rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-outline-variant);
+  background: var(--color-surface-container-lowest);
   cursor: pointer;
+  overflow: hidden;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    transform 80ms ease;
 
   &:hover,
-  &:focus {
-    border-color: var(--color-primary, #1e3a5f);
-    outline: 2px solid var(--color-primary, #1e3a5f);
-    outline-offset: 2px;
+  &:focus-visible {
+    background: var(--color-surface-container-low);
+    border-color: var(--color-primary);
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+
+  &__strip {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--color-outline);
+  }
+
+  // Modificadores por estado. Se bindean desde el template según
+  // `exam.serverStatus.value` — el strip verde comunica "en curso"
+  // sin que el tutor tenga que leer el badge.
+  &--in-progress &__strip {
+    background: var(--color-success);
+  }
+
+  &--finalized &__strip {
+    background: var(--color-outline-variant);
+  }
+
+  &--scheduled &__strip {
+    background: var(--color-outline);
+  }
+
+  &--scheduled,
+  &--finalized {
+    opacity: 0.7;
   }
 
   &__header {
@@ -305,15 +351,15 @@
     font-size: 0.75rem;
     font-weight: 600;
     padding: 0.125rem 0.5rem;
-    border-radius: 4px;
-    background: var(--color-status-bg, #f3f4f6);
-    color: var(--color-status-text, #374151);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-container-high);
+    color: var(--color-on-surface-variant);
   }
 
   &__meta {
     display: flex;
     gap: 0.75rem;
     font-size: 0.875rem;
-    color: var(--color-text-secondary, #6b7280);
+    color: var(--color-on-surface-variant);
   }
 }

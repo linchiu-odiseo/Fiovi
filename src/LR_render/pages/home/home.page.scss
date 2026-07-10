@@ -29,6 +29,15 @@
     gap: var(--space-xs);
   }
 
+  // Fila que agrupa el label "Bienvenido" con el atajo dev "Demo sheet". El
+  // atajo se renderiza a la derecha solo cuando `environment.devTools` es true.
+  &__welcome-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+  }
+
   // Label-caps "Bienvenido" — separación estructural por estilo, no por
   // tamaño. El alumno reconoce que sigue el saludo grande sin que el ojo
   // tenga que escanear texto.
@@ -350,5 +359,32 @@
     color: var(--color-outline);
     font-size: 1.25rem;
     pointer-events: none;
+  }
+}
+
+// Atajo dev-only a /demo-sheet. Chip compacto al costado de "Bienvenido",
+// borde punteado para señalar "esto no es UI real".
+.demo-sheet-link {
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-pill);
+  border: 1px dashed var(--color-outline-variant);
+  background: transparent;
+  color: var(--color-on-surface-variant);
+  font-family: var(--font-body);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+
+  &:hover,
+  &:focus-visible {
+    background: var(--color-surface-container-low);
+    border-color: var(--color-primary);
+    color: var(--color-primary);
   }
 }

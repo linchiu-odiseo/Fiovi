@@ -353,7 +353,7 @@ export class FakeTutorExamsApi implements TutorExamsApi {
     | { kind: 'resolve'; result: readonly ClassroomStudent[] }
     | { kind: 'reject'; error: Error }
     | null = null;
-  private listClassroomStudentsCalls: Array<{ classroomId: string; virtualExamDetailId: string }> = [];
+  private listClassroomStudentsCalls: { classroomId: string; virtualExamDetailId: string }[] = [];
 
   willResolveListClassroomStudents(result: readonly ClassroomStudent[]): void {
     this.nextListClassroomStudents = { kind: 'resolve', result };
@@ -363,7 +363,7 @@ export class FakeTutorExamsApi implements TutorExamsApi {
     this.nextListClassroomStudents = { kind: 'reject', error };
   }
 
-  getListClassroomStudentsCalls(): ReadonlyArray<{ classroomId: string; virtualExamDetailId: string }> {
+  getListClassroomStudentsCalls(): readonly { classroomId: string; virtualExamDetailId: string }[] {
     return this.listClassroomStudentsCalls;
   }
 
@@ -381,7 +381,7 @@ export class FakeTutorExamsApi implements TutorExamsApi {
     | { kind: 'resolve' }
     | { kind: 'reject'; error: Error }
     | null = null;
-  private updateEnabledStudentsCalls: Array<{ recordId: string; enabledStudentIds: readonly string[] }> = [];
+  private updateEnabledStudentsCalls: { recordId: string; enabledStudentIds: readonly string[] }[] = [];
 
   willResolveUpdateEnabledStudents(): void {
     this.nextUpdateEnabledStudents = { kind: 'resolve' };
@@ -391,7 +391,7 @@ export class FakeTutorExamsApi implements TutorExamsApi {
     this.nextUpdateEnabledStudents = { kind: 'reject', error };
   }
 
-  getUpdateEnabledStudentsCalls(): ReadonlyArray<{ recordId: string; enabledStudentIds: readonly string[] }> {
+  getUpdateEnabledStudentsCalls(): readonly { recordId: string; enabledStudentIds: readonly string[] }[] {
     return this.updateEnabledStudentsCalls;
   }
 

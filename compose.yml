@@ -4,5 +4,5 @@ services:
     image: fiovi:latest
     container_name: fiovi
     ports:
-      - "3006:80"
+      - "3007:80"
     restart: unless-stopped

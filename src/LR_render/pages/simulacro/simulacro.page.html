@@ -124,6 +124,18 @@
   }
 </main>
 
+@if (isDev && vm.vigente()) {
+  <button
+    type="button"
+    class="dev-fab"
+    aria-label="DEV: marcar aleatoriamente"
+    title="DEV: marcar aleatoriamente (A–E o vacío)"
+    (click)="onDadoClick()"
+  >
+    🎲
+  </button>
+}
+
 @if (vm.lastAck(); as ack) {
   <app-submission-receipt-modal [ack]="ack" (closed)="vm.onReceiptClose()" />
 }

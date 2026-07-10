@@ -67,6 +67,78 @@
     gap: 1.25rem;
   }
 
+  // Botón "Continuar con Google" — outlined light siguiendo los guidelines
+  // oficiales de Google Sign-In: fondo blanco, borde sutil, logo colorful a
+  // la izquierda. En hover, el borde toma Fiovi Blue para atarlo al sistema
+  // sin romper el look Google-nativo. Se distingue del `.login__submit`
+  // primary sólido azul del form: jerarquía "opción alternativa" vs "acción
+  // por default una vez que hay email + password".
+  &__google-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    width: 100%;
+    min-height: 3rem;
+    padding: 0 var(--space-md);
+    border: 1.5px solid var(--color-outline-variant);
+    border-radius: var(--radius);
+    background: var(--color-surface-container-lowest);
+    color: var(--color-on-surface);
+    font-family: var(--font-body);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    cursor: pointer;
+    transition:
+      background 120ms ease,
+      border-color 120ms ease,
+      transform 60ms ease;
+
+    &:hover:not(:disabled) {
+      background: var(--color-surface-container-low);
+      border-color: var(--color-primary);
+    }
+
+    &:active:not(:disabled) {
+      transform: scale(0.99);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+    }
+  }
+
+  &__google-btn-icon {
+    flex-shrink: 0;
+  }
+
+  // Separador "o continuá con email" entre el botón Google y el form. Dos
+  // líneas horizontales flanquean un label uppercase, patrón standard iOS
+  // /material que comunica "estas son dos opciones separadas".
+  &__divider {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-block: 0.25rem;
+  }
+
+  &__divider-line {
+    flex: 1;
+    height: 1px;
+    background: var(--color-outline-variant);
+  }
+
+  &__divider-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--color-on-surface-variant);
+    white-space: nowrap;
+  }
+
   &__submit {
     height: 3rem; // touch target 48 px exacto
     padding: 0 var(--space-md);

@@ -2,6 +2,7 @@ import { Component, DestroyRef, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AlternativaValue } from '../../../L1_domain/ports/markings-storage';
 import { AdmissionArea } from '../../../L1_domain/value-objects/admission-area';
+import { environment } from '../../../environments/environment';
 import { SimulacroPageViewModel } from '../../view-models/simulacro.view-model';
 import { SubmissionReceiptModalComponent } from '../../components/submission-receipt-modal/submission-receipt-modal.component';
 import { AdmissionAreaPickerComponent } from '../../components/admission-area-picker/admission-area-picker.component';
@@ -32,6 +33,13 @@ export class SimulacroPage {
   protected readonly vm = inject(SimulacroPageViewModel);
 
   protected readonly alternativas = ALTERNATIVAS;
+  // Gate del botón dado (y otros atajos dev). Se lee de `environment.devTools`,
+  // que `scripts/build-env.mjs` genera a partir de `DEV_TOOLS` en `.env`. El
+  // flag NO depende de `production` porque el proyecto no configura
+  // `fileReplacements` en angular.json — la única forma confiable de apagar
+  // dev-tools en un build de release es setear `DEV_TOOLS=false` en `.env`
+  // antes de correr `npm run build`.
+  protected readonly isDev = environment.devTools;
 
   // Estado del long-press en curso. Vivimos en page (no en view-model)
   // porque depende de eventos puramente DOM (PointerEvent.clientX/Y); el
@@ -135,5 +143,9 @@ export class SimulacroPage {
 
   protected onAdmissionAreaSeleccion(area: AdmissionArea): void {
     void this.vm.seleccionarArea(area);
+  }
+
+  protected onDadoClick(): void {
+    void this.vm.marcarAleatorio();
   }
 }

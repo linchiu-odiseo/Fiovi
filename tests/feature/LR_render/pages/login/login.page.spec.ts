@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter, Router } from '@angular/router';
+import { ActivatedRoute, provideRouter, Router } from '@angular/router';
 import { Component } from '@angular/core';
 import { LoginPage } from '../../../../../src/LR_render/pages/login/login.page';
 import { LoginUseCase } from '../../../../../src/L2_application/use-cases/login.use-case';
@@ -235,6 +235,124 @@ describe('LoginPage', () => {
       const footer = el.querySelector('.version-footer');
       expect(footer).not.toBeNull();
       expect(footer?.textContent?.trim()).toBe(`Fiovi · versión ${environment.appVersion}`);
+    });
+  });
+
+  // ─── Google SSO ──────────────────────────────────────────────────────────
+  // Tests del botón "Continuar con Google" y el mapping de `?ssoError=` a copy
+  // es-PE. Ver `openspec/changes/add-google-sso-login/specs/auth-login/spec.md`.
+
+  describe('Google SSO', () => {
+    it('renderiza el botón Google con el data-testid canónico cuando el flag está activo', () => {
+      // El flag `environment.googleSsoEnabled` es true por default en el
+      // build de tests (`.env` de dev no lo apaga). Si algún día se pusiera
+      // en false, este test fallaría y sería una señal clara de la desviación.
+      expect(environment.googleSsoEnabled).toBe(true);
+
+      const fixture = TestBed.createComponent(LoginPage);
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+      const btn = el.querySelector('[data-testid="btn-google-sso"]');
+      expect(btn).not.toBeNull();
+      expect(btn?.textContent).toContain('Continuar con Google');
+    });
+
+    it('click en el botón dispara window.location.assign con la URL Google del backend', () => {
+      const assignSpy = vi.fn();
+      const originalLocation = window.location;
+      Object.defineProperty(window, 'location', {
+        writable: true,
+        value: { ...originalLocation, assign: assignSpy },
+      });
+
+      try {
+        const fixture = TestBed.createComponent(LoginPage);
+        fixture.detectChanges();
+        const btn = fixture.nativeElement.querySelector(
+          '[data-testid="btn-google-sso"]',
+        ) as HTMLButtonElement;
+        btn.click();
+
+        const expected =
+          `${environment.apiBaseUrl}/t/${environment.tenantSlug}` +
+          `/auth/google/start?app=pwa&returnTo=%2F`;
+        expect(assignSpy).toHaveBeenCalledTimes(1);
+        expect(assignSpy).toHaveBeenCalledWith(expected);
+      } finally {
+        Object.defineProperty(window, 'location', {
+          writable: true,
+          value: originalLocation,
+        });
+      }
+    });
+
+    // Mapping de los 8 códigos definidos por learnex + fallback unknown.
+    // Los tests parametrizados sobre-escriben ActivatedRoute con el ssoError
+    // deseado y verifican el copy es-PE en el slot `.error`.
+    const errorMappings: readonly [string, string][] = [
+      ['sso_disabled', 'El login con Google no está disponible para tu institución.'],
+      ['google_error', 'Google no autorizó tu ingreso. Intentá de nuevo.'],
+      ['missing_params', 'Hubo un problema con Google. Intentá de nuevo.'],
+      ['state_invalid', 'La sesión de login venció. Intentá de nuevo.'],
+      ['hosted_domain_mismatch', 'Solo podés ingresar con tu correo institucional.'],
+      ['email_not_verified', 'Tu correo de Google no está verificado.'],
+      ['user_not_found', 'Tu cuenta de Google no está registrada. Contactá a tu tutor.'],
+      ['unknown', 'No se pudo iniciar sesión con Google. Intentá de nuevo.'],
+      ['weird_new_code', 'No se pudo iniciar sesión con Google. Intentá de nuevo.'], // fallback
+    ];
+
+    for (const [code, expectedMessage] of errorMappings) {
+      it(`ssoError=${code} renderiza el mensaje "${expectedMessage.slice(0, 40)}…"`, async () => {
+        TestBed.resetTestingModule();
+        await TestBed.configureTestingModule({
+          imports: [LoginPage],
+          providers: [
+            provideRouter([
+              { path: 'login', component: LoginPage },
+              { path: 'student/home', component: StudentHomeStub },
+              { path: 'tutor/home', component: TutorHomeStub },
+            ]),
+            { provide: LoginUseCase, useValue: fakeUseCase },
+            {
+              provide: ActivatedRoute,
+              useValue: { snapshot: { queryParams: { ssoError: code } } },
+            },
+          ],
+        }).compileComponents();
+
+        const fixture = TestBed.createComponent(LoginPage);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+
+        const el = fixture.nativeElement as HTMLElement;
+        const errorEl = el.querySelector('.error');
+        expect(errorEl).not.toBeNull();
+        expect(errorEl?.textContent).toContain(expectedMessage);
+      });
+    }
+
+    it('sin ssoError en la ruta, el slot .error no aparece', async () => {
+      TestBed.resetTestingModule();
+      await TestBed.configureTestingModule({
+        imports: [LoginPage],
+        providers: [
+          provideRouter([{ path: 'login', component: LoginPage }]),
+          { provide: LoginUseCase, useValue: fakeUseCase },
+          {
+            provide: ActivatedRoute,
+            useValue: { snapshot: { queryParams: {} } },
+          },
+        ],
+      }).compileComponents();
+
+      const fixture = TestBed.createComponent(LoginPage);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('.error')).toBeNull();
     });
   });
 });

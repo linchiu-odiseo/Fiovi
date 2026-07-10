@@ -62,6 +62,24 @@ if (missing.length) {
 // (ausente, 'false', '0') queda en false.
 const draftEnabled = (env['DRAFT_ENABLED'] ?? '').toLowerCase() === 'true';
 
+// DEV_TOOLS: habilita atajos de UI solo útiles para desarrollo (ej. botón dado
+// en la cartilla que marca aleatoriamente, atajo "Cartilla prueba" en /home).
+// Misma coerción que DRAFT_ENABLED: solo 'true' activa; ausente o cualquier otro
+// valor queda en false. Se inyecta en ambos environment.ts para que la señal
+// sobreviva a builds prod si alguien quiere hacer un smoke test con las herramientas
+// activas — pero en el build de release corresponde dejar DEV_TOOLS=false en .env.
+const devTools = (env['DEV_TOOLS'] ?? '').toLowerCase() === 'true';
+
+// GOOGLE_SSO_ENABLED: controla la visibilidad del botón "Continuar con Google"
+// en /login. A diferencia de DRAFT_ENABLED y DEV_TOOLS, este flag es opt-out:
+// el default (ausente en .env) es true — el botón se ve. Solo el string
+// literal 'false' (case-insensitive) lo apaga. Motivo: en dev, prod y todos
+// los ambientes normales queremos el botón visible; el flag existe para poder
+// desactivarlo puntualmente si el backend learnex de un ambiente no soporta
+// aún el flujo `?app=pwa` + `WEB_PWA_BASE_URL` y queremos evitar exponer un
+// botón que redirige mal.
+const googleSsoEnabled = (env['GOOGLE_SSO_ENABLED'] ?? 'true').toLowerCase() !== 'false';
+
 const envDir = resolve(repoRoot, 'src/environments');
 mkdirSync(envDir, { recursive: true });
 
@@ -83,6 +101,8 @@ writeFileSync(
     `  tenantSlug: ${tenantSlug},\n` +
     `  appVersion: ${appVersion},\n` +
     `  draftEnabled: ${draftEnabled},\n` +
+    `  devTools: ${devTools},\n` +
+    `  googleSsoEnabled: ${googleSsoEnabled},\n` +
     `};\n`,
 );
 
@@ -94,6 +114,8 @@ writeFileSync(
     `  tenantSlug: ${tenantSlug},\n` +
     `  appVersion: ${appVersion},\n` +
     `  draftEnabled: ${draftEnabled},\n` +
+    `  devTools: ${devTools},\n` +
+    `  googleSsoEnabled: ${googleSsoEnabled},\n` +
     `};\n`,
 );
 

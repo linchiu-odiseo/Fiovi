@@ -8,7 +8,7 @@
 
 **Fiovi** es una PWA Angular para móviles que sirve como **cartilla virtual de marcaciones** para simulacros (exámenes de práctica). El alumno marca las alternativas A–E por pregunta en pantalla; el enunciado viene impreso en una hoja física que entrega el profesor. Backend: **learnex** (NestJS + Postgres, multi-tenant) en Docker. Auth via cookies HttpOnly + `withCredentials: true`.
 
-**Estado actual (2026-06-20): Fase 3 completada. Sin change activo.**
+**Estado actual (2026-07-08): Fase 3 completada + admission-area cerrado. Sin change activo.**
 
 Changes archivados a la fecha (en `openspec/changes/archive/`):
 
@@ -20,6 +20,7 @@ Changes archivados a la fecha (en `openspec/changes/archive/`):
 - `2026-06-17-pwa-auto-update` — PWA auto-update con `SwUpdate.versionUpdates` y `appData.version` inyectada post-build.
 - `2026-06-17-fase-3-exam-submit-learnex` — Fase 3 submit de marcaciones contra learnex (cierra la migración API-FAKE → learnex).
 - `2026-06-19-draft-auto-save` — auto-save de borrador (`submit-progress-snapshot`).
+- `2026-07-08-add-admission-area` — VO AdmissionArea + picker UI + integración con envío/draft.
 
 **Próximos changes candidatos:** dashboard tutor real (aulas, activación de examen), resultados post-envío, historial del alumno, anti-fraude hardening. Antes de empezar cualquiera: ver workflow SDD en [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
