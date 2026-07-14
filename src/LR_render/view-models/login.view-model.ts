@@ -46,7 +46,11 @@ export class LoginViewModel {
     }
   }
 
-  async submit(credentials: { email: string; password: string }): Promise<SubmitOutcome> {
+  async submit(credentials: {
+    email: string;
+    password: string;
+    captchaToken?: string;
+  }): Promise<SubmitOutcome> {
     this.isSubmitting.set(true);
     this.errorMessage.set(null);
     try {

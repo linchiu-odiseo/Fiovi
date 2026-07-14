@@ -98,7 +98,17 @@
       </p>
     }
 
-    <button type="submit" class="login__submit" [disabled]="form.invalid || vm.isSubmitting()">
+    @if (captchaEnabled) {
+      <app-captcha-widget #captcha (tokenChange)="onCaptchaTokenChange($event)" />
+    }
+
+    <button
+      type="submit"
+      class="login__submit"
+      [disabled]="
+        form.invalid || vm.isSubmitting() || (captchaEnabled && !captchaToken())
+      "
+    >
       @if (vm.isSubmitting()) {
         Ingresando…
       } @else {
