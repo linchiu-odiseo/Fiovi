@@ -1,4 +1,5 @@
 import { InjectionToken } from '@angular/core';
+import { CaptchaProvider } from '../L1_domain/ports/captcha-provider';
 import { IdentityStorage } from '../L1_domain/ports/identity-storage';
 import { ProfileStorage } from '../L1_domain/ports/profile-storage';
 import { OutboxStoragePort } from '../L1_domain/ports/outbox-storage.port';
@@ -24,3 +25,8 @@ export const SW_MESSENGER = new InjectionToken<SwMessengerPort>('SwMessengerPort
 // vive en `app.config.ts` con `useExisting: HttpTutorExamsApi`.
 // Las VM del tutor lo inyectan para usarlo sin acoplarse a la clase L3.
 export const TUTOR_EXAMS_API = new InjectionToken<TutorExamsApi>('TUTOR_EXAMS_API');
+
+// Token DI para el puerto del captcha anti-bot que protege el login. El binding
+// concreto vive en `app.config.ts` con `useExisting: CloudflareTurnstileProvider`.
+// El `CaptchaWidgetComponent` (LR) lo consume vía este token.
+export const CAPTCHA_PROVIDER = new InjectionToken<CaptchaProvider>('CaptchaProvider');
