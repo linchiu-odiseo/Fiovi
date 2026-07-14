@@ -33,7 +33,7 @@ export class FakeAuthRepository implements AuthRepository {
     | { kind: 'reject'; error: Error }
     | null = null;
 
-  private loginCalls: { email: string; password: string }[] = [];
+  private loginCalls: { email: string; password: string; captchaToken?: string }[] = [];
   private selectTenantCalls: { selectionToken: string; slug: string }[] = [];
   private ssoProvidersCalls = 0;
   private meCalls = 0;
@@ -93,7 +93,7 @@ export class FakeAuthRepository implements AuthRepository {
 
   // Inspectores
 
-  getLoginCalls(): readonly { email: string; password: string }[] {
+  getLoginCalls(): readonly { email: string; password: string; captchaToken?: string }[] {
     return this.loginCalls;
   }
 
@@ -126,6 +126,7 @@ export class FakeAuthRepository implements AuthRepository {
   async login(credentials: {
     email: string;
     password: string;
+    captchaToken?: string;
   }): Promise<Identity | SelectionChallenge> {
     this.loginCalls.push(credentials);
     if (!this.nextLogin)
