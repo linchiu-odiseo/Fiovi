@@ -38,7 +38,7 @@ Este cambio deja el cliente listo. Coordinación: el equipo learnex no prenderá
 
 ### Added
 
-- **`captcha-widget`** (implícita, sin spec formal en `openspec/specs/`) — port `CaptchaProvider`, adapter `CloudflareTurnstileProvider`, componente `CaptchaWidgetComponent`, token DI `CAPTCHA_PROVIDER`, env vars `CAPTCHA_PROVIDER` + `CAPTCHA_SITE_KEY`, CSP para `challenges.cloudflare.com`.
+- **`captcha-widget`** (implícita, sin spec formal en `openspec/specs/`) — port `CaptchaProvider`, adapter `CloudflareTurnstileProvider`, componente `CaptchaWidgetComponent`, token DI `CAPTCHA_PROVIDER`, env vars `CAPTCHA_PROVIDER` + `PUBLIC_CAPTCHA_SITE_KEY`, CSP para `challenges.cloudflare.com`.
 
 ### Modified
 
@@ -69,9 +69,9 @@ Este change no genera archivos de delta spec bajo `openspec/changes/2026-07-14-a
 | Var | Dev (recomendado) | Prod |
 |-----|-------------------|------|
 | `CAPTCHA_PROVIDER` | `turnstile` (o vacío para desactivar) | `turnstile` |
-| `CAPTCHA_SITE_KEY` | `3x00000000000000000000FF` (test key siempre-pass) o vacío | site key real de Cloudflare (pedir a ops learnex — misma que web-tenant) |
+| `PUBLIC_CAPTCHA_SITE_KEY` | `3x00000000000000000000FF` (test key siempre-pass) o vacío | site key real de Cloudflare (pedir a ops learnex — misma que web-tenant) |
 
-Con `CAPTCHA_SITE_KEY` vacío, el widget no renderiza, el login viaja sin `captchaToken`, y el backend con `CAPTCHA_SECRET` vacío acepta la request igual. Dev sin fricción.
+Con `PUBLIC_CAPTCHA_SITE_KEY` vacío, el widget no renderiza, el login viaja sin `captchaToken`, y el backend con `CAPTCHA_SECRET` vacío acepta la request igual. Dev sin fricción.
 
 Test keys documentadas por Cloudflare para debug:
 - `3x00000000000000000000FF` — invisible, siempre pasa.
@@ -82,7 +82,7 @@ Test keys documentadas por Cloudflare para debug:
 - **learnex PR #517** — ya mergeado. Sin él, learnex no aceptaría el campo `captchaToken` en el body.
 - **Cloudflare Turnstile** — cuenta compartida con web-tenant. El dominio `yangpimpollo.com` ya está autorizado en el panel de Cloudflare; cubre `app.yangpimpollo.com` (Fiovi) sin trámite adicional.
 - **Ops de learnex** — cuando Fiovi esté en prod con captcha, ops setea `CAPTCHA_SECRET` + demás vars en el `.env` del back. A partir de ese momento la protección real se activa para todos.
-- **Team `.env` local** — sumar `CAPTCHA_PROVIDER=turnstile` y `CAPTCHA_SITE_KEY=3x00000000000000000000FF` para probar el flow completo en dev. Sin esas vars, el flow sigue funcionando (widget deshabilitado).
+- **Team `.env` local** — sumar `CAPTCHA_PROVIDER=turnstile` y `PUBLIC_CAPTCHA_SITE_KEY=3x00000000000000000000FF` para probar el flow completo en dev. Sin esas vars, el flow sigue funcionando (widget deshabilitado).
 
 ## Deuda técnica declarada
 
@@ -93,7 +93,7 @@ Test keys documentadas por Cloudflare para debug:
 
 | # | Caso | Estado |
 |---|------|--------|
-| 1 | Dev con `CAPTCHA_SITE_KEY=""` | Login funciona idéntico a antes; body sin `captchaToken` |
+| 1 | Dev con `PUBLIC_CAPTCHA_SITE_KEY=""` | Login funciona idéntico a antes; body sin `captchaToken` |
 | 2 | Dev con test key siempre-pass (`3x00...FF`) | Widget carga, token viaja, backend acepta |
 | 3 | Prod con site key real + `CAPTCHA_SECRET` vacío en back | Widget carga, token viaja, backend ignora (no-op) |
 | 4 | Prod con site key real + `CAPTCHA_SECRET` real en back | Widget carga, token viaja, backend valida — protección activa |

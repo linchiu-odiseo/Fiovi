@@ -30,7 +30,7 @@ Preparar Fiovi para el captcha anti-bot que learnex ya mergeó en `POST /auth/lo
 
 - **config + env**
   - `app.config.ts`: binding `CAPTCHA_PROVIDER` → `CloudflareTurnstileProvider`.
-  - `scripts/build-env.mjs`: lee `CAPTCHA_PROVIDER` y `CAPTCHA_SITE_KEY` opcionales; los inyecta en `environment{,.production}.ts`.
+  - `scripts/build-env.mjs`: lee `CAPTCHA_PROVIDER` y `PUBLIC_CAPTCHA_SITE_KEY` opcionales; los inyecta en `environment{,.production}.ts`.
   - `src/index.html`: CSP amplía `script-src` y `frame-src` con `https://challenges.cloudflare.com`.
   - `.env.example`: (pendiente — bloqueado por permisos del harness) sumar las dos vars con doc.
 
@@ -49,10 +49,10 @@ Preparar Fiovi para el captcha anti-bot que learnex ya mergeó en `POST /auth/lo
 
 ### Added
 
-- **`captcha-widget`** (implícita, sin spec formal) — port `CaptchaProvider`, adapter `CloudflareTurnstileProvider`, componente `CaptchaWidgetComponent`, token DI `CAPTCHA_PROVIDER`, env vars `CAPTCHA_PROVIDER` + `CAPTCHA_SITE_KEY`, CSP para `challenges.cloudflare.com`.
+- **`captcha-widget`** (implícita, sin spec formal) — port `CaptchaProvider`, adapter `CloudflareTurnstileProvider`, componente `CaptchaWidgetComponent`, token DI `CAPTCHA_PROVIDER`, env vars `CAPTCHA_PROVIDER` + `PUBLIC_CAPTCHA_SITE_KEY`, CSP para `challenges.cloudflare.com`.
 
 ## Rollout
 
-1. **Fiovi merge y deploy a prod** (este cambio) — con `CAPTCHA_SITE_KEY` seteada en `.env` de prod (site key real de Cloudflare, se comparte con web-tenant por dominio `yangpimpollo.com`).
+1. **Fiovi merge y deploy a prod** (este cambio) — con `PUBLIC_CAPTCHA_SITE_KEY` seteada en `.env` de prod (site key real de Cloudflare, se comparte con web-tenant por dominio `yangpimpollo.com`).
 2. **Coordinar con ops de learnex**: cuando el prod de Fiovi ya está corriendo con captcha, ops setea `CAPTCHA_SECRET` + las demás vars de captcha en el `.env` del backend. A partir de ese momento el server valida tokens y rechaza requests sin captcha válido.
-3. **Dev/local**: sin cambios de comportamiento — `.env` sin `CAPTCHA_SITE_KEY` (o con la test key `3x00000000000000000000FF` que siempre pasa) deja el login funcionando como antes.
+3. **Dev/local**: sin cambios de comportamiento — `.env` sin `PUBLIC_CAPTCHA_SITE_KEY` (o con la test key `3x00000000000000000000FF` que siempre pasa) deja el login funcionando como antes.

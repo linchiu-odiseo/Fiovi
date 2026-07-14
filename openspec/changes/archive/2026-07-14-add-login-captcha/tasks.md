@@ -27,9 +27,9 @@
 ## Phase 5: Config + env
 
 - [x] T5.1 `app.config.ts`: binding `CAPTCHA_PROVIDER` → `CloudflareTurnstileProvider`. (`src/app.config.ts`)
-- [x] T5.2 `scripts/build-env.mjs`: lee `CAPTCHA_PROVIDER` y `CAPTCHA_SITE_KEY` opcionales; los escribe en `environment{,.production}.ts` (default vacíos). (`scripts/build-env.mjs`)
+- [x] T5.2 `scripts/build-env.mjs`: lee `CAPTCHA_PROVIDER` y `PUBLIC_CAPTCHA_SITE_KEY` opcionales; los escribe en `environment{,.production}.ts` (default vacíos). (`scripts/build-env.mjs`)
 - [x] T5.3 `src/index.html`: CSP amplía `script-src` y `frame-src` con `https://challenges.cloudflare.com`. (`src/index.html`)
-- [ ] T5.4 `.env.example`: sumar `CAPTCHA_PROVIDER` y `CAPTCHA_SITE_KEY` con doc. **Pendiente** — bloqueado por permisos del harness, requiere edición manual del maintainer.
+- [ ] T5.4 `.env.example`: sumar `CAPTCHA_PROVIDER` y `PUBLIC_CAPTCHA_SITE_KEY` con doc. **Pendiente** — bloqueado por permisos del harness, requiere edición manual del maintainer.
 
 ## Phase 6: Tests
 
