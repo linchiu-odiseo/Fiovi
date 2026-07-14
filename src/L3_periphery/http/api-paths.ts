@@ -1,69 +1,65 @@
 import { environment } from '../../environments/environment';
 
 // Único punto de interpolación del tenant slug en URLs de learnex.
-// La regla: ningún adapter L3 concatena `/t/<slug>/...` directamente — todo
-// pasa por este helper. Cambiar `TENANT_SLUG` en `.env` cambia todas las
-// URLs sin tocar código fuente.
 //
-// Las rutas siguen el contrato de learnex (.authentic/pwa-auth-contract.md
-// y .authentic/contrato-pwa-submit.md):
-//   POST /t/{slug}/auth/login
-//   POST /t/{slug}/auth/refresh
-//   POST /t/{slug}/auth/logout
-//   GET  /t/{slug}/auth/me
-//   GET  /t/{slug}/{role}/me
-//   GET  /t/{slug}/student/exam-sessions
-//   POST /t/{slug}/student/exam-sessions/{sessionId}/submit
-//   POST /t/{slug}/student/exam-sessions/{sessionId}/draft
-function base(): string {
-  return `${environment.apiBaseUrl}/t/${environment.tenantSlug}`;
+// Endpoints GLOBALES (sin slug en path) — descubiertos post PR #481/#482:
+//   POST /auth/login                       — cross-tenant, responde con user.slug
+//   POST /auth/select-tenant               — completa el flow multi-tenant
+//   GET  /auth/sso/providers               — lista dinámica para render del botón
+//   GET  /auth/sso/{provider}/start        — inicia OAuth (query `app=pwa`)
+//
+// Endpoints TENANT-SCOPED (siguen bajo `/t/{slug}/...`) — el slug viene de
+// la Identity (login response), NO del `.env`. El caller (HttpAuthRepository
+// o adapters de exams/tutor) lee el slug de `SlugStore` y lo pasa a estos
+// helpers como parámetro. Si el slug es null/vacío, la URL sale malformada
+// a propósito y el request falla — señal de que la app está mal hidratada.
+
+function tenantBase(slug: string): string {
+  return `${environment.apiBaseUrl}/t/${encodeURIComponent(slug)}`;
 }
 
 export const apiPath = {
-  login: (): string => `${base()}/auth/login`,
-  refresh: (): string => `${base()}/auth/refresh`,
-  logout: (): string => `${base()}/auth/logout`,
-  me: (): string => `${base()}/auth/me`,
-  profile: (role: 'student' | 'tutor'): string => `${base()}/${role}/me`,
-  studentExamSessions: (): string => `${base()}/student/exam-sessions`,
+  // ---- Globales (sin slug) ---------------------------------------------
+
+  login: (): string => `${environment.apiBaseUrl}/auth/login`,
+  selectTenant: (): string => `${environment.apiBaseUrl}/auth/select-tenant`,
+  listSsoProviders: (): string => `${environment.apiBaseUrl}/auth/sso/providers`,
+  // `returnTo=/` deja que Fiovi decida la ruta final post-callback según role.
+  // `app=pwa` hace que el backend redirija a WEB_PWA_BASE_URL (no WEB_TENANT_BASE_URL).
+  ssoStart: (provider: string): string =>
+    `${environment.apiBaseUrl}/auth/sso/${encodeURIComponent(provider)}/start` +
+    `?app=pwa&returnTo=%2F`,
+
+  // ---- Tenant-scoped (con slug del Identity) ---------------------------
+
+  refresh: (slug: string): string => `${tenantBase(slug)}/auth/refresh`,
+  logout: (slug: string): string => `${tenantBase(slug)}/auth/logout`,
+  me: (slug: string): string => `${tenantBase(slug)}/auth/me`,
+  profile: (slug: string, role: 'student' | 'tutor'): string => `${tenantBase(slug)}/${role}/me`,
+
+  studentExamSessions: (slug: string): string => `${tenantBase(slug)}/student/exam-sessions`,
   // `sessionId` viene del `Exam.id` (confirmado por back en handoff de
-  // `fase-3-exam-submit-learnex`: el `id` del GET de sesiones ES el
-  // sessionId del POST). encodeURIComponent es defensa básica — el
-  // contrato lo define como UUID v4, pero no asumimos sanitización.
-  studentExamSubmit: (sessionId: string): string =>
-    `${base()}/student/exam-sessions/${encodeURIComponent(sessionId)}/submit`,
-  // Auto-save progresivo (draft-auto-save). Mismo patrón que studentExamSubmit.
-  // El endpoint recibe 204 No Content; sin body de respuesta.
-  studentExamDraft: (sessionId: string): string =>
-    `${base()}/student/exam-sessions/${encodeURIComponent(sessionId)}/draft`,
+  // `fase-3-exam-submit-learnex`). encodeURIComponent es defensa básica —
+  // el contrato define UUID v4 pero no asumimos sanitización.
+  studentExamSubmit: (slug: string, sessionId: string): string =>
+    `${tenantBase(slug)}/student/exam-sessions/${encodeURIComponent(sessionId)}/submit`,
+  // Auto-save progresivo. Response 204 No Content; sin body.
+  studentExamDraft: (slug: string, sessionId: string): string =>
+    `${tenantBase(slug)}/student/exam-sessions/${encodeURIComponent(sessionId)}/draft`,
 
-  // ---- Endpoints del tutor (virtual exams) --------------------------------
-  // Todos usan encodeURIComponent sobre los parámetros de path/query.
-  // PROHIBIDO el literal del tenant slug aquí — viene de environment.tenantSlug
-  // vía base(). Ver http-client spec: "Prohibido el literal del slug en los nuevos helpers".
+  // ---- Tutor (virtual exams) -------------------------------------------
 
-  // GET /t/:slug/tutor/virtual-exams — lista de virtual exams del tutor.
-  tutorVirtualExams: (): string => `${base()}/tutor/virtual-exams`,
-
-  // GET /t/:slug/virtual-exams/:recordId — detalle del virtual exam.
-  virtualExam: (recordId: string): string =>
-    `${base()}/virtual-exams/${encodeURIComponent(recordId)}`,
-
-  // GET /t/:slug/classrooms/:classroomId/students?virtualExamDetailId= — roster.
-  // `virtualExamDetailId` es el detailId interno (dto.id de la lista), NO el recordId.
-  classroomStudents: (classroomId: string, virtualExamDetailId: string): string =>
-    `${base()}/classrooms/${encodeURIComponent(classroomId)}/students?virtualExamDetailId=${encodeURIComponent(virtualExamDetailId)}`,
-
-  // PATCH /t/:slug/virtual-exams/:recordId/enabled-students — actualizar alumnos habilitados.
-  virtualExamEnabledStudents: (recordId: string): string =>
-    `${base()}/virtual-exams/${encodeURIComponent(recordId)}/enabled-students`,
-
-  // POST /t/:slug/virtual-exams/:recordId/start — iniciar el examen (scheduled → in_progress).
-  virtualExamStart: (recordId: string): string =>
-    `${base()}/virtual-exams/${encodeURIComponent(recordId)}/start`,
-
-  // POST /t/:slug/virtual-exams/:recordId/finalize — finalizar el examen (in_progress → finalized).
-  // Respuesta 200 (NO 202 ni 204) con body { transitioned, jobId? } — ver design.md R2.
-  virtualExamFinalize: (recordId: string): string =>
-    `${base()}/virtual-exams/${encodeURIComponent(recordId)}/finalize`,
+  tutorVirtualExams: (slug: string): string => `${tenantBase(slug)}/tutor/virtual-exams`,
+  virtualExam: (slug: string, recordId: string): string =>
+    `${tenantBase(slug)}/virtual-exams/${encodeURIComponent(recordId)}`,
+  classroomStudents: (slug: string, classroomId: string, virtualExamDetailId: string): string =>
+    `${tenantBase(slug)}/classrooms/${encodeURIComponent(classroomId)}/students` +
+    `?virtualExamDetailId=${encodeURIComponent(virtualExamDetailId)}`,
+  virtualExamEnabledStudents: (slug: string, recordId: string): string =>
+    `${tenantBase(slug)}/virtual-exams/${encodeURIComponent(recordId)}/enabled-students`,
+  virtualExamStart: (slug: string, recordId: string): string =>
+    `${tenantBase(slug)}/virtual-exams/${encodeURIComponent(recordId)}/start`,
+  // Response 200 (no 202/204) con `{transitioned, jobId?}` — ver design R2.
+  virtualExamFinalize: (slug: string, recordId: string): string =>
+    `${tenantBase(slug)}/virtual-exams/${encodeURIComponent(recordId)}/finalize`,
 };

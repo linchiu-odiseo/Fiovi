@@ -22,6 +22,7 @@ const LEGACY_KEY = 'lugia.session';
 const VALID_PERSISTED = {
   id: '766aac21-71f9-4f48-a14a-5c2bcebc7d0b',
   tenantId: '5fff5eec-34dc-40a2-b15e-10e503e7c2dc',
+  tenantSlug: 'vonex',
   email: '79507732@vonex.edu.pe',
   codigo: '79507732',
   roles: ['student'],
@@ -44,6 +45,7 @@ describe('LocalStorageIdentityStorage', () => {
       const identity = new Identity(
         '766aac21-71f9-4f48-a14a-5c2bcebc7d0b',
         '5fff5eec-34dc-40a2-b15e-10e503e7c2dc',
+        'vonex',
         '79507732@vonex.edu.pe',
         '79507732',
         ['student'],
@@ -54,6 +56,7 @@ describe('LocalStorageIdentityStorage', () => {
       const restored = await storage.read();
       expect(restored).toBeInstanceOf(Identity);
       expect(restored?.id).toBe('766aac21-71f9-4f48-a14a-5c2bcebc7d0b');
+      expect(restored?.tenantSlug).toBe('vonex');
       expect(restored?.email).toBe('79507732@vonex.edu.pe');
       expect(restored?.codigo).toBe('79507732');
       expect(restored?.roles).toEqual(['student']);
@@ -66,6 +69,7 @@ describe('LocalStorageIdentityStorage', () => {
       const identity = new Identity(
         'id',
         'tenant',
+        'vonex',
         'a@b.test',
         '12345',
         ['student'],
@@ -80,6 +84,7 @@ describe('LocalStorageIdentityStorage', () => {
       const tutor = new Identity(
         '7526d026-7de5-4b99-bd2f-cc95b560f630',
         'tenant',
+        'vonex',
         'tutor1@vonex.pe',
         null, // tutor real: codigo viene null del back
         ['tutor'],
@@ -164,6 +169,7 @@ describe('LocalStorageIdentityStorage', () => {
       const identity = new Identity(
         'id',
         'tenant',
+        'vonex',
         'a@b.test',
         null,
         ['student'],
