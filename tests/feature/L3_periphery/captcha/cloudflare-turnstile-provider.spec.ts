@@ -93,7 +93,7 @@ describe('CloudflareTurnstileProvider', () => {
       ).rejects.toThrow(/disabled/);
     });
 
-    it('llama a window.turnstile.render con size:"invisible" y siteKey del environment', async () => {
+    it('llama a window.turnstile.render con siteKey del environment y sin overrides visuales', async () => {
       const renderSpy = vi.fn().mockReturnValue('widget-1');
       stubTurnstile({ render: renderSpy, reset: vi.fn() });
       const container = document.createElement('div');
@@ -110,7 +110,12 @@ describe('CloudflareTurnstileProvider', () => {
       const [el, params] = renderSpy.mock.calls[0];
       expect(el).toBe(container);
       expect(params.sitekey).toBe('test-site-key');
-      expect(params.size).toBe('invisible');
+      // La modalidad la decide el panel de Cloudflare — el cliente NO debe
+      // pasar `size`/`theme`/`appearance`. Forzar `size: 'invisible'` cuando
+      // el panel está en `managed` deja el widget sin emitir token.
+      expect(params.size).toBeUndefined();
+      expect(params.theme).toBeUndefined();
+      expect(params.appearance).toBeUndefined();
     });
 
     it('propaga token de Turnstile a onToken', async () => {

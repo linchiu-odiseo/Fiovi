@@ -1,4 +1,4 @@
-# Proposal: Add login captcha (Cloudflare Turnstile invisible)
+# Proposal: Add login captcha (Cloudflare Turnstile)
 
 > **Retrospective SDD** — implementado en `feat/add-login-captcha` (6 commits: L1 · L2 · L3 · LR · env/config · tests). Este proposal subsana el flujo — 73 test files / 1057 tests verdes, lint OK, build OK, hexagonal-guard aprobado.
 
@@ -18,7 +18,7 @@ Preparar Fiovi para el captcha anti-bot que learnex ya mergeó en `POST /auth/lo
   - `LoginUseCase.execute()` acepta `captchaToken?` y lo propaga al port. Cero lógica extra.
 
 - **L3 — periferia**
-  - Nuevo adapter `CloudflareTurnstileProvider` (implementa `CaptchaProvider`): carga el SDK de Cloudflare bajo demanda desde `challenges.cloudflare.com/turnstile/v0/api.js?render=explicit`, renderiza en modo `invisible`, expone `reset()` para reintentos.
+  - Nuevo adapter `CloudflareTurnstileProvider` (implementa `CaptchaProvider`): carga el SDK de Cloudflare bajo demanda desde `challenges.cloudflare.com/turnstile/v0/api.js?render=explicit`, llama `render()` solo con `sitekey` + callbacks (la modalidad la decide el panel de Cloudflare, no el cliente), expone `reset()` para reintentos.
   - `HttpAuthRepository.login()` construye el body explícito; incluye `captchaToken` solo cuando viene con valor (no viaja como `null`).
   - Nuevo tipado global `turnstile.d.ts` con el subset del SDK que consumimos.
   - Nuevo token DI `CAPTCHA_PROVIDER` en `L3_periphery/tokens.ts`.

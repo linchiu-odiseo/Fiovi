@@ -1,4 +1,4 @@
-# Archive Report — Add login captcha (Cloudflare Turnstile invisible)
+# Archive Report — Add login captcha (Cloudflare Turnstile)
 
 **Fecha de archive:** 2026-07-14
 **Change:** `2026-07-14-add-login-captcha`
@@ -59,7 +59,7 @@ Este change no genera archivos de delta spec bajo `openspec/changes/2026-07-14-a
 ## Notas de seguridad
 
 - **Site key es pública por diseño.** Vive en `.env` de Fiovi (frontend) y en el bundle del build. La secret key vive solo en el backend learnex, jamás en Fiovi. Cloudflare autoriza por dominio (`yangpimpollo.com` ya cubre `app.yangpimpollo.com`); no hay que dar de alta el widget aparte para Fiovi.
-- **Modo invisible.** El widget corre en background; el usuario no ve nada. Cambia de UX cero. Si Cloudflare detecta comportamiento sospechoso, escala a challenge visible automáticamente.
+- **Modalidad decidida por el panel de Cloudflare.** El cliente no pasa `size`/`theme`/`appearance` — la config del widget vive en el panel (invisible, managed, non-interactive). Un hardcode de `size: 'invisible'` en el cliente cuando el panel está en `managed` (default) deja el widget sin emitir token y bloquea el login. Corregido tras primer deploy — ver commit del fix.
 - **CSP: `script-src` y `frame-src`.** Se amplió con `https://challenges.cloudflare.com` para el SDK y el iframe. `connect-src` NO se toca — el fetch de validación va desde adentro del iframe (mismo origen del iframe, no cliente).
 - **Política uniforme del back para 401.** Learnex responde el mismo `TENANT_AUTH_INVALID_CREDENTIALS` para captcha inválido, password inválido o email inexistente — decisión anti-bot intencional. Fiovi respeta esa política: cero diferenciación en la UI (`InvalidCredentialsError` → "Credenciales inválidas" para todo).
 - **Ad-blockers.** Si un usuario tiene un ad-blocker que bloquea Cloudflare, el script no carga → widget nunca emite token → botón queda deshabilitado. Caso raro, no se cubre con UI específica (el usuario ve el botón gris y contactará soporte). Puede mejorarse en un change futuro si aparece feedback.

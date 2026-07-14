@@ -18,9 +18,12 @@ const TURNSTILE_SCRIPT_URL =
 //   `CAPTCHA_SECRET` vacío, acepta requests sin captcha).
 //
 // - `render()` carga el script de Turnstile bajo demanda (una sola vez por
-//   sesión) y llama `window.turnstile.render()` con `size: 'invisible'`. El
-//   widgetId devuelto es opaco desde el punto de vista del consumer — se
-//   guarda y se pasa a `reset()` tras un login rechazado.
+//   sesión) y llama `window.turnstile.render()` con `sitekey` + callbacks
+//   solamente. **NO pasamos `size`/`theme`/`appearance`** — la modalidad la
+//   configura el panel de Cloudflare por widget/site key (ver memoria
+//   `turnstile-size-panel-managed`). Forzar `size: 'invisible'` desde el
+//   cliente cuando el panel está en `managed` deja el widget sin emitir
+//   token y bloquea el login.
 //
 // - `reset()` invalida el token previo. Los tokens de Turnstile son de un solo
 //   uso y expiran a los 2 minutos; el consumer debe llamar `reset()` cada vez
@@ -50,7 +53,6 @@ export class CloudflareTurnstileProvider implements CaptchaProvider {
     const el = container as HTMLElement;
     return api.render(el, {
       sitekey: this.siteKey,
-      size: 'invisible',
       callback: (token) => callbacks.onToken(token),
       'expired-callback': () => callbacks.onExpired(),
       'error-callback': () => callbacks.onError(),

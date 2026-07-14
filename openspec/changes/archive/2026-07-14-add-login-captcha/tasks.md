@@ -1,4 +1,4 @@
-# Tasks: Add login captcha (Cloudflare Turnstile invisible)
+# Tasks: Add login captcha (Cloudflare Turnstile)
 
 > **Retrospective SDD** — todos los tasks reflejan trabajo ya aplicado en la rama `feat/add-login-captcha`. Marcados `[x]` al momento de escribir este documento (2026-07-14). Commits: `64a58d5` (L1) · `40c74e4` (L2) · `e1aee2e` (L3) · `6f28ea2` (LR) · `19eac6d` (env/config) · `ae47d22` (tests).
 
@@ -14,7 +14,7 @@
 ## Phase 3: L3 periphery
 
 - [x] T3.1 `HttpAuthRepository.login()` construye body explícito; incluye `captchaToken` solo cuando viene con valor (evita `null` en el body que el zod del back rechazaría). (`src/L3_periphery/http/http-auth-repository.ts`)
-- [x] T3.2 Nuevo adapter `CloudflareTurnstileProvider` (implements `CaptchaProvider`): script loader idempotente (una sola vez por sesión), render con `size:'invisible'`, mapeo de callbacks Turnstile → callbacks del port, `reset()` no-op si el script no cargó. (`src/L3_periphery/captcha/cloudflare-turnstile-provider.ts`)
+- [x] T3.2 Nuevo adapter `CloudflareTurnstileProvider` (implements `CaptchaProvider`): script loader idempotente (una sola vez por sesión), render con `sitekey` + callbacks solamente (la modalidad la decide el panel de Cloudflare — no pasar `size`/`theme`/`appearance`), `reset()` no-op si el script no cargó. (`src/L3_periphery/captcha/cloudflare-turnstile-provider.ts`)
 - [x] T3.3 Tipado global `turnstile.d.ts` con subset del SDK usado (`render`/`reset` + params). `export {}` para forzar módulo. (`src/L3_periphery/captcha/turnstile.d.ts`)
 - [x] T3.4 Nuevo token DI `CAPTCHA_PROVIDER`. (`src/L3_periphery/tokens.ts`)
 
