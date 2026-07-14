@@ -1,5 +1,8 @@
 import { Component, inject } from '@angular/core';
-import { TutorAulaCoursesViewModel, AulaCourseItem } from '../../view-models/tutor-aula-courses.view-model';
+import {
+  TutorAulaCoursesViewModel,
+  AulaCourseItem,
+} from '../../view-models/tutor-aula-courses.view-model';
 
 // Pantalla /tutor/aulas/:classroomId — lista los cursos que hay dentro del aula
 // seleccionada, agrupados desde el snapshot de exámenes del store.

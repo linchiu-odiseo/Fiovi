@@ -74,9 +74,7 @@ describe('SubmissionAck', () => {
 
   describe('validación de submittedAt', () => {
     it('rechaza Date inválido (NaN)', () => {
-      expect(() => new SubmissionAck(VALID_ID, VALID_HASH, new Date('no-es-fecha'))).toThrow(
-        Error,
-      );
+      expect(() => new SubmissionAck(VALID_ID, VALID_HASH, new Date('no-es-fecha'))).toThrow(Error);
     });
 
     it('rechaza algo que no es Date (string)', () => {

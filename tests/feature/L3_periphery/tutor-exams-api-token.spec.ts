@@ -11,9 +11,7 @@ import type { TutorExamsApi } from '../../../src/L1_domain/ports/tutor-exams-api
 describe('TUTOR_EXAMS_API token + FakeTutorExamsApi', () => {
   it('TUTOR_EXAMS_API token resuelve a TutorExamsApi cuando se inyecta FakeTutorExamsApi', () => {
     TestBed.configureTestingModule({
-      providers: [
-        { provide: TUTOR_EXAMS_API, useClass: FakeTutorExamsApi },
-      ],
+      providers: [{ provide: TUTOR_EXAMS_API, useClass: FakeTutorExamsApi }],
     });
 
     // Si FakeTutorExamsApi no implementara TutorExamsApi, useClass fallaría en tiempo

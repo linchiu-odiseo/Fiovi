@@ -45,44 +45,44 @@ Auto-generado por `.claude/hooks/log-agent-usage.ps1` en cada PostToolUse del to
 | 2026-06-14 15:48:01 | test-engineer    | Tests LR PR3 fase-3-login-learnex                                | opus-4-7 | 149,516      | --    | --       | $0.3463   |
 | 2026-06-14 15:53:13 | hexagonal-guard  | Audit final hexagonal PR3                                        | opus-4-7 | 77,135       | --    | --       | $0.5323   |
 | 2026-06-14 21:36:42 | sdd-verify       | SDD verify fase-3-login-learnex                                  | opus-4-7 | 101,514      | --    | --       | $0.4987   |
-| 2026-06-14 22:13:59 | sdd-archive | SDD archive fase-3-login-learnex | opus-4-7 | 120,400 | -- | -- | $0.3938 |
-| 2026-06-15 18:08:53 | sdd-explore | SDD explore fase-3-exam-list-learnex | opus-4-7 | 79,150 | -- | -- | $0.5384 |
-| 2026-06-15 18:14:43 | sdd-propose | SDD propose fase-3-exam-list-learnex | opus-4-7 | 19,091 | -- | -- | $0.1444 |
-| 2026-06-15 18:21:43 | sdd-spec | SDD spec fase-3-exam-list-learnex | opus-4-7 | 33,065 | -- | -- | $0.1593 |
-| 2026-06-15 18:24:42 | sdd-design | SDD design fase-3-exam-list-learnex | opus-4-7 | 34,281 | -- | -- | $0.2440 |
-| 2026-06-15 18:28:53 | sdd-tasks | SDD tasks fase-3-exam-list-learnex | opus-4-7 | 43,085 | -- | -- | $0.1517 |
-| 2026-06-15 18:58:38 | frontend-builder | LR view-models Exam migration | opus-4-7 | 101,327 | -- | -- | $0.3364 |
-| 2026-06-15 19:22:30 | test-engineer | Reshape tests to Exam vocabulary | opus-4-7 | 292,144 | -- | -- | $0.7590 |
-| 2026-06-15 19:29:53 | hexagonal-guard | Hexagonal audit post-change | opus-4-7 | 118,355 | -- | -- | $0.4843 |
-| 2026-06-16 12:38:10 | hexagonal-guard | Audit hexagonal post-fixes | opus-4-7 | -- | -- | -- | -- |
-| 2026-06-16 14:32:51 | sdd-archive | Archive fase-3-exam-list-learnex | opus-4-7 | 95,447 | -- | -- | $0.3252 |
-| 2026-06-16 16:13:20 | test-engineer | Tests Vitest del PwaUpdateService + integraci├│n LR | opus-4-7 | 155,836 | -- | -- | $0.3039 |
-| 2026-06-16 16:17:44 | hexagonal-guard | Hexagonal audit de los archivos nuevos del change | opus-4-7 | 45,126 | -- | -- | $0.1464 |
-| 2026-06-17 14:58:37 | frontend-builder | C5 ÔÇö modal de comprobante + view-models | opus-4-7 | 141,848 | -- | -- | $0.3930 |
-| 2026-06-17 15:15:55 | test-engineer | C7 ÔÇö tests del flujo POST + ack + modal | opus-4-7 | -- | -- | -- | -- |
-| 2026-06-17 15:16:52 | hexagonal-guard | G1 ÔÇö hexagonal-guard audit de src/ | opus-4-7 | -- | -- | -- | -- |
-| 2026-06-17 15:58:13 | general-purpose | Sync delta specs a main specs | opus-4-7 | 79,431 | -- | -- | $0.2391 |
-| 2026-06-18 11:39:42 | sdd-explore | SDD explore: draft-auto-save | opus-4-7 | 58,296 | -- | -- | $0.4043 |
-| 2026-06-18 12:18:52 | sdd-propose | SDD propose: draft-auto-save | opus-4-7 | -- | -- | -- | -- |
-| 2026-06-18 12:28:42 | sdd-propose | Resume sdd-propose draft-auto-save | opus-4-7 | 109,041 | -- | -- | $0.3505 |
-| 2026-06-18 13:14:21 | sdd-apply | SDD apply: draft-auto-save | opus-4-7 | 85,825 | -- | -- | $0.2162 |
-| 2026-06-18 14:20:21 | test-engineer | Update tests for fixed-string contract | opus-4-7 | 102,223 | -- | -- | $0.3081 |
-| 2026-06-19 01:05:48 | sdd-verify | SDD verify draft-auto-save | opus-4-7 | 114,633 | -- | -- | $0.4378 |
-| 2026-06-19 01:15:25 | sdd-archive | SDD archive draft-auto-save | opus-4-7 | 101,246 | -- | -- | $0.3058 |
-| 2026-07-05 09:24:36 | test-engineer | Tests L1+L2+L3 para admission-area | opus-4-7 | 179,100 | -- | -- | $0.5116 |
-| 2026-07-05 09:31:17 | frontend-builder | AdmissionAreaPicker + view-model wiring | opus-4-7 | 109,229 | -- | -- | $0.2780 |
-| 2026-07-05 09:39:00 | test-engineer | Tests LR picker + view-model wiring | opus-4-7 | 116,712 | -- | -- | $0.3138 |
-| 2026-07-05 09:42:26 | hexagonal-guard | Auditar boundaries del change | opus-4-7 | 87,297 | -- | -- | $0.4711 |
-| 2026-07-08 22:16:38 | sdd-verify | Verify add-admission-area change | opus-4-7 | 122,915 | -- | -- | $0.2914 |
-| 2026-07-08 22:23:19 | sdd-archive | Archive add-admission-area change | opus-4-7 | 114,060 | -- | -- | $0.2591 |
-| 2026-07-09 09:56:37 | sdd-explore | Explore tutor restyle | opus-4-7 | 61,757 | -- | -- | $0.4414 |
-| 2026-07-09 10:00:22 | Explore | Locate cartilla marking flow | opus-4-7 | 34,056 | -- | -- | $0.1537 |
-| 2026-07-09 10:03:59 | sdd-propose | Propose restyle-tutor-pages | opus-4-7 | 41,516 | -- | -- | $0.2512 |
-| 2026-07-09 10:08:02 | sdd-spec | Spec restyle-tutor-pages | opus-4-7 | 39,958 | -- | -- | $0.1752 |
-| 2026-07-09 10:11:46 | sdd-design | Design restyle-tutor-pages | opus-4-7 | 43,500 | -- | -- | $0.2836 |
-| 2026-07-09 10:14:09 | Explore | Locate student home page header | opus-4-7 | 26,790 | -- | -- | $0.1254 |
-| 2026-07-09 10:15:09 | sdd-tasks | Tasks restyle-tutor-pages | opus-4-7 | 50,082 | -- | -- | $0.2289 |
-| 2026-07-09 11:14:21 | hexagonal-guard | Guard tutor restyle boundaries | opus-4-7 | 80,675 | -- | -- | $0.3845 |
-| 2026-07-09 11:26:33 | sdd-verify | Verify restyle-tutor-pages | opus-4-7 | 82,864 | -- | -- | $0.2246 |
-| 2026-07-09 11:36:08 | sdd-archive | Archive restyle-tutor-pages | opus-4-7 | 96,763 | -- | -- | $0.2819 |
-| 2026-07-09 12:46:30 | hexagonal-guard | Guard google-sso change | opus-4-7 | 35,397 | -- | -- | $0.1617 |
+| 2026-06-14 22:13:59 | sdd-archive      | SDD archive fase-3-login-learnex                                 | opus-4-7 | 120,400      | --    | --       | $0.3938   |
+| 2026-06-15 18:08:53 | sdd-explore      | SDD explore fase-3-exam-list-learnex                             | opus-4-7 | 79,150       | --    | --       | $0.5384   |
+| 2026-06-15 18:14:43 | sdd-propose      | SDD propose fase-3-exam-list-learnex                             | opus-4-7 | 19,091       | --    | --       | $0.1444   |
+| 2026-06-15 18:21:43 | sdd-spec         | SDD spec fase-3-exam-list-learnex                                | opus-4-7 | 33,065       | --    | --       | $0.1593   |
+| 2026-06-15 18:24:42 | sdd-design       | SDD design fase-3-exam-list-learnex                              | opus-4-7 | 34,281       | --    | --       | $0.2440   |
+| 2026-06-15 18:28:53 | sdd-tasks        | SDD tasks fase-3-exam-list-learnex                               | opus-4-7 | 43,085       | --    | --       | $0.1517   |
+| 2026-06-15 18:58:38 | frontend-builder | LR view-models Exam migration                                    | opus-4-7 | 101,327      | --    | --       | $0.3364   |
+| 2026-06-15 19:22:30 | test-engineer    | Reshape tests to Exam vocabulary                                 | opus-4-7 | 292,144      | --    | --       | $0.7590   |
+| 2026-06-15 19:29:53 | hexagonal-guard  | Hexagonal audit post-change                                      | opus-4-7 | 118,355      | --    | --       | $0.4843   |
+| 2026-06-16 12:38:10 | hexagonal-guard  | Audit hexagonal post-fixes                                       | opus-4-7 | --           | --    | --       | --        |
+| 2026-06-16 14:32:51 | sdd-archive      | Archive fase-3-exam-list-learnex                                 | opus-4-7 | 95,447       | --    | --       | $0.3252   |
+| 2026-06-16 16:13:20 | test-engineer    | Tests Vitest del PwaUpdateService + integraci├│n LR              | opus-4-7 | 155,836      | --    | --       | $0.3039   |
+| 2026-06-16 16:17:44 | hexagonal-guard  | Hexagonal audit de los archivos nuevos del change                | opus-4-7 | 45,126       | --    | --       | $0.1464   |
+| 2026-06-17 14:58:37 | frontend-builder | C5 ÔÇö modal de comprobante + view-models                        | opus-4-7 | 141,848      | --    | --       | $0.3930   |
+| 2026-06-17 15:15:55 | test-engineer    | C7 ÔÇö tests del flujo POST + ack + modal                        | opus-4-7 | --           | --    | --       | --        |
+| 2026-06-17 15:16:52 | hexagonal-guard  | G1 ÔÇö hexagonal-guard audit de src/                             | opus-4-7 | --           | --    | --       | --        |
+| 2026-06-17 15:58:13 | general-purpose  | Sync delta specs a main specs                                    | opus-4-7 | 79,431       | --    | --       | $0.2391   |
+| 2026-06-18 11:39:42 | sdd-explore      | SDD explore: draft-auto-save                                     | opus-4-7 | 58,296       | --    | --       | $0.4043   |
+| 2026-06-18 12:18:52 | sdd-propose      | SDD propose: draft-auto-save                                     | opus-4-7 | --           | --    | --       | --        |
+| 2026-06-18 12:28:42 | sdd-propose      | Resume sdd-propose draft-auto-save                               | opus-4-7 | 109,041      | --    | --       | $0.3505   |
+| 2026-06-18 13:14:21 | sdd-apply        | SDD apply: draft-auto-save                                       | opus-4-7 | 85,825       | --    | --       | $0.2162   |
+| 2026-06-18 14:20:21 | test-engineer    | Update tests for fixed-string contract                           | opus-4-7 | 102,223      | --    | --       | $0.3081   |
+| 2026-06-19 01:05:48 | sdd-verify       | SDD verify draft-auto-save                                       | opus-4-7 | 114,633      | --    | --       | $0.4378   |
+| 2026-06-19 01:15:25 | sdd-archive      | SDD archive draft-auto-save                                      | opus-4-7 | 101,246      | --    | --       | $0.3058   |
+| 2026-07-05 09:24:36 | test-engineer    | Tests L1+L2+L3 para admission-area                               | opus-4-7 | 179,100      | --    | --       | $0.5116   |
+| 2026-07-05 09:31:17 | frontend-builder | AdmissionAreaPicker + view-model wiring                          | opus-4-7 | 109,229      | --    | --       | $0.2780   |
+| 2026-07-05 09:39:00 | test-engineer    | Tests LR picker + view-model wiring                              | opus-4-7 | 116,712      | --    | --       | $0.3138   |
+| 2026-07-05 09:42:26 | hexagonal-guard  | Auditar boundaries del change                                    | opus-4-7 | 87,297       | --    | --       | $0.4711   |
+| 2026-07-08 22:16:38 | sdd-verify       | Verify add-admission-area change                                 | opus-4-7 | 122,915      | --    | --       | $0.2914   |
+| 2026-07-08 22:23:19 | sdd-archive      | Archive add-admission-area change                                | opus-4-7 | 114,060      | --    | --       | $0.2591   |
+| 2026-07-09 09:56:37 | sdd-explore      | Explore tutor restyle                                            | opus-4-7 | 61,757       | --    | --       | $0.4414   |
+| 2026-07-09 10:00:22 | Explore          | Locate cartilla marking flow                                     | opus-4-7 | 34,056       | --    | --       | $0.1537   |
+| 2026-07-09 10:03:59 | sdd-propose      | Propose restyle-tutor-pages                                      | opus-4-7 | 41,516       | --    | --       | $0.2512   |
+| 2026-07-09 10:08:02 | sdd-spec         | Spec restyle-tutor-pages                                         | opus-4-7 | 39,958       | --    | --       | $0.1752   |
+| 2026-07-09 10:11:46 | sdd-design       | Design restyle-tutor-pages                                       | opus-4-7 | 43,500       | --    | --       | $0.2836   |
+| 2026-07-09 10:14:09 | Explore          | Locate student home page header                                  | opus-4-7 | 26,790       | --    | --       | $0.1254   |
+| 2026-07-09 10:15:09 | sdd-tasks        | Tasks restyle-tutor-pages                                        | opus-4-7 | 50,082       | --    | --       | $0.2289   |
+| 2026-07-09 11:14:21 | hexagonal-guard  | Guard tutor restyle boundaries                                   | opus-4-7 | 80,675       | --    | --       | $0.3845   |
+| 2026-07-09 11:26:33 | sdd-verify       | Verify restyle-tutor-pages                                       | opus-4-7 | 82,864       | --    | --       | $0.2246   |
+| 2026-07-09 11:36:08 | sdd-archive      | Archive restyle-tutor-pages                                      | opus-4-7 | 96,763       | --    | --       | $0.2819   |
+| 2026-07-09 12:46:30 | hexagonal-guard  | Guard google-sso change                                          | opus-4-7 | 35,397       | --    | --       | $0.1617   |

@@ -76,12 +76,7 @@ export class TutorAulaCoursesViewModel {
   }
 
   goToCourse(course: string): void {
-    void this.router.navigate([
-      '/tutor/aulas',
-      this.classroomId(),
-      'curso',
-      course,
-    ]);
+    void this.router.navigate(['/tutor/aulas', this.classroomId(), 'curso', course]);
   }
 
   goBack(): void {
@@ -91,9 +86,7 @@ export class TutorAulaCoursesViewModel {
   private async resolveClassroomName(classroomId: string): Promise<void> {
     try {
       const profile = (await this.getProfile.execute('tutor')) as TutorProfile;
-      const aula: TutorClassroom | undefined = profile.classrooms.find(
-        (c) => c.id === classroomId,
-      );
+      const aula: TutorClassroom | undefined = profile.classrooms.find((c) => c.id === classroomId);
       if (!aula) {
         this.error.set('notFound');
         return;

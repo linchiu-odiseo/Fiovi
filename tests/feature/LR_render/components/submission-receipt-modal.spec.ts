@@ -121,7 +121,9 @@ describe('SubmissionReceiptModalComponent', () => {
     });
 
     it('renderiza un único botón "Volver al inicio"', () => {
-      const button = fixture.nativeElement.querySelector('button.modal__btn-primary') as HTMLButtonElement;
+      const button = fixture.nativeElement.querySelector(
+        'button.modal__btn-primary',
+      ) as HTMLButtonElement;
       expect(button).not.toBeNull();
       expect(button.textContent).toContain('Volver al inicio');
     });

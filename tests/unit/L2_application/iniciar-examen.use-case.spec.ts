@@ -21,7 +21,9 @@ describe('IniciarExamenUseCase', () => {
 
   it('propaga ExamPreconditionError sin envoltorio', async () => {
     api.willRejectIniciar(new ExamPreconditionError());
-    await expect(useCase.execute({ recordId: 'rec-1' })).rejects.toBeInstanceOf(ExamPreconditionError);
+    await expect(useCase.execute({ recordId: 'rec-1' })).rejects.toBeInstanceOf(
+      ExamPreconditionError,
+    );
   });
 
   it('NO llama a IDB ni outbox (verificación estructural)', async () => {

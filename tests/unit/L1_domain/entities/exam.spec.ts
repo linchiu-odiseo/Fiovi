@@ -168,9 +168,9 @@ describe('Exam', () => {
     });
 
     it('rechaza count no-numérico con InvalidExamError', () => {
-      expect(
-        () => new Exam({ ...validParams, count: 'veinte' as unknown as number }),
-      ).toThrow(InvalidExamError);
+      expect(() => new Exam({ ...validParams, count: 'veinte' as unknown as number })).toThrow(
+        InvalidExamError,
+      );
     });
   });
 

@@ -43,6 +43,8 @@ describe('GetTutorExamDetailUseCase', () => {
 
   it('propaga VirtualExamNotFoundError sin envoltorio', async () => {
     api.willRejectGetExamDetail(new VirtualExamNotFoundError());
-    await expect(useCase.execute({ recordId: 'rec-1' })).rejects.toBeInstanceOf(VirtualExamNotFoundError);
+    await expect(useCase.execute({ recordId: 'rec-1' })).rejects.toBeInstanceOf(
+      VirtualExamNotFoundError,
+    );
   });
 });

@@ -1,6 +1,6 @@
 {
-    "sonarlint.connectedMode.project": {
-        "connectionId": "lugia 2",
-        "projectKey": "Lugia"
-    }
+  "sonarlint.connectedMode.project": {
+    "connectionId": "lugia 2",
+    "projectKey": "Lugia"
+  }
 }

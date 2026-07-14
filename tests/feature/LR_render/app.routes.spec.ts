@@ -74,7 +74,7 @@ describe('app.routes', () => {
       // Verificamos que la función lazy resuelve al componente correcto.
       // En el entorno de test, loadComponent() puede retornar la clase directamente
       // o un objeto con la clase. Inspeccionamos ambas posibilidades.
-      const result = await r!.loadComponent!() as unknown;
+      const result = (await r!.loadComponent!()) as unknown;
       // Buscar recursivamente el nombre de clase en el resultado
       const resultName =
         (result as { name?: string })?.name ??
@@ -103,7 +103,7 @@ describe('app.routes', () => {
     it('/tutor/exams/:recordId loadComponent resuelve TutorExamDetailPage (no el stub)', async () => {
       const r = findRoute('tutor/exams/:recordId');
       expect(typeof r?.loadComponent).toBe('function');
-      const result = await r!.loadComponent!() as unknown;
+      const result = (await r!.loadComponent!()) as unknown;
       const resultName =
         (result as { name?: string })?.name ??
         (result as { default?: { name?: string } })?.default?.name ??
@@ -127,7 +127,7 @@ describe('app.routes', () => {
       // placeholder TutorHomePage. Verificamos resolviendo la lazy function.
       const r = findRoute('tutor/home');
       expect(typeof r?.loadComponent).toBe('function');
-      const result = await r!.loadComponent!() as unknown;
+      const result = (await r!.loadComponent!()) as unknown;
       const resultName =
         (result as { name?: string })?.name ??
         (result as { default?: { name?: string } })?.default?.name ??

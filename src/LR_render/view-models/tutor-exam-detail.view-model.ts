@@ -210,9 +210,7 @@ export class TutorExamDetailViewModel {
     if (totalSeconds < min || totalSeconds > max) {
       const minMm = Math.floor(min / 60);
       const maxMm = Math.floor(max / 60);
-      this.durationError.set(
-        `La duración debe estar entre ${minMm}:00 y ${maxMm}:00.`,
-      );
+      this.durationError.set(`La duración debe estar entre ${minMm}:00 y ${maxMm}:00.`);
       return;
     }
 
@@ -389,12 +387,10 @@ export class TutorExamDetailViewModel {
           return 'El examen ya cambió de estado. Actualizá la pantalla e intentá de nuevo.';
         if (err instanceof ExamPreconditionError)
           return 'No se puede iniciar: configurá las claves y habilitá al menos un alumno antes de iniciar el examen.';
-        if (err instanceof VirtualExamNotFoundError)
-          return 'Este examen ya no está disponible.';
+        if (err instanceof VirtualExamNotFoundError) return 'Este examen ya no está disponible.';
         if (err instanceof TutorExamForbiddenError)
           return 'No tenés permiso para operar este examen.';
-        if (err instanceof NetworkError)
-          return 'Sin conexión. Revisá tu red y reintentá.';
+        if (err instanceof NetworkError) return 'Sin conexión. Revisá tu red y reintentá.';
         return 'Ocurrió un error al iniciar el examen. Reintentá.';
 
       case 'finalizar':
@@ -402,12 +398,10 @@ export class TutorExamDetailViewModel {
           return 'El examen ya cambió de estado. Actualizá la pantalla e intentá de nuevo.';
         if (err instanceof ExamPreconditionError)
           return 'No se puede finalizar un examen que todavía no fue iniciado. Iniciálo primero.';
-        if (err instanceof VirtualExamNotFoundError)
-          return 'Este examen ya no está disponible.';
+        if (err instanceof VirtualExamNotFoundError) return 'Este examen ya no está disponible.';
         if (err instanceof TutorExamForbiddenError)
           return 'No tenés permiso para operar este examen.';
-        if (err instanceof NetworkError)
-          return 'Sin conexión. Revisá tu red y reintentá.';
+        if (err instanceof NetworkError) return 'Sin conexión. Revisá tu red y reintentá.';
         return 'Ocurrió un error al finalizar el examen. Reintentá.';
 
       case 'actualizarAlumnos':
@@ -415,12 +409,10 @@ export class TutorExamDetailViewModel {
           return 'No se pueden cambiar los alumnos: el set está congelado o un alumno ya entregó.';
         if (err instanceof ExamPreconditionError)
           return 'Configuración de alumnos inválida. Revisá la selección.';
-        if (err instanceof VirtualExamNotFoundError)
-          return 'Este examen ya no está disponible.';
+        if (err instanceof VirtualExamNotFoundError) return 'Este examen ya no está disponible.';
         if (err instanceof TutorExamForbiddenError)
           return 'No tenés permiso para operar este examen.';
-        if (err instanceof NetworkError)
-          return 'Sin conexión. Revisá tu red y reintentá.';
+        if (err instanceof NetworkError) return 'Sin conexión. Revisá tu red y reintentá.';
         return 'Ocurrió un error al actualizar los alumnos. Reintentá.';
     }
   }

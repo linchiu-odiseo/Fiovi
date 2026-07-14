@@ -11,7 +11,10 @@ import { TutorExam } from '../../../../src/L1_domain/entities/tutor-exam';
 import { ExamServerStatus } from '../../../../src/L1_domain/value-objects/exam-server-status';
 import { NetworkError } from '../../../../src/L1_domain/errors/network.error';
 import { ProfileNotAvailableError } from '../../../../src/L1_domain/errors/profile-not-available.error';
-import { TutorProfile, TutorClassroom } from '../../../../src/L1_domain/value-objects/tutor-profile';
+import {
+  TutorProfile,
+  TutorClassroom,
+} from '../../../../src/L1_domain/value-objects/tutor-profile';
 import { Role } from '../../../../src/L1_domain/entities/identity';
 import { StudentProfile } from '../../../../src/L1_domain/value-objects/student-profile';
 

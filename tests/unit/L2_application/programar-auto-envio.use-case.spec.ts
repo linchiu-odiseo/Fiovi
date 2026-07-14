@@ -88,7 +88,7 @@ describe('ProgramarAutoEnvioUseCase', () => {
       count: 20,
       duration: overrides.duration ?? 90,
       scheduled: overrides.scheduled ?? new Date(SCHEDULED_ISO),
-      started: 'started' in overrides ? overrides.started ?? null : new Date(STARTED_ISO),
+      started: 'started' in overrides ? (overrides.started ?? null) : new Date(STARTED_ISO),
       finished: null,
       serverStatus: new ExamServerStatus(statusValue),
     });
@@ -316,5 +316,4 @@ describe('ProgramarAutoEnvioUseCase', () => {
       expect(enviar.calls).toHaveLength(1);
     });
   });
-
 });

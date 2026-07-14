@@ -10,9 +10,7 @@ import { ExamServerStatus } from '../../../../../src/L1_domain/value-objects/exa
 
 // ─── builders ────────────────────────────────────────────────────────────────
 
-function buildDetail(
-  overrides: Partial<TutorExamDetail> = {},
-): TutorExamDetail {
+function buildDetail(overrides: Partial<TutorExamDetail> = {}): TutorExamDetail {
   return {
     id: 'det-1',
     recordId: 'rec-1',
@@ -30,9 +28,7 @@ function buildDetail(
   };
 }
 
-function buildStudent(
-  overrides: Partial<ClassroomStudent> = {},
-): ClassroomStudent {
+function buildStudent(overrides: Partial<ClassroomStudent> = {}): ClassroomStudent {
   return {
     studentId: 's-1',
     studentCode: 'CODE001',
@@ -94,11 +90,21 @@ class FakeTutorExamDetailViewModel {
     this.finalizarModalOpen.set(false);
   });
 
-  async load(): Promise<void> { /* no-op */ }
-  async retry(): Promise<void> { /* no-op */ }
-  async iniciar(_newDuration?: number): Promise<void> { /* no-op */ }
-  async finalizar(): Promise<void> { /* no-op */ }
-  async toggleStudent(_studentId: string): Promise<void> { /* no-op */ }
+  async load(): Promise<void> {
+    /* no-op */
+  }
+  async retry(): Promise<void> {
+    /* no-op */
+  }
+  async iniciar(_newDuration?: number): Promise<void> {
+    /* no-op */
+  }
+  async finalizar(): Promise<void> {
+    /* no-op */
+  }
+  async toggleStudent(_studentId: string): Promise<void> {
+    /* no-op */
+  }
 }
 
 @Component({ template: '' })
@@ -301,7 +307,9 @@ describe('TutorExamDetailPage', () => {
       fixture.detectChanges();
 
       const el = fixture.nativeElement as HTMLElement;
-      const checkbox = el.querySelector('input[type="checkbox"][data-testid="student-checkbox"]') as HTMLInputElement;
+      const checkbox = el.querySelector(
+        'input[type="checkbox"][data-testid="student-checkbox"]',
+      ) as HTMLInputElement;
       expect(checkbox).not.toBeNull();
       expect(checkbox.disabled).toBe(true);
     });
