@@ -1,0 +1,48 @@
+<main class="select-tenant">
+  <header class="select-tenant__header">
+    <div class="select-tenant__brand" aria-hidden="true">L</div>
+    <h1 class="select-tenant__title">¿En qué academia entrás?</h1>
+    <p class="select-tenant__subtitle">Tu correo está registrado en varias academias.</p>
+  </header>
+
+  @if (vm.errorMessage(); as msg) {
+    <p class="error" role="alert">
+      <span class="material-symbols-outlined error__icon" aria-hidden="true">error</span>
+      <span class="error__copy">{{ msg }}</span>
+    </p>
+  }
+
+  <ul class="select-tenant__list" role="list">
+    @for (t of vm.tenants(); track t.slug) {
+      <li>
+        <button
+          type="button"
+          class="select-tenant__tenant-btn"
+          [attr.data-testid]="'btn-tenant-' + t.slug"
+          [disabled]="vm.isSubmitting()"
+          (click)="onChoose(t.slug)"
+        >
+          <span class="select-tenant__tenant-name">{{ t.name }}</span>
+          @if (vm.submittingSlug() === t.slug) {
+            <span class="select-tenant__tenant-icon" aria-hidden="true">…</span>
+          } @else {
+            <span class="material-symbols-outlined select-tenant__tenant-icon" aria-hidden="true"
+              >chevron_right</span
+            >
+          }
+        </button>
+      </li>
+    }
+  </ul>
+
+  <button
+    type="button"
+    class="select-tenant__cancel"
+    [disabled]="vm.isSubmitting()"
+    (click)="onCancel()"
+  >
+    Volver a iniciar sesión
+  </button>
+
+  <app-version-footer />
+</main>
