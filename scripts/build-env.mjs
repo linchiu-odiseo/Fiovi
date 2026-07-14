@@ -74,6 +74,19 @@ const draftEnabled = (env['DRAFT_ENABLED'] ?? '').toLowerCase() === 'true';
 // activas — pero en el build de release corresponde dejar DEV_TOOLS=false en .env.
 const devTools = (env['DEV_TOOLS'] ?? '').toLowerCase() === 'true';
 
+// CAPTCHA_PROVIDER / CAPTCHA_SITE_KEY: config del captcha anti-bot del login.
+// Ambas opcionales:
+//   - Sin CAPTCHA_SITE_KEY (o vacía) → el adapter L3 (`CloudflareTurnstileProvider`)
+//     reporta `isEnabled()=false` y el LoginPage skipea el widget. El body del
+//     login viaja sin `captchaToken` — el backend con `CAPTCHA_SECRET` vacío
+//     acepta la request igual. Este es el default de dev sin fricción.
+//   - Con site key seteada → el widget renderiza en el LoginPage y el submit
+//     queda bloqueado hasta tener token. Prod exige key real de Cloudflare.
+// `CAPTCHA_PROVIDER` default 'turnstile' porque es el único soportado hoy;
+// existe la var para poder cambiar de proveedor sin tocar código en el futuro.
+const captchaProvider = env['CAPTCHA_PROVIDER'] ?? '';
+const captchaSiteKey = env['CAPTCHA_SITE_KEY'] ?? '';
+
 const envDir = resolve(repoRoot, 'src/environments');
 mkdirSync(envDir, { recursive: true });
 
@@ -85,6 +98,8 @@ const banner =
 const sq = (s) => `'${String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 const apiBaseUrl = sq(env.API_BASE_URL);
 const appVersion = sq(env.APP_VERSION);
+const captchaProviderLit = sq(captchaProvider);
+const captchaSiteKeyLit = sq(captchaSiteKey);
 
 writeFileSync(
   resolve(envDir, 'environment.ts'),
@@ -94,6 +109,8 @@ writeFileSync(
     `  appVersion: ${appVersion},\n` +
     `  draftEnabled: ${draftEnabled},\n` +
     `  devTools: ${devTools},\n` +
+    `  captchaProvider: ${captchaProviderLit},\n` +
+    `  captchaSiteKey: ${captchaSiteKeyLit},\n` +
     `};\n`,
 );
 
@@ -105,6 +122,8 @@ writeFileSync(
     `  appVersion: ${appVersion},\n` +
     `  draftEnabled: ${draftEnabled},\n` +
     `  devTools: ${devTools},\n` +
+    `  captchaProvider: ${captchaProviderLit},\n` +
+    `  captchaSiteKey: ${captchaSiteKeyLit},\n` +
     `};\n`,
 );
 
