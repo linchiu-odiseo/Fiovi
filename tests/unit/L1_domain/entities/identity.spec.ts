@@ -12,6 +12,7 @@ const makeIdentity = (
   const defaults = {
     id: 'user-uuid',
     tenantId: 'tenant-uuid',
+    tenantSlug: 'vonex',
     email: 'alumno@vonex.edu.pe',
     codigo: '79507732' as string | null,
     roles: ['student'] as ['student'],
@@ -22,6 +23,7 @@ const makeIdentity = (
   return new Identity(
     merged.id as string,
     merged.tenantId as string,
+    merged.tenantSlug as string,
     merged.email as string,
     merged.codigo as string | null,
     merged.roles as ['student'] | ['tutor'],
@@ -45,16 +47,36 @@ describe('Identity', () => {
     });
 
     it('lanza InvalidIdentityError con 0 roles', () => {
-      expect(() => new Identity('id', 'tid', 'email@test.pe', null, [], [], NOW + 1000)).toThrow(
-        InvalidIdentityError,
-      );
+      expect(
+        () => new Identity('id', 'tid', 'vonex', 'email@test.pe', null, [], [], NOW + 1000),
+      ).toThrow(InvalidIdentityError);
     });
 
     it('lanza InvalidIdentityError con 2 roles', () => {
       expect(
         () =>
-          new Identity('id', 'tid', 'email@test.pe', null, ['student', 'tutor'], [], NOW + 1000),
+          new Identity(
+            'id',
+            'tid',
+            'vonex',
+            'email@test.pe',
+            null,
+            ['student', 'tutor'],
+            [],
+            NOW + 1000,
+          ),
       ).toThrow(InvalidIdentityError);
+    });
+
+    it('lanza InvalidIdentityError si tenantSlug es vacío', () => {
+      expect(
+        () => new Identity('id', 'tid', '', 'email@test.pe', null, ['student'], [], NOW + 1000),
+      ).toThrow(InvalidIdentityError);
+    });
+
+    it('expone tenantSlug como propiedad readonly', () => {
+      const identity = makeIdentity({ tenantSlug: 'pitagoras' });
+      expect(identity.tenantSlug).toBe('pitagoras');
     });
   });
 
