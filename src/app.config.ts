@@ -23,6 +23,7 @@ import { IdentityStorage } from './L1_domain/ports/identity-storage';
 import { ProfileStorage } from './L1_domain/ports/profile-storage';
 import { OutboxStoragePort } from './L1_domain/ports/outbox-storage.port';
 import { RouterPort } from './L1_domain/ports/router-port';
+import { TenantSlugCache } from './L1_domain/ports/tenant-slug-cache';
 
 // L2 use cases — clases TS puras sin @Injectable, instanciadas por factory.
 import { LoginUseCase } from './L2_application/use-cases/login.use-case';
@@ -31,6 +32,8 @@ import { GetIdentityUseCase } from './L2_application/use-cases/get-identity.use-
 import { RefreshIdentityUseCase } from './L2_application/use-cases/refresh-identity.use-case';
 import { GetProfileUseCase } from './L2_application/use-cases/get-profile.use-case';
 import { InitializeSessionUseCase } from './L2_application/use-cases/initialize-session.use-case';
+import { SelectTenantUseCase } from './L2_application/use-cases/select-tenant.use-case';
+import { ListSsoProvidersUseCase } from './L2_application/use-cases/list-sso-providers.use-case';
 import { GetTodaysExamsUseCase } from './L2_application/use-cases/get-todays-exams.use-case';
 import { MarcarRespuestaUseCase } from './L2_application/use-cases/marcar-respuesta.use-case';
 import { EnviarSimulacroUseCase } from './L2_application/use-cases/enviar-simulacro.use-case';
@@ -55,7 +58,14 @@ import {
 } from './L3_periphery/envio/draft-auto-save-dispatcher.service';
 import { credentialsInterceptor } from './L3_periphery/interceptors/credentials.interceptor';
 import { PwaUpdateService } from './L3_periphery/pwa/pwa-update.service';
-import { IDENTITY_STORAGE, PROFILE_STORAGE, OUTBOX_STORAGE, TUTOR_EXAMS_API } from './L3_periphery/tokens';
+import { SlugStore } from './L3_periphery/http/slug-store';
+import { SsoCallbackBootstrap } from './L3_periphery/http/sso-callback-bootstrap';
+import {
+  IDENTITY_STORAGE,
+  PROFILE_STORAGE,
+  OUTBOX_STORAGE,
+  TUTOR_EXAMS_API,
+} from './L3_periphery/tokens';
 import { environment } from './environments/environment';
 
 // L2 use-cases del tutor — puras TS, sin decorador Angular.
@@ -75,6 +85,7 @@ export const CONNECTIVITY = new InjectionToken<Connectivity>('CONNECTIVITY');
 export const MARKINGS_STORAGE = new InjectionToken<MarkingsStorage>('MARKINGS_STORAGE');
 export const EXAMS_API = new InjectionToken<ExamsApi>('EXAMS_API');
 export const ROUTER_PORT = new InjectionToken<RouterPort>('ROUTER_PORT');
+export const TENANT_SLUG_CACHE = new InjectionToken<TenantSlugCache>('TENANT_SLUG_CACHE');
 
 // Adapter Angular `Router` → `RouterPort` (L1). Inline factory; sin nuevo archivo
 // porque es un wrapper trivial usado solo desde el wiring.
@@ -100,6 +111,7 @@ export const appConfig: ApplicationConfig = {
     // Bind puertos L1 → implementaciones L3.
     { provide: AUTH_REPOSITORY, useExisting: HttpAuthRepository },
     { provide: IDENTITY_STORAGE, useExisting: LocalStorageIdentityStorage },
+    { provide: TENANT_SLUG_CACHE, useExisting: SlugStore },
     { provide: PROFILE_STORAGE, useExisting: IndexedDbProfileStorage },
     // IndexedDbMarkingsStorage implementa MarkingsStorage Y OutboxStoragePort.
     { provide: MARKINGS_STORAGE, useExisting: IndexedDbMarkingsStorage },
@@ -126,23 +138,53 @@ export const appConfig: ApplicationConfig = {
     },
     {
       provide: LoginUseCase,
-      useFactory: (repo: AuthRepository, storage: IdentityStorage, getProfile: GetProfileUseCase) =>
-        new LoginUseCase(repo, storage, getProfile),
-      deps: [AUTH_REPOSITORY, IDENTITY_STORAGE, GetProfileUseCase],
+      useFactory: (
+        repo: AuthRepository,
+        storage: IdentityStorage,
+        slugCache: TenantSlugCache,
+        getProfile: GetProfileUseCase,
+      ) => new LoginUseCase(repo, storage, slugCache, getProfile),
+      deps: [AUTH_REPOSITORY, IDENTITY_STORAGE, TENANT_SLUG_CACHE, GetProfileUseCase],
+    },
+    {
+      provide: SelectTenantUseCase,
+      useFactory: (
+        repo: AuthRepository,
+        storage: IdentityStorage,
+        slugCache: TenantSlugCache,
+        getProfile: GetProfileUseCase,
+      ) => new SelectTenantUseCase(repo, storage, slugCache, getProfile),
+      deps: [AUTH_REPOSITORY, IDENTITY_STORAGE, TENANT_SLUG_CACHE, GetProfileUseCase],
+    },
+    {
+      provide: ListSsoProvidersUseCase,
+      useFactory: (repo: AuthRepository) => new ListSsoProvidersUseCase(repo),
+      deps: [AUTH_REPOSITORY],
     },
     {
       provide: LogoutUseCase,
       useFactory: (
         repo: AuthRepository,
         identityStorage: IdentityStorage,
+        slugCache: TenantSlugCache,
         profileStorage: ProfileStorage,
         markings: MarkingsStorage,
         outbox: OutboxStoragePort,
         routerPort: RouterPort,
-      ) => new LogoutUseCase(repo, identityStorage, profileStorage, markings, outbox, routerPort),
+      ) =>
+        new LogoutUseCase(
+          repo,
+          identityStorage,
+          slugCache,
+          profileStorage,
+          markings,
+          outbox,
+          routerPort,
+        ),
       deps: [
         AUTH_REPOSITORY,
         IDENTITY_STORAGE,
+        TENANT_SLUG_CACHE,
         PROFILE_STORAGE,
         MARKINGS_STORAGE,
         OUTBOX_STORAGE,
@@ -156,15 +198,23 @@ export const appConfig: ApplicationConfig = {
     },
     {
       provide: RefreshIdentityUseCase,
-      useFactory: (repo: AuthRepository, storage: IdentityStorage, logout: LogoutUseCase) =>
-        new RefreshIdentityUseCase(repo, storage, logout),
-      deps: [AUTH_REPOSITORY, IDENTITY_STORAGE, LogoutUseCase],
+      useFactory: (
+        repo: AuthRepository,
+        storage: IdentityStorage,
+        slugCache: TenantSlugCache,
+        logout: LogoutUseCase,
+      ) => new RefreshIdentityUseCase(repo, storage, slugCache, logout),
+      deps: [AUTH_REPOSITORY, IDENTITY_STORAGE, TENANT_SLUG_CACHE, LogoutUseCase],
     },
     {
       provide: InitializeSessionUseCase,
-      useFactory: (repo: AuthRepository, storage: IdentityStorage, getProfile: GetProfileUseCase) =>
-        new InitializeSessionUseCase(repo, storage, getProfile),
-      deps: [AUTH_REPOSITORY, IDENTITY_STORAGE, GetProfileUseCase],
+      useFactory: (
+        repo: AuthRepository,
+        storage: IdentityStorage,
+        slugCache: TenantSlugCache,
+        getProfile: GetProfileUseCase,
+      ) => new InitializeSessionUseCase(repo, storage, slugCache, getProfile),
+      deps: [AUTH_REPOSITORY, IDENTITY_STORAGE, TENANT_SLUG_CACHE, GetProfileUseCase],
     },
     {
       provide: GetTodaysExamsUseCase,
@@ -250,13 +300,25 @@ export const appConfig: ApplicationConfig = {
     {
       provide: DraftAutoSaveDispatcher,
       useFactory: (useCase: GuardarDraftUseCase) =>
-        environment.draftEnabled ? new DraftAutoSaveDispatcher(useCase) : new NoopDraftAutoSaveDispatcher(),
+        environment.draftEnabled
+          ? new DraftAutoSaveDispatcher(useCase)
+          : new NoopDraftAutoSaveDispatcher(),
       deps: [GuardarDraftUseCase],
     },
 
-    // AppInitializer: re-valida identity contra learnex al arrancar (cookie
-    // HttpOnly puede seguir viva entre sesiones). Si OK, identity queda
-    // disponible para guards y view-models antes del primer render.
+    // AppInitializer #0 (SÍNCRONO, corre PRIMERO): procesa la URL post-callback
+    // SSO. Si viene `?slug=` hidrata `SlugStore` para que el `InitializeSession`
+    // pueda armar `me()`. Si viene `?selectionToken=&tenants=` stashea el
+    // challenge en sessionStorage y limpia URL antes del Router. Ver
+    // `SsoCallbackBootstrap` para el flow por caso.
+    provideAppInitializer(() => {
+      inject(SsoCallbackBootstrap).run();
+    }),
+
+    // AppInitializer #1: re-valida identity contra learnex al arrancar (cookie
+    // HttpOnly puede seguir viva entre sesiones, o venimos de un callback SSO
+    // que dejó cookies + hidrató SlugStore). Si OK, identity queda disponible
+    // para guards y view-models antes del primer render.
     provideAppInitializer(async () => {
       await inject(InitializeSessionUseCase).execute();
     }),
