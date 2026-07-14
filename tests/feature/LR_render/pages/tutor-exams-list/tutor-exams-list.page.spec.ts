@@ -223,10 +223,7 @@ describe('TutorExamsListPage', () => {
     });
 
     it('los scheduled y finalized quedan fuera del home (no aparecen cards)', async () => {
-      fakeVm.exams.set([
-        buildExam('rec-s', 'scheduled'),
-        buildExam('rec-f', 'finalized'),
-      ]);
+      fakeVm.exams.set([buildExam('rec-s', 'scheduled'), buildExam('rec-f', 'finalized')]);
 
       const fixture = TestBed.createComponent(TutorExamsListPage);
       fixture.detectChanges();

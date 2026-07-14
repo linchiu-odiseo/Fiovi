@@ -40,9 +40,7 @@ function buildTutorExam(
   });
 }
 
-function buildDetail(
-  overrides: Partial<TutorExamDetail> = {},
-): TutorExamDetail {
+function buildDetail(overrides: Partial<TutorExamDetail> = {}): TutorExamDetail {
   return {
     id: 'det-1',
     recordId: 'rec-1',
@@ -60,9 +58,7 @@ function buildDetail(
   };
 }
 
-function buildStudent(
-  overrides: Partial<ClassroomStudent> = {},
-): ClassroomStudent {
+function buildStudent(overrides: Partial<ClassroomStudent> = {}): ClassroomStudent {
   return {
     studentId: 's-1',
     studentCode: 'CODE001',
@@ -97,9 +93,7 @@ class FakeGetTutorExamsUseCase {
 
 class FakeGetTutorExamDetailUseCase {
   callCount = 0;
-  private _next:
-    | { kind: 'resolve'; detail: TutorExamDetail }
-    | { kind: 'reject'; error: Error } = {
+  private _next: { kind: 'resolve'; detail: TutorExamDetail } | { kind: 'reject'; error: Error } = {
     kind: 'resolve',
     detail: buildDetail(),
   };
@@ -129,9 +123,10 @@ class FakeListClassroomStudentsUseCase {
   willReject(error: Error) {
     this._next = { kind: 'reject', error };
   }
-  async execute(
-    _req: { classroomId: string; virtualExamDetailId: string },
-  ): Promise<readonly ClassroomStudent[]> {
+  async execute(_req: {
+    classroomId: string;
+    virtualExamDetailId: string;
+  }): Promise<readonly ClassroomStudent[]> {
     this.callCount++;
     if (this._next.kind === 'reject') throw this._next.error;
     return this._next.students;
@@ -158,9 +153,7 @@ class FakeIniciarExamenUseCase {
 
 class FakeFinalizarExamenUseCase {
   callCount = 0;
-  private _next:
-    | { kind: 'resolve'; result: FinalizeResult }
-    | { kind: 'reject'; error: Error } = {
+  private _next: { kind: 'resolve'; result: FinalizeResult } | { kind: 'reject'; error: Error } = {
     kind: 'resolve',
     result: { transitioned: true },
   };
@@ -180,8 +173,7 @@ class FakeFinalizarExamenUseCase {
 
 class FakeActualizarAlumnosHabilitadosUseCase {
   callCount = 0;
-  lastCall: { recordId: string; enabledStudentIds: readonly string[] } | null =
-    null;
+  lastCall: { recordId: string; enabledStudentIds: readonly string[] } | null = null;
   private _next: { kind: 'resolve' } | { kind: 'reject'; error: Error } = {
     kind: 'resolve',
   };
@@ -192,10 +184,7 @@ class FakeActualizarAlumnosHabilitadosUseCase {
   willReject(error: Error) {
     this._next = { kind: 'reject', error };
   }
-  async execute(req: {
-    recordId: string;
-    enabledStudentIds: readonly string[];
-  }): Promise<void> {
+  async execute(req: { recordId: string; enabledStudentIds: readonly string[] }): Promise<void> {
     this.callCount++;
     this.lastCall = req;
     if (this._next.kind === 'reject') throw this._next.error;
@@ -368,8 +357,16 @@ describe('TutorExamDetailViewModel', () => {
     it('canIniciar() es true con status=scheduled y enabledStudentIds.length>0', async () => {
       const { vm, store, fakeGetDetail, fakeListStudents } = setup('rec-1');
 
-      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1', serverStatus: new ExamServerStatus('scheduled') })]);
-      fakeGetDetail.willResolve(buildDetail({ status: new ExamServerStatus('scheduled'), enabledStudentIds: ['s-1'] }));
+      store.setExams([
+        buildTutorExam({
+          recordId: 'rec-1',
+          classroomId: 'cls-1',
+          serverStatus: new ExamServerStatus('scheduled'),
+        }),
+      ]);
+      fakeGetDetail.willResolve(
+        buildDetail({ status: new ExamServerStatus('scheduled'), enabledStudentIds: ['s-1'] }),
+      );
       fakeListStudents.willResolve([buildStudent({ studentId: 's-1' })]);
 
       await vm.load();
@@ -382,8 +379,16 @@ describe('TutorExamDetailViewModel', () => {
     it('canIniciar() es false cuando enabledStudentIds está vacío', async () => {
       const { vm, store, fakeGetDetail, fakeListStudents } = setup('rec-1');
 
-      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1', serverStatus: new ExamServerStatus('scheduled') })]);
-      fakeGetDetail.willResolve(buildDetail({ status: new ExamServerStatus('scheduled'), enabledStudentIds: [] }));
+      store.setExams([
+        buildTutorExam({
+          recordId: 'rec-1',
+          classroomId: 'cls-1',
+          serverStatus: new ExamServerStatus('scheduled'),
+        }),
+      ]);
+      fakeGetDetail.willResolve(
+        buildDetail({ status: new ExamServerStatus('scheduled'), enabledStudentIds: [] }),
+      );
       fakeListStudents.willResolve([]);
 
       await vm.load();
@@ -394,8 +399,16 @@ describe('TutorExamDetailViewModel', () => {
     it('NO llama IniciarExamenUseCase si canIniciar() es false', async () => {
       const { vm, store, fakeGetDetail, fakeListStudents, fakeIniciar } = setup('rec-1');
 
-      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1', serverStatus: new ExamServerStatus('scheduled') })]);
-      fakeGetDetail.willResolve(buildDetail({ status: new ExamServerStatus('scheduled'), enabledStudentIds: [] }));
+      store.setExams([
+        buildTutorExam({
+          recordId: 'rec-1',
+          classroomId: 'cls-1',
+          serverStatus: new ExamServerStatus('scheduled'),
+        }),
+      ]);
+      fakeGetDetail.willResolve(
+        buildDetail({ status: new ExamServerStatus('scheduled'), enabledStudentIds: [] }),
+      );
       fakeListStudents.willResolve([]);
 
       await vm.load();
@@ -411,8 +424,16 @@ describe('TutorExamDetailViewModel', () => {
     it('canIniciar() es false cuando status es in_progress', async () => {
       const { vm, store, fakeGetDetail, fakeListStudents } = setup('rec-1');
 
-      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1', serverStatus: new ExamServerStatus('in_progress') })]);
-      fakeGetDetail.willResolve(buildDetail({ status: new ExamServerStatus('in_progress'), enabledStudentIds: ['s-1'] }));
+      store.setExams([
+        buildTutorExam({
+          recordId: 'rec-1',
+          classroomId: 'cls-1',
+          serverStatus: new ExamServerStatus('in_progress'),
+        }),
+      ]);
+      fakeGetDetail.willResolve(
+        buildDetail({ status: new ExamServerStatus('in_progress'), enabledStudentIds: ['s-1'] }),
+      );
       fakeListStudents.willResolve([buildStudent()]);
 
       await vm.load();
@@ -423,8 +444,16 @@ describe('TutorExamDetailViewModel', () => {
     it('canIniciar() es false cuando status es finalized', async () => {
       const { vm, store, fakeGetDetail, fakeListStudents } = setup('rec-1');
 
-      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1', serverStatus: new ExamServerStatus('finalized') })]);
-      fakeGetDetail.willResolve(buildDetail({ status: new ExamServerStatus('finalized'), enabledStudentIds: ['s-1'] }));
+      store.setExams([
+        buildTutorExam({
+          recordId: 'rec-1',
+          classroomId: 'cls-1',
+          serverStatus: new ExamServerStatus('finalized'),
+        }),
+      ]);
+      fakeGetDetail.willResolve(
+        buildDetail({ status: new ExamServerStatus('finalized'), enabledStudentIds: ['s-1'] }),
+      );
       fakeListStudents.willResolve([buildStudent()]);
 
       await vm.load();
@@ -439,15 +468,26 @@ describe('TutorExamDetailViewModel', () => {
     it('iniciar() exitoso: recarga detail, actionError() es null', async () => {
       const { vm, store, fakeGetDetail, fakeListStudents, fakeIniciar } = setup('rec-1');
 
-      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1', serverStatus: new ExamServerStatus('scheduled') })]);
-      fakeGetDetail.willResolve(buildDetail({ status: new ExamServerStatus('scheduled'), enabledStudentIds: ['s-1'] }));
+      store.setExams([
+        buildTutorExam({
+          recordId: 'rec-1',
+          classroomId: 'cls-1',
+          serverStatus: new ExamServerStatus('scheduled'),
+        }),
+      ]);
+      fakeGetDetail.willResolve(
+        buildDetail({ status: new ExamServerStatus('scheduled'), enabledStudentIds: ['s-1'] }),
+      );
       fakeListStudents.willResolve([buildStudent()]);
       fakeIniciar.willResolve();
 
       await vm.load();
 
       // Reload will return in_progress
-      const detailAfter = buildDetail({ status: new ExamServerStatus('in_progress'), enabledStudentIds: ['s-1'] });
+      const detailAfter = buildDetail({
+        status: new ExamServerStatus('in_progress'),
+        enabledStudentIds: ['s-1'],
+      });
       fakeGetDetail.willResolve(detailAfter);
 
       await vm.iniciar();
@@ -461,16 +501,25 @@ describe('TutorExamDetailViewModel', () => {
     it('store.upsert es llamado tras iniciar exitoso', async () => {
       const { vm, store, fakeGetDetail, fakeListStudents, fakeIniciar } = setup('rec-1');
 
-      const exam = buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1', serverStatus: new ExamServerStatus('scheduled') });
+      const exam = buildTutorExam({
+        recordId: 'rec-1',
+        classroomId: 'cls-1',
+        serverStatus: new ExamServerStatus('scheduled'),
+      });
       store.setExams([exam]);
-      fakeGetDetail.willResolve(buildDetail({ status: new ExamServerStatus('scheduled'), enabledStudentIds: ['s-1'] }));
+      fakeGetDetail.willResolve(
+        buildDetail({ status: new ExamServerStatus('scheduled'), enabledStudentIds: ['s-1'] }),
+      );
       fakeListStudents.willResolve([buildStudent()]);
       fakeIniciar.willResolve();
 
       await vm.load();
 
       const upsertSpy = vi.spyOn(store, 'upsert');
-      const detailAfter = buildDetail({ status: new ExamServerStatus('in_progress'), enabledStudentIds: ['s-1'] });
+      const detailAfter = buildDetail({
+        status: new ExamServerStatus('in_progress'),
+        enabledStudentIds: ['s-1'],
+      });
       fakeGetDetail.willResolve(detailAfter);
 
       await vm.iniciar();
@@ -485,7 +534,13 @@ describe('TutorExamDetailViewModel', () => {
     it('canFinalizar() es true con status=in_progress', async () => {
       const { vm, store, fakeGetDetail, fakeListStudents } = setup('rec-1');
 
-      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1', serverStatus: new ExamServerStatus('in_progress') })]);
+      store.setExams([
+        buildTutorExam({
+          recordId: 'rec-1',
+          classroomId: 'cls-1',
+          serverStatus: new ExamServerStatus('in_progress'),
+        }),
+      ]);
       fakeGetDetail.willResolve(buildDetail({ status: new ExamServerStatus('in_progress') }));
       fakeListStudents.willResolve([]);
 
@@ -509,7 +564,13 @@ describe('TutorExamDetailViewModel', () => {
     it('canFinalizar() es false con status=finalized', async () => {
       const { vm, store, fakeGetDetail, fakeListStudents } = setup('rec-1');
 
-      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1', serverStatus: new ExamServerStatus('finalized') })]);
+      store.setExams([
+        buildTutorExam({
+          recordId: 'rec-1',
+          classroomId: 'cls-1',
+          serverStatus: new ExamServerStatus('finalized'),
+        }),
+      ]);
       fakeGetDetail.willResolve(buildDetail({ status: new ExamServerStatus('finalized') }));
       fakeListStudents.willResolve([]);
 
@@ -525,7 +586,13 @@ describe('TutorExamDetailViewModel', () => {
     it('transitioned:true → actionError()=null, detail recargado', async () => {
       const { vm, store, fakeGetDetail, fakeListStudents, fakeFinalizar } = setup('rec-1');
 
-      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1', serverStatus: new ExamServerStatus('in_progress') })]);
+      store.setExams([
+        buildTutorExam({
+          recordId: 'rec-1',
+          classroomId: 'cls-1',
+          serverStatus: new ExamServerStatus('in_progress'),
+        }),
+      ]);
       fakeGetDetail.willResolve(buildDetail({ status: new ExamServerStatus('in_progress') }));
       fakeListStudents.willResolve([]);
       fakeFinalizar.willResolve({ transitioned: true });
@@ -546,7 +613,13 @@ describe('TutorExamDetailViewModel', () => {
     it('transitioned:false → actionError()=null (no error), detail recargado', async () => {
       const { vm, store, fakeGetDetail, fakeListStudents, fakeFinalizar } = setup('rec-1');
 
-      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1', serverStatus: new ExamServerStatus('in_progress') })]);
+      store.setExams([
+        buildTutorExam({
+          recordId: 'rec-1',
+          classroomId: 'cls-1',
+          serverStatus: new ExamServerStatus('in_progress'),
+        }),
+      ]);
       fakeGetDetail.willResolve(buildDetail({ status: new ExamServerStatus('in_progress') }));
       fakeListStudents.willResolve([]);
       fakeFinalizar.willResolve({ transitioned: false });
@@ -565,7 +638,11 @@ describe('TutorExamDetailViewModel', () => {
     it('store.upsert invocado después de finalizar con transitioned:true', async () => {
       const { vm, store, fakeGetDetail, fakeListStudents, fakeFinalizar } = setup('rec-1');
 
-      const exam = buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1', serverStatus: new ExamServerStatus('in_progress') });
+      const exam = buildTutorExam({
+        recordId: 'rec-1',
+        classroomId: 'cls-1',
+        serverStatus: new ExamServerStatus('in_progress'),
+      });
       store.setExams([exam]);
       fakeGetDetail.willResolve(buildDetail({ status: new ExamServerStatus('in_progress') }));
       fakeListStudents.willResolve([]);
@@ -616,7 +693,13 @@ describe('TutorExamDetailViewModel', () => {
     it('isCheckboxDisabled() es true para cualquier alumno cuando status=finalized', async () => {
       const { vm, store, fakeGetDetail, fakeListStudents } = setup('rec-1');
 
-      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1', serverStatus: new ExamServerStatus('finalized') })]);
+      store.setExams([
+        buildTutorExam({
+          recordId: 'rec-1',
+          classroomId: 'cls-1',
+          serverStatus: new ExamServerStatus('finalized'),
+        }),
+      ]);
       fakeGetDetail.willResolve(buildDetail({ status: new ExamServerStatus('finalized') }));
       fakeListStudents.willResolve([
         buildStudent({ studentId: 's-1', hasSubmitted: false }),
@@ -710,8 +793,16 @@ describe('TutorExamDetailViewModel', () => {
     it('actionError() contiene mensaje sobre configuración/alumnos habilitados', async () => {
       const { vm, store, fakeGetDetail, fakeListStudents, fakeIniciar } = setup('rec-1');
 
-      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1', serverStatus: new ExamServerStatus('scheduled') })]);
-      fakeGetDetail.willResolve(buildDetail({ status: new ExamServerStatus('scheduled'), enabledStudentIds: ['s-1'] }));
+      store.setExams([
+        buildTutorExam({
+          recordId: 'rec-1',
+          classroomId: 'cls-1',
+          serverStatus: new ExamServerStatus('scheduled'),
+        }),
+      ]);
+      fakeGetDetail.willResolve(
+        buildDetail({ status: new ExamServerStatus('scheduled'), enabledStudentIds: ['s-1'] }),
+      );
       fakeListStudents.willResolve([buildStudent()]);
       fakeIniciar.willReject(new ExamPreconditionError());
 
@@ -729,8 +820,16 @@ describe('TutorExamDetailViewModel', () => {
     it('actionError() contiene mensaje sobre el estado actual del examen', async () => {
       const { vm, store, fakeGetDetail, fakeListStudents, fakeIniciar } = setup('rec-1');
 
-      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1', serverStatus: new ExamServerStatus('scheduled') })]);
-      fakeGetDetail.willResolve(buildDetail({ status: new ExamServerStatus('scheduled'), enabledStudentIds: ['s-1'] }));
+      store.setExams([
+        buildTutorExam({
+          recordId: 'rec-1',
+          classroomId: 'cls-1',
+          serverStatus: new ExamServerStatus('scheduled'),
+        }),
+      ]);
+      fakeGetDetail.willResolve(
+        buildDetail({ status: new ExamServerStatus('scheduled'), enabledStudentIds: ['s-1'] }),
+      );
       fakeListStudents.willResolve([buildStudent()]);
       fakeIniciar.willReject(new ExamConflictError());
 
@@ -747,7 +846,13 @@ describe('TutorExamDetailViewModel', () => {
     it('actionError() indica que el examen debe iniciarse primero', async () => {
       const { vm, store, fakeGetDetail, fakeListStudents, fakeFinalizar } = setup('rec-1');
 
-      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1', serverStatus: new ExamServerStatus('in_progress') })]);
+      store.setExams([
+        buildTutorExam({
+          recordId: 'rec-1',
+          classroomId: 'cls-1',
+          serverStatus: new ExamServerStatus('in_progress'),
+        }),
+      ]);
       fakeGetDetail.willResolve(buildDetail({ status: new ExamServerStatus('in_progress') }));
       fakeListStudents.willResolve([]);
       fakeFinalizar.willReject(new ExamPreconditionError());
@@ -765,7 +870,13 @@ describe('TutorExamDetailViewModel', () => {
     it('actionError() menciona falta de conexión y NOT es null', async () => {
       const { vm, store, fakeGetDetail, fakeListStudents, fakeFinalizar } = setup('rec-1');
 
-      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1', serverStatus: new ExamServerStatus('in_progress') })]);
+      store.setExams([
+        buildTutorExam({
+          recordId: 'rec-1',
+          classroomId: 'cls-1',
+          serverStatus: new ExamServerStatus('in_progress'),
+        }),
+      ]);
       fakeGetDetail.willResolve(buildDetail({ status: new ExamServerStatus('in_progress') }));
       fakeListStudents.willResolve([]);
       fakeFinalizar.willReject(new NetworkError());
@@ -823,8 +934,16 @@ describe('TutorExamDetailViewModel', () => {
     it('actionError usa instanceof ExamPreconditionError, no comparación de strings', async () => {
       const { vm, store, fakeGetDetail, fakeListStudents, fakeIniciar } = setup('rec-1');
 
-      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1', serverStatus: new ExamServerStatus('scheduled') })]);
-      fakeGetDetail.willResolve(buildDetail({ status: new ExamServerStatus('scheduled'), enabledStudentIds: ['s-1'] }));
+      store.setExams([
+        buildTutorExam({
+          recordId: 'rec-1',
+          classroomId: 'cls-1',
+          serverStatus: new ExamServerStatus('scheduled'),
+        }),
+      ]);
+      fakeGetDetail.willResolve(
+        buildDetail({ status: new ExamServerStatus('scheduled'), enabledStudentIds: ['s-1'] }),
+      );
       fakeListStudents.willResolve([buildStudent()]);
       // ExamPreconditionError with no message to prove we don't rely on body.message
       fakeIniciar.willReject(new ExamPreconditionError('mensaje_del_backend'));
@@ -879,8 +998,16 @@ describe('TutorExamDetailViewModel', () => {
     it('IniciarExamenUseCase rechaza con NetworkError → no escribe en IDB ni outbox', async () => {
       const { vm, store, fakeGetDetail, fakeListStudents, fakeIniciar } = setup('rec-1');
 
-      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1', serverStatus: new ExamServerStatus('scheduled') })]);
-      fakeGetDetail.willResolve(buildDetail({ status: new ExamServerStatus('scheduled'), enabledStudentIds: ['s-1'] }));
+      store.setExams([
+        buildTutorExam({
+          recordId: 'rec-1',
+          classroomId: 'cls-1',
+          serverStatus: new ExamServerStatus('scheduled'),
+        }),
+      ]);
+      fakeGetDetail.willResolve(
+        buildDetail({ status: new ExamServerStatus('scheduled'), enabledStudentIds: ['s-1'] }),
+      );
       fakeListStudents.willResolve([buildStudent()]);
       fakeIniciar.willReject(new NetworkError());
 

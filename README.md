@@ -39,18 +39,17 @@ npm run dev
 # Abre http://localhost:4200/login
 ```
 
-
 ## Comandos
 
-| Comando                | Qué hace                                                     |
-| ---------------------- | ------------------------------------------------------------ |
-| `npm run dev`          | Dev server en `http://localhost:4200` (preflight: build-env) |
-| `npm test`             | Vitest sobre `tests/`                                        |
-| `npm run lint`         | ESLint flat config sobre `src/` y `tests/`                   |
-| `npm run format`       | Prettier write                                               |
-| `npm run format:check` | Prettier check (CI-friendly)                                 |
+| Comando                | Qué hace                                                                             |
+| ---------------------- | ------------------------------------------------------------------------------------ |
+| `npm run dev`          | Dev server en `http://localhost:4200` (preflight: build-env)                         |
+| `npm test`             | Vitest sobre `tests/`                                                                |
+| `npm run lint`         | ESLint flat config sobre `src/` y `tests/`                                           |
+| `npm run format`       | Prettier write                                                                       |
+| `npm run format:check` | Prettier check (CI-friendly)                                                         |
 | `npm run build`        | Bundle producción en `dist/` (preflight: build-env, postflight: inject-ngsw-appdata) |
-| `npm run build-env`    | Regenera `src/environments/` desde `.env`                    |
+| `npm run build-env`    | Regenera `src/environments/` desde `.env`                                            |
 
 ## Estructura
 
@@ -92,12 +91,12 @@ Hexagonal estricta en 4 capas. Las reglas de import están enforzadas por ESLint
 
 Todas las variables las consume `scripts/build-env.mjs` y termina en `src/environments/environment.ts`. Si falta alguna requerida, el hook `predev`/`prebuild` falla con mensaje claro.
 
-| Variable         | Requerida | Origen   | Ejemplo dev                    | Notas                                                                                                  |
-| ---------------- | --------- | -------- | ------------------------------ | ------------------------------------------------------------------------------------------------------ |
-| `API_BASE_URL`   | sí        | `.env`   | `http://localhost:2001`        | URL del backend learnex. En prod tiene que ser **HTTPS** (cookies HttpOnly + `SameSite=None` lo exigen). |
-| `TENANT_SLUG`    | sí        | `.env`   | `vonex`                        | Slug multi-tenant. Se inyecta en todas las URLs `/t/{slug}/...` vía `src/L3_periphery/http/api-paths.ts`. Cualquier mención literal de un slug en `src/` está prohibida. |
-| `DRAFT_ENABLED`  | sí        | `.env`   | `true`                         | Si `false`, el dispatcher de draft auto-save usa la implementación `Noop` (no llama al backend). |
-| `APP_VERSION`    | sí        | `.env`   | `1.0.0`                        | SemVer humana. Se inyecta en `ngsw.json` post-build y dispara el modal "hay versión nueva" en clientes con la PWA cacheada. **Bumpear en cada release.** |
+| Variable        | Requerida | Origen | Ejemplo dev             | Notas                                                                                                                                                                    |
+| --------------- | --------- | ------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `API_BASE_URL`  | sí        | `.env` | `http://localhost:2001` | URL del backend learnex. En prod tiene que ser **HTTPS** (cookies HttpOnly + `SameSite=None` lo exigen).                                                                 |
+| `TENANT_SLUG`   | sí        | `.env` | `vonex`                 | Slug multi-tenant. Se inyecta en todas las URLs `/t/{slug}/...` vía `src/L3_periphery/http/api-paths.ts`. Cualquier mención literal de un slug en `src/` está prohibida. |
+| `DRAFT_ENABLED` | sí        | `.env` | `true`                  | Si `false`, el dispatcher de draft auto-save usa la implementación `Noop` (no llama al backend).                                                                         |
+| `APP_VERSION`   | sí        | `.env` | `1.0.0`                 | SemVer humana. Se inyecta en `ngsw.json` post-build y dispara el modal "hay versión nueva" en clientes con la PWA cacheada. **Bumpear en cada release.**                 |
 
 `.env` está en `.gitignore`. Documentación viva de las variables en `.env.example`.
 
@@ -107,12 +106,12 @@ Todas las variables las consume `scripts/build-env.mjs` y termina en `src/enviro
 
 El repo ya está dockerizado. Producción corre como un único container nginx con los assets compilados.
 
-| Archivo          | Rol                                                                                                                                              |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `Dockerfile`     | Multi-stage. Etapa 1 (`node:22-alpine`): `npm ci` + `npm run build`. Etapa 2 (`nginx:alpine`): copia `dist/fiovi/browser` y `nginx.conf`. Sin Node en la imagen final. |
-| `nginx.conf`     | SPA fallback (`try_files`), gzip, cache `immutable` 1y para assets hasheados, `no-cache` para `index.html`, `ngsw.json`, `ngsw-worker.js`.                              |
-| `compose.yml`    | Servicio `fiovi` expuesto en **puerto 3006:80**, `restart: unless-stopped`.                                                                                  |
-| `.dockerignore`  | Excluye `node_modules`, `tests/`, `docs/`, `openspec/`, etc. **Conserva `.env`** porque `build-env.mjs` lo necesita dentro del build.                          |
+| Archivo         | Rol                                                                                                                                                                    |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Dockerfile`    | Multi-stage. Etapa 1 (`node:22-alpine`): `npm ci` + `npm run build`. Etapa 2 (`nginx:alpine`): copia `dist/fiovi/browser` y `nginx.conf`. Sin Node en la imagen final. |
+| `nginx.conf`    | SPA fallback (`try_files`), gzip, cache `immutable` 1y para assets hasheados, `no-cache` para `index.html`, `ngsw.json`, `ngsw-worker.js`.                             |
+| `compose.yml`   | Servicio `fiovi` expuesto en **puerto 3006:80**, `restart: unless-stopped`.                                                                                            |
+| `.dockerignore` | Excluye `node_modules`, `tests/`, `docs/`, `openspec/`, etc. **Conserva `.env`** porque `build-env.mjs` lo necesita dentro del build.                                  |
 
 ### Deploy manual (válido para staging o como referencia)
 

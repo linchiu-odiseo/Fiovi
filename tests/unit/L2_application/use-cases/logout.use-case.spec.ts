@@ -4,6 +4,7 @@ import { Identity } from '../../../../src/L1_domain/entities/identity';
 import { FakeAuthRepository } from '../../fixtures/auth-repository.fake';
 import { FakeIdentityStorage } from '../../fixtures/identity-storage.fake';
 import { FakeProfileStorage } from '../../fixtures/profile-storage.fake';
+import { FakeTenantSlugCache } from '../../fixtures/tenant-slug-cache.fake';
 import { MarkingsStorage } from '../../../../src/L1_domain/ports/markings-storage';
 import { OutboxStoragePort } from '../../../../src/L1_domain/ports/outbox-storage.port';
 import { RouterPort } from '../../../../src/L1_domain/ports/router-port';
@@ -15,6 +16,7 @@ const makeIdentity = (role: 'student' | 'tutor' = 'student') =>
   new Identity(
     'user-id',
     'tenant-id',
+    'vonex',
     'alumno@vonex.edu.pe',
     '79507732',
     [role],
@@ -109,6 +111,7 @@ describe('LogoutUseCase', () => {
   let repo: FakeAuthRepository;
   let identityStorage: FakeIdentityStorage;
   let profileStorage: FakeProfileStorage;
+  let slugCache: FakeTenantSlugCache;
   let markingsStorage: FakeMarkingsStorage;
   let outboxStorage: FakeOutboxStorage;
   let router: FakeRouter;
@@ -119,6 +122,7 @@ describe('LogoutUseCase', () => {
     repo = new FakeAuthRepository();
     identityStorage = new FakeIdentityStorage();
     profileStorage = new FakeProfileStorage();
+    slugCache = new FakeTenantSlugCache();
     markingsStorage = new FakeMarkingsStorage();
     outboxStorage = new FakeOutboxStorage();
     router = new FakeRouter();
@@ -126,6 +130,7 @@ describe('LogoutUseCase', () => {
     useCase = new LogoutUseCase(
       repo,
       identityStorage,
+      slugCache,
       profileStorage,
       markingsStorage,
       outboxStorage,
@@ -187,6 +192,7 @@ describe('LogoutUseCase', () => {
       const ucWithoutSw = new LogoutUseCase(
         repo,
         identityStorage,
+        slugCache,
         profileStorage,
         markingsStorage,
         outboxStorage,

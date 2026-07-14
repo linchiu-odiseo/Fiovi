@@ -283,10 +283,7 @@ export class FakeExamsApi implements ExamsApi {
 // control programático resolve/reject por método, call recording.
 // ---------------------------------------------------------------------------
 
-import {
-  TutorExamsApi,
-  FinalizeResult,
-} from '../../../src/L1_domain/ports/tutor-exams-api';
+import { TutorExamsApi, FinalizeResult } from '../../../src/L1_domain/ports/tutor-exams-api';
 import { TutorExam } from '../../../src/L1_domain/entities/tutor-exam';
 import { TutorExamDetail } from '../../../src/L1_domain/value-objects/tutor-exam-detail';
 import { ClassroomStudent } from '../../../src/L1_domain/value-objects/classroom-student';
@@ -314,7 +311,9 @@ export class FakeTutorExamsApi implements TutorExamsApi {
   async getTutorExams(): Promise<readonly TutorExam[]> {
     this.getTutorExamsCalls++;
     if (!this.nextGetTutorExams) {
-      throw new Error('FakeTutorExamsApi: configurar willResolveGetTutorExams o willRejectGetTutorExams antes de llamar getTutorExams()');
+      throw new Error(
+        'FakeTutorExamsApi: configurar willResolveGetTutorExams o willRejectGetTutorExams antes de llamar getTutorExams()',
+      );
     }
     if (this.nextGetTutorExams.kind === 'reject') throw this.nextGetTutorExams.error;
     return this.nextGetTutorExams.result;
@@ -342,7 +341,9 @@ export class FakeTutorExamsApi implements TutorExamsApi {
   async getExamDetail(recordId: string): Promise<TutorExamDetail> {
     this.getExamDetailCalls.push(recordId);
     if (!this.nextGetExamDetail) {
-      throw new Error('FakeTutorExamsApi: configurar willResolveGetExamDetail o willRejectGetExamDetail antes de llamar getExamDetail()');
+      throw new Error(
+        'FakeTutorExamsApi: configurar willResolveGetExamDetail o willRejectGetExamDetail antes de llamar getExamDetail()',
+      );
     }
     if (this.nextGetExamDetail.kind === 'reject') throw this.nextGetExamDetail.error;
     return this.nextGetExamDetail.result;
@@ -367,21 +368,26 @@ export class FakeTutorExamsApi implements TutorExamsApi {
     return this.listClassroomStudentsCalls;
   }
 
-  async listClassroomStudents(req: { classroomId: string; virtualExamDetailId: string }): Promise<readonly ClassroomStudent[]> {
+  async listClassroomStudents(req: {
+    classroomId: string;
+    virtualExamDetailId: string;
+  }): Promise<readonly ClassroomStudent[]> {
     this.listClassroomStudentsCalls.push(req);
     if (!this.nextListClassroomStudents) {
-      throw new Error('FakeTutorExamsApi: configurar willResolveListClassroomStudents o willRejectListClassroomStudents antes de llamar listClassroomStudents()');
+      throw new Error(
+        'FakeTutorExamsApi: configurar willResolveListClassroomStudents o willRejectListClassroomStudents antes de llamar listClassroomStudents()',
+      );
     }
-    if (this.nextListClassroomStudents.kind === 'reject') throw this.nextListClassroomStudents.error;
+    if (this.nextListClassroomStudents.kind === 'reject')
+      throw this.nextListClassroomStudents.error;
     return this.nextListClassroomStudents.result;
   }
 
   // --- updateEnabledStudents ---
-  private nextUpdateEnabledStudents:
-    | { kind: 'resolve' }
-    | { kind: 'reject'; error: Error }
-    | null = null;
-  private updateEnabledStudentsCalls: { recordId: string; enabledStudentIds: readonly string[] }[] = [];
+  private nextUpdateEnabledStudents: { kind: 'resolve' } | { kind: 'reject'; error: Error } | null =
+    null;
+  private updateEnabledStudentsCalls: { recordId: string; enabledStudentIds: readonly string[] }[] =
+    [];
 
   willResolveUpdateEnabledStudents(): void {
     this.nextUpdateEnabledStudents = { kind: 'resolve' };
@@ -391,23 +397,29 @@ export class FakeTutorExamsApi implements TutorExamsApi {
     this.nextUpdateEnabledStudents = { kind: 'reject', error };
   }
 
-  getUpdateEnabledStudentsCalls(): readonly { recordId: string; enabledStudentIds: readonly string[] }[] {
+  getUpdateEnabledStudentsCalls(): readonly {
+    recordId: string;
+    enabledStudentIds: readonly string[];
+  }[] {
     return this.updateEnabledStudentsCalls;
   }
 
-  async updateEnabledStudents(req: { recordId: string; enabledStudentIds: readonly string[] }): Promise<void> {
+  async updateEnabledStudents(req: {
+    recordId: string;
+    enabledStudentIds: readonly string[];
+  }): Promise<void> {
     this.updateEnabledStudentsCalls.push(req);
     if (!this.nextUpdateEnabledStudents) {
-      throw new Error('FakeTutorExamsApi: configurar willResolveUpdateEnabledStudents o willRejectUpdateEnabledStudents antes de llamar updateEnabledStudents()');
+      throw new Error(
+        'FakeTutorExamsApi: configurar willResolveUpdateEnabledStudents o willRejectUpdateEnabledStudents antes de llamar updateEnabledStudents()',
+      );
     }
-    if (this.nextUpdateEnabledStudents.kind === 'reject') throw this.nextUpdateEnabledStudents.error;
+    if (this.nextUpdateEnabledStudents.kind === 'reject')
+      throw this.nextUpdateEnabledStudents.error;
   }
 
   // --- iniciar ---
-  private nextIniciar:
-    | { kind: 'resolve' }
-    | { kind: 'reject'; error: Error }
-    | null = null;
+  private nextIniciar: { kind: 'resolve' } | { kind: 'reject'; error: Error } | null = null;
   // `iniciarCalls` conserva la firma histórica (solo recordId) para no romper
   // los tests existentes; `iniciarCallsFull` registra también el duration para
   // los tests nuevos del override al iniciar.
@@ -434,7 +446,9 @@ export class FakeTutorExamsApi implements TutorExamsApi {
     this.iniciarCalls.push(recordId);
     this.iniciarCallsFull.push({ recordId, duration });
     if (!this.nextIniciar) {
-      throw new Error('FakeTutorExamsApi: configurar willResolveIniciar o willRejectIniciar antes de llamar iniciar()');
+      throw new Error(
+        'FakeTutorExamsApi: configurar willResolveIniciar o willRejectIniciar antes de llamar iniciar()',
+      );
     }
     if (this.nextIniciar.kind === 'reject') throw this.nextIniciar.error;
   }
@@ -461,7 +475,9 @@ export class FakeTutorExamsApi implements TutorExamsApi {
   async finalizar(recordId: string): Promise<FinalizeResult> {
     this.finalizarCalls.push(recordId);
     if (!this.nextFinalizar) {
-      throw new Error('FakeTutorExamsApi: configurar willResolveFinalizar o willRejectFinalizar antes de llamar finalizar()');
+      throw new Error(
+        'FakeTutorExamsApi: configurar willResolveFinalizar o willRejectFinalizar antes de llamar finalizar()',
+      );
     }
     if (this.nextFinalizar.kind === 'reject') throw this.nextFinalizar.error;
     return this.nextFinalizar.result;

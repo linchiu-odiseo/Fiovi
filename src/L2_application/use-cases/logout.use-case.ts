@@ -1,5 +1,6 @@
 import { AuthRepository } from '../../L1_domain/ports/auth-repository';
 import { IdentityStorage } from '../../L1_domain/ports/identity-storage';
+import { TenantSlugCache } from '../../L1_domain/ports/tenant-slug-cache';
 import { ProfileStorage } from '../../L1_domain/ports/profile-storage';
 import { MarkingsStorage } from '../../L1_domain/ports/markings-storage';
 import { OutboxStoragePort } from '../../L1_domain/ports/outbox-storage.port';
@@ -20,6 +21,7 @@ export class LogoutUseCase {
   constructor(
     private readonly authRepo: AuthRepository,
     private readonly identityStorage: IdentityStorage,
+    private readonly slugCache: TenantSlugCache,
     private readonly profileStorage: ProfileStorage,
     private readonly markingsStorage: MarkingsStorage,
     private readonly outboxStorage: OutboxStoragePort,
@@ -71,6 +73,10 @@ export class LogoutUseCase {
     } catch (err) {
       console.warn('identity storage clear failed during logout', err);
     }
+
+    // Paso 6.5: limpiar el cache del slug (post-clear del storage). Sin esto,
+    // el próximo request a /t/{slug}/... armaría el path con un slug fantasma.
+    this.slugCache.clear();
 
     // Paso 7: notificar al SW (opcional).
     this.swMessenger?.post({ type: 'LOGOUT' });

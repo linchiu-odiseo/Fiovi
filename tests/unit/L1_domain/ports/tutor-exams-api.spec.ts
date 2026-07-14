@@ -27,8 +27,14 @@ describe('TutorExamsApi port — smoke de tipos', () => {
       getExamDetail: async (_recordId: string) => {
         throw new Error('not implemented');
       },
-      listClassroomStudents: async (_req: { classroomId: string; virtualExamDetailId: string }) => [],
-      updateEnabledStudents: async (_req: { recordId: string; enabledStudentIds: readonly string[] }) => {
+      listClassroomStudents: async (_req: {
+        classroomId: string;
+        virtualExamDetailId: string;
+      }) => [],
+      updateEnabledStudents: async (_req: {
+        recordId: string;
+        enabledStudentIds: readonly string[];
+      }) => {
         return;
       },
       iniciar: async (_recordId: string) => {

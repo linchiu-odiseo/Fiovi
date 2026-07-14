@@ -51,7 +51,7 @@ interface DraftState {
   inflight: boolean;
   stopped: boolean;
   // Backoff (design.md D11):
-  retryCount: number;       // fallos consecutivos sin éxito (0 = ninguno)
+  retryCount: number; // fallos consecutivos sin éxito (0 = ninguno)
   nextRetryAt: number | null; // timestamp mínimo del próximo intento (null = sin restricción)
 }
 
@@ -236,9 +236,7 @@ export class DraftAutoSaveDispatcher implements IDraftAutoSaveDispatcher {
 // (design.md D7) — también instanciada via factory en app.config.ts.
 @Injectable({ providedIn: 'root' })
 export class NoopDraftAutoSaveDispatcher implements IDraftAutoSaveDispatcher {
-  readonly closedSessions: Signal<readonly string[]> = signal<readonly string[]>(
-    [],
-  ).asReadonly();
+  readonly closedSessions: Signal<readonly string[]> = signal<readonly string[]>([]).asReadonly();
 
   notificarCambio(_sessionId: string, _count: number): void {
     // no-op

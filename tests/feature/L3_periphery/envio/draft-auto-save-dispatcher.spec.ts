@@ -18,10 +18,7 @@ const DEFAULT_COUNT = 4;
 // permitir assert del passthrough del count nuevo (design.md D12).
 class FakeGuardarDraftUseCase {
   public calls: { examId: string; count: number }[] = [];
-  private plan:
-    | { kind: 'resolve' }
-    | { kind: 'reject'; error: Error }
-    | null = null;
+  private plan: { kind: 'resolve' } | { kind: 'reject'; error: Error } | null = null;
 
   willResolve(): void {
     this.plan = { kind: 'resolve' };
@@ -34,9 +31,7 @@ class FakeGuardarDraftUseCase {
   // Configura para una secuencia de resultados (1 por llamada).
   private sequence: ({ kind: 'resolve' } | { kind: 'reject'; error: Error })[] = [];
 
-  willDoSequence(
-    seq: ({ kind: 'resolve' } | { kind: 'reject'; error: Error })[],
-  ): void {
+  willDoSequence(seq: ({ kind: 'resolve' } | { kind: 'reject'; error: Error })[]): void {
     this.sequence = [...seq];
     this.plan = null;
   }
@@ -235,10 +230,7 @@ describe('DraftAutoSaveDispatcher', () => {
     });
 
     it('backoff 1° falla → 30_000ms', async () => {
-      uc.willDoSequence([
-        { kind: 'reject', error: new NetworkError() },
-        { kind: 'resolve' },
-      ]);
+      uc.willDoSequence([{ kind: 'reject', error: new NetworkError() }, { kind: 'resolve' }]);
 
       dispatcher.notificarCambio('S1', DEFAULT_COUNT);
       await advanceAndDrain(3000); // primera falla a t=3000
@@ -286,7 +278,7 @@ describe('DraftAutoSaveDispatcher', () => {
     });
 
     it('quinta falla → backoff capeado en 300_000ms', async () => {
-      const rejects: ({ kind: 'reject'; error: Error })[] = Array(5).fill({
+      const rejects: { kind: 'reject'; error: Error }[] = Array(5).fill({
         kind: 'reject' as const,
         error: new NetworkError(),
       });
@@ -326,7 +318,7 @@ describe('DraftAutoSaveDispatcher', () => {
         { kind: 'reject', error: new NetworkError() },
         { kind: 'reject', error: new NetworkError() },
         { kind: 'reject', error: new NetworkError() }, // 4 fallas → retryCount=4
-        { kind: 'resolve' },                            // éxito → reset
+        { kind: 'resolve' }, // éxito → reset
         { kind: 'reject', error: new NetworkError() }, // 6ta call falla → debe aplicar 30s
         { kind: 'resolve' },
       ]);
@@ -463,9 +455,7 @@ describe('DraftAutoSaveDispatcher', () => {
         },
       };
 
-      const d = new DraftAutoSaveDispatcher(
-        customUc as unknown as GuardarDraftUseCase,
-      );
+      const d = new DraftAutoSaveDispatcher(customUc as unknown as GuardarDraftUseCase);
 
       // Iniciar primer POST (inflight)
       d.notificarCambio('S1', DEFAULT_COUNT);
@@ -502,9 +492,7 @@ describe('DraftAutoSaveDispatcher', () => {
         },
       };
 
-      const d = new DraftAutoSaveDispatcher(
-        customUc as unknown as GuardarDraftUseCase,
-      );
+      const d = new DraftAutoSaveDispatcher(customUc as unknown as GuardarDraftUseCase);
 
       // Primer POST arranca (inflight)
       d.notificarCambio('S1', DEFAULT_COUNT);
@@ -522,8 +510,8 @@ describe('DraftAutoSaveDispatcher', () => {
       // El debounce del segundo notificarCambio expira a t=6000, pero el throttle
       // (lastPostAt=3000 + 10_000 = 13_000) lo reagenda a t=13_000.
       // Avanzamos lo suficiente para que el throttle-reagenda también dispare.
-      await advanceAndDrain(3_000);  // t=6000: debounce expira, throttle reagenda a t=13_000
-      await advanceAndDrain(7_001);  // t=13_001: throttle-reagenda dispara el segundo POST
+      await advanceAndDrain(3_000); // t=6000: debounce expira, throttle reagenda a t=13_000
+      await advanceAndDrain(7_001); // t=13_001: throttle-reagenda dispara el segundo POST
       await drainMicrotasks();
       expect(callCount).toBeGreaterThanOrEqual(2);
     });
@@ -557,9 +545,7 @@ describe('DraftAutoSaveDispatcher', () => {
         },
       };
 
-      const d = new DraftAutoSaveDispatcher(
-        customUc as unknown as GuardarDraftUseCase,
-      );
+      const d = new DraftAutoSaveDispatcher(customUc as unknown as GuardarDraftUseCase);
 
       // POST arranca (inflight)
       d.notificarCambio('S1', DEFAULT_COUNT);
@@ -607,10 +593,7 @@ describe('DraftAutoSaveDispatcher', () => {
 
   describe('Garantías no-fatal', () => {
     it('NetworkError silencia, dirty queda, no escala closedSessions', async () => {
-      uc.willDoSequence([
-        { kind: 'reject', error: new NetworkError() },
-        { kind: 'resolve' },
-      ]);
+      uc.willDoSequence([{ kind: 'reject', error: new NetworkError() }, { kind: 'resolve' }]);
 
       dispatcher.notificarCambio('S1', DEFAULT_COUNT);
       await advanceAndDrain(3_000);

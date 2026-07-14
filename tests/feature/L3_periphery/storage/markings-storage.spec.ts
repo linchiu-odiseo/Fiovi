@@ -59,6 +59,7 @@ function makeIdentity(email: string): Identity {
   return new Identity(
     'user-id',
     'tenant-id',
+    'vonex',
     email,
     '79507732',
     ['student'],
@@ -507,9 +508,9 @@ describe('IndexedDbMarkingsStorage', () => {
       const ackKeys = keys.filter((k) => k.includes('.ack.'));
       expect(ackKeys.length).toBeGreaterThan(0);
       // El patrón exacto requerido por el spec offline-storage.
-      expect(
-        ackKeys.some((k) => k === 'cartilla.alumno-a@vonex.edu.pe.ack.ack-key-test'),
-      ).toBe(true);
+      expect(ackKeys.some((k) => k === 'cartilla.alumno-a@vonex.edu.pe.ack.ack-key-test')).toBe(
+        true,
+      );
     });
   });
 

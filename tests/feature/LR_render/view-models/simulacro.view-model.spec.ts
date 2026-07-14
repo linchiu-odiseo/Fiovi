@@ -300,7 +300,12 @@ class FakeDraftDispatcher implements IDraftAutoSaveDispatcher {
 const buildExam = (
   id: string,
   serverStatusValue: 'scheduled' | 'in_progress' | 'finalized',
-  overrides: Partial<{ count: number; scheduled: Date; started: Date | null; duration: number }> = {},
+  overrides: Partial<{
+    count: number;
+    scheduled: Date;
+    started: Date | null;
+    duration: number;
+  }> = {},
 ): Exam => {
   const inProgress = serverStatusValue === 'in_progress';
   const finalized = serverStatusValue === 'finalized';
@@ -315,7 +320,7 @@ const buildExam = (
     scheduled: overrides.scheduled ?? new Date('2026-06-11T10:00:00Z'),
     started:
       'started' in overrides
-        ? overrides.started ?? null
+        ? (overrides.started ?? null)
         : inProgress || finalized
           ? new Date('2026-06-11T10:00:05Z')
           : null,
@@ -597,10 +602,8 @@ describe('SimulacroPageViewModel', () => {
 
   // Hash sha256 hex válido (64 chars) para construir SubmissionAck en tests.
   const VALID_HASH = 'a3f5c8d1b2e4f6a8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2';
-  const buildAck = (
-    id = 'ack-1',
-    submittedIso = '2026-06-11T10:30:00.000Z',
-  ): SubmissionAck => new SubmissionAck(id, VALID_HASH, new Date(submittedIso));
+  const buildAck = (id = 'ack-1', submittedIso = '2026-06-11T10:30:00.000Z'): SubmissionAck =>
+    new SubmissionAck(id, VALID_HASH, new Date(submittedIso));
 
   describe('submit() — guard por serverStatus.permiteEntrada()', () => {
     it('submit es no-op si exam no está en in_progress (defensa adicional)', async () => {
@@ -957,7 +960,6 @@ describe('SimulacroPageViewModel', () => {
       expect(navigateSpy).not.toHaveBeenCalled();
       vm.stop();
     });
-
   });
 
   describe('DraftAutoSaveDispatcher — integración con view-model', () => {
@@ -1231,7 +1233,8 @@ describe('SimulacroPageViewModel', () => {
       // Cubre la expectativa crítica del scenario del spec — el view-model debe
       // usar el mismo hook que post-marcarRespuesta, no una firma distinta.
       expect(fakeDraftDispatcher.notificarCalls.length).toBe(notificarCallsBefore + 1);
-      const last = fakeDraftDispatcher.notificarCalls[fakeDraftDispatcher.notificarCalls.length - 1];
+      const last =
+        fakeDraftDispatcher.notificarCalls[fakeDraftDispatcher.notificarCalls.length - 1];
       expect(last).toEqual({ sessionId: 'exam-1', count: 40 });
       vm.stop();
     });

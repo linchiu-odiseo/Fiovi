@@ -51,13 +51,17 @@
         @if (detail.area) {
           <li>
             <span class="material-symbols-outlined" aria-hidden="true">category</span>
-            <span>Área: <strong>{{ detail.area }}</strong></span>
+            <span
+              >Área: <strong>{{ detail.area }}</strong></span
+            >
           </li>
         }
         @if (detail.course) {
           <li>
             <span class="material-symbols-outlined" aria-hidden="true">menu_book</span>
-            <span>Curso: <strong>{{ detail.course }}</strong></span>
+            <span
+              >Curso: <strong>{{ detail.course }}</strong></span
+            >
           </li>
         }
         <li>
@@ -66,18 +70,24 @@
         </li>
         <li>
           <span class="material-symbols-outlined" aria-hidden="true">timer</span>
-          <span>Duración: <strong>{{ durationMinutes(detail) }} min</strong></span>
+          <span
+            >Duración: <strong>{{ durationMinutes(detail) }} min</strong></span
+          >
         </li>
         @if (detail.startedAt) {
           <li>
             <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>
-            <span>Iniciado: <strong>{{ formatDateTime(detail.startedAt) }}</strong></span>
+            <span
+              >Iniciado: <strong>{{ formatDateTime(detail.startedAt) }}</strong></span
+            >
           </li>
         }
         @if (detail.finishedAt) {
           <li>
             <span class="material-symbols-outlined" aria-hidden="true">flag</span>
-            <span>Finalizado: <strong>{{ formatDateTime(detail.finishedAt) }}</strong></span>
+            <span
+              >Finalizado: <strong>{{ formatDateTime(detail.finishedAt) }}</strong></span
+            >
           </li>
         }
       </ul>
@@ -135,8 +145,8 @@
             Finalizar examen
           </h2>
           <p class="tutor-exam-detail__modal-hint">
-            ¿Seguro que querés cerrar el examen antes de tiempo? Los alumnos
-            no podrán seguir marcando y se enviará a procesar.
+            ¿Seguro que querés cerrar el examen antes de tiempo? Los alumnos no podrán seguir
+            marcando y se enviará a procesar.
           </p>
           <div class="tutor-exam-detail__modal-actions tutor-exam-detail__modal-actions--stacked">
             <button
@@ -172,9 +182,7 @@
         data-testid="iniciar-modal"
       >
         <div class="tutor-exam-detail__modal tutor-exam-detail__modal--iniciar">
-          <h2 id="iniciar-modal-title" class="tutor-exam-detail__modal-title">
-            Iniciar examen
-          </h2>
+          <h2 id="iniciar-modal-title" class="tutor-exam-detail__modal-title">Iniciar examen</h2>
           <p class="tutor-exam-detail__modal-hint">
             Confirmá o ajustá el tiempo antes de iniciar. Los alumnos verán esta duración.
           </p>

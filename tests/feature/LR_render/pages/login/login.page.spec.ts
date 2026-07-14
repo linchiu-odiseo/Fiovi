@@ -4,7 +4,10 @@ import { ActivatedRoute, provideRouter, Router } from '@angular/router';
 import { Component } from '@angular/core';
 import { LoginPage } from '../../../../../src/LR_render/pages/login/login.page';
 import { LoginUseCase } from '../../../../../src/L2_application/use-cases/login.use-case';
+import { ListSsoProvidersUseCase } from '../../../../../src/L2_application/use-cases/list-sso-providers.use-case';
 import { Identity } from '../../../../../src/L1_domain/entities/identity';
+import { SelectionChallenge } from '../../../../../src/L1_domain/value-objects/selection-challenge';
+import { SsoProvider } from '../../../../../src/L1_domain/value-objects/sso-provider';
 import { InvalidCredentialsError } from '../../../../../src/L1_domain/errors/invalid-credentials.error';
 import { NetworkError } from '../../../../../src/L1_domain/errors/network.error';
 import { RateLimitError } from '../../../../../src/L1_domain/errors/rate-limit.error';
@@ -16,20 +19,36 @@ class StudentHomeStub {}
 @Component({ template: '' })
 class TutorHomeStub {}
 
+@Component({ template: '' })
+class SelectTenantStub {}
+
 function buildIdentity(role: 'student' | 'tutor' = 'student'): Identity {
   const email = role === 'student' ? '79507732@vonex.edu.pe' : 'tutor1@vonex.pe';
   const codigo = role === 'student' ? '79507732' : null;
-  return new Identity('user-id', 'tenant-id', email, codigo, [role], [], Date.now() + 900_000);
+  return new Identity(
+    'user-id',
+    'tenant-id',
+    'vonex',
+    email,
+    codigo,
+    [role],
+    [],
+    Date.now() + 900_000,
+  );
 }
 
 class FakeLoginUseCase {
   private nextOutcome:
-    | { kind: 'ok'; role: 'student' | 'tutor' }
-    | { kind: 'reject'; error: Error } = { kind: 'ok', role: 'student' };
+    | { kind: 'identity'; role: 'student' | 'tutor' }
+    | { kind: 'selection'; challenge: SelectionChallenge }
+    | { kind: 'reject'; error: Error } = { kind: 'identity', role: 'student' };
   public calls: { email: string; password: string }[] = [];
 
   willResolveAs(role: 'student' | 'tutor') {
-    this.nextOutcome = { kind: 'ok', role };
+    this.nextOutcome = { kind: 'identity', role };
+  }
+  willResolveSelection(challenge: SelectionChallenge) {
+    this.nextOutcome = { kind: 'selection', challenge };
   }
   willRejectInvalid() {
     this.nextOutcome = { kind: 'reject', error: new InvalidCredentialsError() };
@@ -41,10 +60,26 @@ class FakeLoginUseCase {
     this.nextOutcome = { kind: 'reject', error: new RateLimitError() };
   }
 
-  async execute(credentials: { email: string; password: string }): Promise<Identity> {
+  async execute(credentials: {
+    email: string;
+    password: string;
+  }): Promise<Identity | SelectionChallenge> {
     this.calls.push(credentials);
     if (this.nextOutcome.kind === 'reject') throw this.nextOutcome.error;
+    if (this.nextOutcome.kind === 'selection') return this.nextOutcome.challenge;
     return buildIdentity(this.nextOutcome.role);
+  }
+}
+
+class FakeListSsoProvidersUseCase {
+  private providers: SsoProvider[] = [{ provider: 'google', displayName: 'Google' }];
+
+  willResolveWith(providers: SsoProvider[]) {
+    this.providers = providers;
+  }
+
+  async execute(): Promise<SsoProvider[]> {
+    return this.providers;
   }
 }
 
@@ -65,19 +100,23 @@ const setEmailAndPasswordViaDOM = (
 
 describe('LoginPage', () => {
   let fakeUseCase: FakeLoginUseCase;
+  let fakeSsoProviders: FakeListSsoProvidersUseCase;
 
   beforeEach(async () => {
     fakeUseCase = new FakeLoginUseCase();
+    fakeSsoProviders = new FakeListSsoProvidersUseCase();
     TestBed.resetTestingModule();
     await TestBed.configureTestingModule({
       imports: [LoginPage],
       providers: [
         provideRouter([
           { path: 'login', component: LoginPage },
+          { path: 'login/select-tenant', component: SelectTenantStub },
           { path: 'student/home', component: StudentHomeStub },
           { path: 'tutor/home', component: TutorHomeStub },
         ]),
         { provide: LoginUseCase, useValue: fakeUseCase },
+        { provide: ListSsoProvidersUseCase, useValue: fakeSsoProviders },
       ],
     }).compileComponents();
   });
@@ -107,7 +146,7 @@ describe('LoginPage', () => {
     expect(btn.disabled).toBe(false);
   });
 
-  it('submit exitoso con identity student invoca LoginUseCase con las credenciales y navega a /student/home', async () => {
+  it('submit exitoso con identity student navega a /student/home', async () => {
     const fixture = TestBed.createComponent(LoginPage);
     fixture.detectChanges();
     setEmailAndPasswordViaDOM(fixture, validCredentials);
@@ -136,6 +175,28 @@ describe('LoginPage', () => {
     await fixture.whenStable();
 
     expect(router.url).toBe('/tutor/home');
+  });
+
+  it('submit con selectionChallenge (N tenants) navega a /login/select-tenant', async () => {
+    const fixture = TestBed.createComponent(LoginPage);
+    fixture.detectChanges();
+    setEmailAndPasswordViaDOM(fixture, validCredentials);
+    fixture.detectChanges();
+    fakeUseCase.willResolveSelection({
+      selectionToken: 'tkn',
+      selectionExpiresAt: Date.now() + 5 * 60 * 1000,
+      tenants: [
+        { slug: 'vonex', name: 'Vonex' },
+        { slug: 'pitagoras', name: 'Pitágoras' },
+      ],
+    });
+
+    const router = TestBed.inject(Router);
+    const form = fixture.nativeElement.querySelector('form') as HTMLFormElement;
+    form.dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+
+    expect(router.url).toBe('/login/select-tenant');
   });
 
   it('credenciales inválidas muestran mensaje y limpian password pero conservan email', async () => {
@@ -202,9 +263,6 @@ describe('LoginPage', () => {
   });
 
   describe('version footer', () => {
-    // 15.1 — Render inicial: el footer aparece con el copy literal y la
-    // versión leída desde environment.appVersion (no acoplamos a un string
-    // hardcoded: leemos lo que el build generó).
     it('renderiza el footer de versión con copy literal en initial render', () => {
       const fixture = TestBed.createComponent(LoginPage);
       fixture.detectChanges();
@@ -214,8 +272,6 @@ describe('LoginPage', () => {
       expect(footer?.textContent?.trim()).toBe(`Fiovi · versión ${environment.appVersion}`);
     });
 
-    // 15.2 — El footer sigue visible aún con un error de form activo
-    // (ej. RateLimitError): el copy no se pierde por el banner de error.
     it('el footer sigue visible cuando hay errorMessage por RateLimitError', async () => {
       const fixture = TestBed.createComponent(LoginPage);
       fixture.detectChanges();
@@ -229,35 +285,45 @@ describe('LoginPage', () => {
       fixture.detectChanges();
 
       const el = fixture.nativeElement as HTMLElement;
-      // Confirmamos que el error sí está renderizado (precondición del test).
       expect(el.querySelector('.error')).not.toBeNull();
-      // Y que el footer no fue desplazado/ocultado por el banner.
       const footer = el.querySelector('.version-footer');
       expect(footer).not.toBeNull();
       expect(footer?.textContent?.trim()).toBe(`Fiovi · versión ${environment.appVersion}`);
     });
   });
 
-  // ─── Google SSO ──────────────────────────────────────────────────────────
-  // Tests del botón "Continuar con Google" y el mapping de `?ssoError=` a copy
-  // es-PE. Ver `openspec/changes/add-google-sso-login/specs/auth-login/spec.md`.
+  // ─── SSO ────────────────────────────────────────────────────────────────
+  // Los botones ahora se renderizan dinámicamente por provider desde
+  // GET /auth/sso/providers (via ListSsoProvidersUseCase).
 
-  describe('Google SSO', () => {
-    it('renderiza el botón Google con el data-testid canónico cuando el flag está activo', () => {
-      // El flag `environment.googleSsoEnabled` es true por default en el
-      // build de tests (`.env` de dev no lo apaga). Si algún día se pusiera
-      // en false, este test fallaría y sería una señal clara de la desviación.
-      expect(environment.googleSsoEnabled).toBe(true);
-
+  describe('SSO providers dinámicos', () => {
+    it('renderiza el botón Google cuando el backend lo devuelve en providers', async () => {
+      fakeSsoProviders.willResolveWith([{ provider: 'google', displayName: 'Google' }]);
       const fixture = TestBed.createComponent(LoginPage);
       fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
       const el = fixture.nativeElement as HTMLElement;
-      const btn = el.querySelector('[data-testid="btn-google-sso"]');
+      const btn = el.querySelector('[data-testid="btn-sso-google"]');
       expect(btn).not.toBeNull();
       expect(btn?.textContent).toContain('Continuar con Google');
     });
 
-    it('click en el botón dispara window.location.assign con la URL Google del backend', () => {
+    it('NO renderiza botones SSO si el backend devuelve lista vacía', async () => {
+      fakeSsoProviders.willResolveWith([]);
+      const fixture = TestBed.createComponent(LoginPage);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('[data-testid^="btn-sso-"]')).toBeNull();
+      expect(el.querySelector('.login__divider')).toBeNull();
+    });
+
+    it('click en el botón dispara window.location.assign con la URL SSO del backend (sin slug)', async () => {
+      fakeSsoProviders.willResolveWith([{ provider: 'google', displayName: 'Google' }]);
       const assignSpy = vi.fn();
       const originalLocation = window.location;
       Object.defineProperty(window, 'location', {
@@ -268,14 +334,14 @@ describe('LoginPage', () => {
       try {
         const fixture = TestBed.createComponent(LoginPage);
         fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
         const btn = fixture.nativeElement.querySelector(
-          '[data-testid="btn-google-sso"]',
+          '[data-testid="btn-sso-google"]',
         ) as HTMLButtonElement;
         btn.click();
 
-        const expected =
-          `${environment.apiBaseUrl}/t/${environment.tenantSlug}` +
-          `/auth/google/start?app=pwa&returnTo=%2F`;
+        const expected = `${environment.apiBaseUrl}/auth/sso/google/start?app=pwa&returnTo=%2F`;
         expect(assignSpy).toHaveBeenCalledTimes(1);
         expect(assignSpy).toHaveBeenCalledWith(expected);
       } finally {
@@ -286,19 +352,20 @@ describe('LoginPage', () => {
       }
     });
 
-    // Mapping de los 8 códigos definidos por learnex + fallback unknown.
-    // Los tests parametrizados sobre-escriben ActivatedRoute con el ssoError
-    // deseado y verifican el copy es-PE en el slot `.error`.
+    // Mapping de códigos del backend post-cambio + fallback unknown.
     const errorMappings: readonly [string, string][] = [
-      ['sso_disabled', 'El login con Google no está disponible para tu institución.'],
+      ['sso_disabled', 'El login con Google no está disponible en este momento.'],
+      ['sso_disabled_for_tenant', 'Tu academia no permite iniciar sesión con Google.'],
+      ['sso_provider_unsupported', 'Ese proveedor de login no está soportado.'],
+      ['sso_no_matching_tenant', 'Ese correo no está registrado en ninguna academia.'],
+      ['sso_email_not_verified', 'Verificá tu correo con Google antes de iniciar sesión.'],
+      ['sso_hosted_domain_mismatch', 'Tu cuenta de Google no pertenece al dominio autorizado.'],
+      ['sso_user_inactive', 'Tu cuenta está desactivada. Contactá a tu academia.'],
+      ['sso_multiple_tenants', 'Iniciá sesión con tu contraseña por ahora.'],
       ['google_error', 'Google no autorizó tu ingreso. Intentá de nuevo.'],
       ['missing_params', 'Hubo un problema con Google. Intentá de nuevo.'],
-      ['state_invalid', 'La sesión de login venció. Intentá de nuevo.'],
-      ['hosted_domain_mismatch', 'Solo podés ingresar con tu correo institucional.'],
-      ['email_not_verified', 'Tu correo de Google no está verificado.'],
-      ['user_not_found', 'Tu cuenta de Google no está registrada. Contactá a tu tutor.'],
-      ['unknown', 'No se pudo iniciar sesión con Google. Intentá de nuevo.'],
-      ['weird_new_code', 'No se pudo iniciar sesión con Google. Intentá de nuevo.'], // fallback
+      ['state_invalid', 'El intento de login expiró. Intentá de nuevo.'],
+      ['weird_new_code', 'No se pudo iniciar sesión con Google. Intentá de nuevo.'],
     ];
 
     for (const [code, expectedMessage] of errorMappings) {
@@ -309,10 +376,12 @@ describe('LoginPage', () => {
           providers: [
             provideRouter([
               { path: 'login', component: LoginPage },
+              { path: 'login/select-tenant', component: SelectTenantStub },
               { path: 'student/home', component: StudentHomeStub },
               { path: 'tutor/home', component: TutorHomeStub },
             ]),
             { provide: LoginUseCase, useValue: fakeUseCase },
+            { provide: ListSsoProvidersUseCase, useValue: fakeSsoProviders },
             {
               provide: ActivatedRoute,
               useValue: { snapshot: { queryParams: { ssoError: code } } },
@@ -339,6 +408,7 @@ describe('LoginPage', () => {
         providers: [
           provideRouter([{ path: 'login', component: LoginPage }]),
           { provide: LoginUseCase, useValue: fakeUseCase },
+          { provide: ListSsoProvidersUseCase, useValue: fakeSsoProviders },
           {
             provide: ActivatedRoute,
             useValue: { snapshot: { queryParams: {} } },

@@ -3,6 +3,8 @@ import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { AuthRepository } from '../../L1_domain/ports/auth-repository';
 import { Identity, Role } from '../../L1_domain/entities/identity';
+import { SelectionChallenge } from '../../L1_domain/value-objects/selection-challenge';
+import { SsoProvider } from '../../L1_domain/value-objects/sso-provider';
 import { StudentProfile } from '../../L1_domain/value-objects/student-profile';
 import { TutorProfile } from '../../L1_domain/value-objects/tutor-profile';
 import { InvalidCredentialsError } from '../../L1_domain/errors/invalid-credentials.error';
@@ -11,17 +13,35 @@ import { RateLimitError } from '../../L1_domain/errors/rate-limit.error';
 import { RefreshFailedError } from '../../L1_domain/errors/refresh-failed.error';
 import { ProfileNotAvailableError } from '../../L1_domain/errors/profile-not-available.error';
 import { SessionExpiredError } from '../../L1_domain/errors/session-expired.error';
+import { SelectionInvalidError } from '../../L1_domain/errors/selection-invalid.error';
 import { UnsupportedRoleError } from '../../L1_domain/errors/unsupported-role.error';
 import { apiPath } from './api-paths';
+import { SlugStore } from './slug-store';
 
 // Roles que Fiovi soporta hoy. Cualquier otro (admin, teacher, custom)
 // que devuelva el back se rechaza en el mapper con UnsupportedRoleError.
 // Cuando se agregue soporte, ampliar este set y el tipo `Role` en L1.
 const SUPPORTED_ROLES: ReadonlySet<Role> = new Set(['student', 'tutor']);
 
-// Shapes del back learnex (verificados al 2026-06-13 contra responses reales).
-// Ver .authentic/pwa-auth-contract.md y proposal.md del change.
-interface LoginResponseDto {
+// Shape del user en `PublicAuthResponse` (POST /auth/login 1 tenant, POST
+// /auth/select-tenant): incluye `slug` que hidrata `Identity.tenantSlug`.
+interface PublicAuthResponseDto {
+  user: {
+    id: string;
+    tenantId: string;
+    slug: string;
+    email: string;
+    codigo: string | null;
+    roles: string[];
+    permissions: string[];
+  };
+  expiresAt: number;
+}
+
+// Shape del user en `TenantAuthResponse` (GET /t/{slug}/auth/me, POST /t/{slug}/auth/refresh):
+// endpoints tenant-scoped que NO devuelven `slug` en el body (el slug ya está
+// implícito en el path). El mapper lo inyecta desde el argumento `slug`.
+interface TenantAuthResponseDto {
   user: {
     id: string;
     tenantId: string;
@@ -31,6 +51,16 @@ interface LoginResponseDto {
     permissions: string[];
   };
   expiresAt: number;
+}
+
+interface PublicAuthSelectionResponseDto {
+  selectionToken: string;
+  selectionExpiresAt: number;
+  tenants: { slug: string; name: string }[];
+}
+
+interface PublicSsoProvidersResponseDto {
+  providers: { provider: string; displayName: string }[];
 }
 
 interface StudentProfileDto {
@@ -67,31 +97,78 @@ interface ErrorBodyDto {
 // Códigos del zod del back. Sólo se leen estos campos del body de error;
 // `message` queda PROHIBIDO porque es texto humano volátil.
 const CODE_INVALID_CREDENTIALS = 'TENANT_AUTH_INVALID_CREDENTIALS';
-const CODE_REFRESH_INVALID = 'TENANT_AUTH_REFRESH_TOKEN_INVALID';
-const CODE_REFRESH_MISSING = 'TENANT_AUTH_REFRESH_TOKEN_MISSING';
+const REFRESH_FAILURE_CODES: ReadonlySet<string> = new Set([
+  'TENANT_AUTH_REFRESH_TOKEN_MISSING',
+  'TENANT_AUTH_REFRESH_TOKEN_NOT_FOUND',
+  'TENANT_AUTH_REFRESH_TOKEN_EXPIRED',
+  'TENANT_AUTH_REFRESH_TOKEN_REVOKED',
+  'TENANT_AUTH_REFRESH_TOKEN_TENANT_MISMATCH',
+  // legacy — algunos backs viejos aún emiten este código en vez de los 5 nuevos.
+  'TENANT_AUTH_REFRESH_TOKEN_INVALID',
+]);
+const CODE_SELECTION_INVALID = 'PUBLIC_AUTH_SELECTION_TOKEN_INVALID';
 
 @Injectable({ providedIn: 'root' })
 export class HttpAuthRepository implements AuthRepository {
   private readonly http = inject(HttpClient);
+  private readonly slugStore = inject(SlugStore);
 
-  async login(credentials: { email: string; password: string }): Promise<Identity> {
+  async login(credentials: {
+    email: string;
+    password: string;
+  }): Promise<Identity | SelectionChallenge> {
     try {
       const dto = await firstValueFrom(
-        this.http.post<LoginResponseDto>(apiPath.login(), credentials),
+        this.http.post<PublicAuthResponseDto | PublicAuthSelectionResponseDto>(
+          apiPath.login(),
+          credentials,
+        ),
       );
-      return this.mapIdentity(dto);
+      if (isSelectionResponse(dto)) {
+        return {
+          selectionToken: dto.selectionToken,
+          selectionExpiresAt: dto.selectionExpiresAt,
+          tenants: dto.tenants.map((t) => ({ slug: t.slug, name: t.name })),
+        };
+      }
+      return this.mapIdentityFromPublic(dto);
     } catch (err) {
-      // UnsupportedRoleError viene de mapIdentity (post-200), NO es error HTTP.
-      // Propagar tal cual sin clasificar.
       if (err instanceof UnsupportedRoleError) throw err;
       throw this.classifyLoginError(err);
     }
   }
 
-  async me(): Promise<Identity> {
+  async selectTenant(input: { selectionToken: string; slug: string }): Promise<Identity> {
     try {
-      const dto = await firstValueFrom(this.http.get<LoginResponseDto>(apiPath.me()));
-      return this.mapIdentity(dto);
+      const dto = await firstValueFrom(
+        this.http.post<PublicAuthResponseDto>(apiPath.selectTenant(), input),
+      );
+      return this.mapIdentityFromPublic(dto);
+    } catch (err) {
+      if (err instanceof UnsupportedRoleError) throw err;
+      throw this.classifySelectTenantError(err);
+    }
+  }
+
+  async listSsoProviders(): Promise<SsoProvider[]> {
+    try {
+      const dto = await firstValueFrom(
+        this.http.get<PublicSsoProvidersResponseDto>(apiPath.listSsoProviders()),
+      );
+      return dto.providers.map((p) => ({ provider: p.provider, displayName: p.displayName }));
+    } catch {
+      // Best-effort: si falla el fetch de providers, el botón simplemente no
+      // se renderiza. No queremos que un provider caído bloquee el login por
+      // password. Devolvemos lista vacía.
+      return [];
+    }
+  }
+
+  async me(): Promise<Identity> {
+    const slug = this.requireSlug();
+    try {
+      const dto = await firstValueFrom(this.http.get<TenantAuthResponseDto>(apiPath.me(slug)));
+      return this.mapIdentityFromTenant(dto, slug);
     } catch (err) {
       if (err instanceof UnsupportedRoleError) throw err;
       throw this.classifyMeError(err);
@@ -99,11 +176,12 @@ export class HttpAuthRepository implements AuthRepository {
   }
 
   async refresh(): Promise<Identity> {
+    const slug = this.requireSlug();
     try {
       const dto = await firstValueFrom(
-        this.http.post<LoginResponseDto>(apiPath.refresh(), {}),
+        this.http.post<TenantAuthResponseDto>(apiPath.refresh(slug), {}),
       );
-      return this.mapIdentity(dto);
+      return this.mapIdentityFromTenant(dto, slug);
     } catch (err) {
       if (err instanceof UnsupportedRoleError) throw err;
       throw this.classifyRefreshError(err);
@@ -111,21 +189,24 @@ export class HttpAuthRepository implements AuthRepository {
   }
 
   async logout(): Promise<void> {
+    const slug = this.slugStore.current();
+    if (!slug) return; // sin slug no hay endpoint que llamar — best-effort.
     // Best-effort: errores de red o 5xx no se clasifican — el LogoutUseCase
     // ya envuelve la llamada en try/catch y continúa con la limpieza local.
-    await firstValueFrom(this.http.post(apiPath.logout(), {}));
+    await firstValueFrom(this.http.post(apiPath.logout(slug), {}));
   }
 
   async getProfile(role: Role): Promise<StudentProfile | TutorProfile> {
+    const slug = this.requireSlug();
     try {
       if (role === 'student') {
         const dto = await firstValueFrom(
-          this.http.get<StudentProfileDto>(apiPath.profile('student')),
+          this.http.get<StudentProfileDto>(apiPath.profile(slug, 'student')),
         );
         return this.mapStudentProfile(dto);
       }
       const dto = await firstValueFrom(
-        this.http.get<TutorProfileDto>(apiPath.profile('tutor')),
+        this.http.get<TutorProfileDto>(apiPath.profile(slug, 'tutor')),
       );
       return this.mapTutorProfile(dto);
     } catch (err) {
@@ -133,25 +214,75 @@ export class HttpAuthRepository implements AuthRepository {
     }
   }
 
+  // --- helpers ---
+
+  private requireSlug(): string {
+    const slug = this.slugStore.current();
+    if (!slug) {
+      // Bug del programador: alguien llamó un endpoint tenant-scoped sin haber
+      // hidratado el slug (login exitoso o restore de storage al arrancar).
+      // Lanzamos NetworkError para que el interceptor no intente refresh
+      // (loop) y el use case caller navegue a /login.
+      throw new NetworkError();
+    }
+    return slug;
+  }
+
   // --- mappers ---
 
-  private mapIdentity(dto: LoginResponseDto): Identity {
+  private mapIdentityFromPublic(dto: PublicAuthResponseDto): Identity {
+    return this.buildIdentity({
+      id: dto.user.id,
+      tenantId: dto.user.tenantId,
+      tenantSlug: dto.user.slug,
+      email: dto.user.email,
+      codigo: dto.user.codigo,
+      roles: dto.user.roles,
+      permissions: dto.user.permissions,
+      expiresAt: dto.expiresAt,
+    });
+  }
+
+  private mapIdentityFromTenant(dto: TenantAuthResponseDto, slug: string): Identity {
+    return this.buildIdentity({
+      id: dto.user.id,
+      tenantId: dto.user.tenantId,
+      tenantSlug: slug,
+      email: dto.user.email,
+      codigo: dto.user.codigo,
+      roles: dto.user.roles,
+      permissions: dto.user.permissions,
+      expiresAt: dto.expiresAt,
+    });
+  }
+
+  private buildIdentity(fields: {
+    id: string;
+    tenantId: string;
+    tenantSlug: string;
+    email: string;
+    codigo: string | null;
+    roles: string[];
+    permissions: string[];
+    expiresAt: number;
+  }): Identity {
     // Validamos rol ANTES de construir Identity: el cast `as Role[]` sería
     // una mentira de TypeScript si el back devuelve admin/teacher. El
     // invariante single-role de Identity ya se aplica en su constructor;
     // acá agregamos el invariante "rol soportado por este cliente".
-    const rawRole = dto.user.roles[0];
-    if (dto.user.roles.length !== 1 || !SUPPORTED_ROLES.has(rawRole as Role)) {
+    const rawRole = fields.roles[0];
+    if (fields.roles.length !== 1 || !SUPPORTED_ROLES.has(rawRole as Role)) {
       throw new UnsupportedRoleError(rawRole ?? '(empty)');
     }
     return new Identity(
-      dto.user.id,
-      dto.user.tenantId,
-      dto.user.email,
-      dto.user.codigo,
+      fields.id,
+      fields.tenantId,
+      fields.tenantSlug,
+      fields.email,
+      fields.codigo,
       [rawRole as Role],
-      dto.user.permissions,
-      dto.expiresAt,
+      fields.permissions,
+      fields.expiresAt,
     );
   }
 
@@ -202,6 +333,22 @@ export class HttpAuthRepository implements AuthRepository {
     return new NetworkError();
   }
 
+  private classifySelectTenantError(err: unknown): Error {
+    if (!(err instanceof HttpErrorResponse)) return new NetworkError();
+    if (err.status === 0 || err.status >= 500) return new NetworkError();
+    // 400/401/403/404 → el token expiró, el slug no está en la lista pre-
+    // autenticada, o el backend rechazó por cualquier motivo. Todos convergen
+    // al mismo mensaje UX: pedirle al user que inicie sesión de nuevo.
+    if (err.status === 401 || err.status === 400 || err.status === 403 || err.status === 404) {
+      const code = this.extractCode(err);
+      if (code === CODE_SELECTION_INVALID || err.status === 401) {
+        return new SelectionInvalidError();
+      }
+      return new SelectionInvalidError();
+    }
+    return new NetworkError();
+  }
+
   private classifyMeError(err: unknown): Error {
     if (!(err instanceof HttpErrorResponse)) return new NetworkError();
     if (err.status === 0 || err.status >= 500) return new NetworkError();
@@ -214,7 +361,7 @@ export class HttpAuthRepository implements AuthRepository {
     if (err.status === 0 || err.status >= 500) return new NetworkError();
     if (err.status === 401) {
       const code = this.extractCode(err);
-      if (code === CODE_REFRESH_INVALID || code === CODE_REFRESH_MISSING) {
+      if (code && REFRESH_FAILURE_CODES.has(code)) {
         return new RefreshFailedError();
       }
       // 401 sin code conocido también es refresh failure — no podemos seguir.
@@ -235,4 +382,10 @@ export class HttpAuthRepository implements AuthRepository {
     const body = err.error as ErrorBodyDto | null;
     return typeof body?.code === 'string' ? body.code : null;
   }
+}
+
+function isSelectionResponse(
+  dto: PublicAuthResponseDto | PublicAuthSelectionResponseDto,
+): dto is PublicAuthSelectionResponseDto {
+  return 'selectionToken' in dto;
 }

@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { HttpTutorExamsApi } from '../../../../src/L3_periphery/http/http-tutor-exams-api';
+import { SlugStore } from '../../../../src/L3_periphery/http/slug-store';
 import { TutorExam } from '../../../../src/L1_domain/entities/tutor-exam';
 import { NetworkError } from '../../../../src/L1_domain/errors/network.error';
 import { InvalidPayloadError } from '../../../../src/L1_domain/errors/invalid-payload.error';
@@ -12,7 +13,8 @@ import { ExamPreconditionError } from '../../../../src/L1_domain/errors/exam-pre
 import { TutorExamForbiddenError } from '../../../../src/L1_domain/errors/tutor-exam-forbidden.error';
 import { environment } from '../../../../src/environments/environment';
 
-const BASE = `${environment.apiBaseUrl}/t/${environment.tenantSlug}`;
+const TEST_SLUG = 'vonex';
+const BASE = `${environment.apiBaseUrl}/t/${TEST_SLUG}`;
 
 // DTO builders — reflejan el shape actual del back: sin entryId/courseId/createdAt
 // en la lista del tutor; con `course`, `area` snapshot y `scheduled`.
@@ -58,10 +60,11 @@ describe('HttpTutorExamsApi', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), HttpTutorExamsApi],
+      providers: [provideHttpClient(), provideHttpClientTesting(), HttpTutorExamsApi, SlugStore],
     });
     httpMock = TestBed.inject(HttpTestingController);
     adapter = TestBed.inject(HttpTutorExamsApi);
+    TestBed.inject(SlugStore).set(TEST_SLUG);
   });
 
   afterEach(() => httpMock.verify());
@@ -220,9 +223,7 @@ describe('HttpTutorExamsApi', () => {
         virtualExamDetailId: 'det-1',
       });
 
-      const req = httpMock.expectOne(
-        `${BASE}/classrooms/cls-1/students?virtualExamDetailId=det-1`,
-      );
+      const req = httpMock.expectOne(`${BASE}/classrooms/cls-1/students?virtualExamDetailId=det-1`);
       expect(req.request.method).toBe('GET');
       req.flush({ students: [] });
       await pending;
@@ -233,9 +234,7 @@ describe('HttpTutorExamsApi', () => {
         classroomId: 'cls-1',
         virtualExamDetailId: 'det-1',
       });
-      const req = httpMock.expectOne(
-        `${BASE}/classrooms/cls-1/students?virtualExamDetailId=det-1`,
-      );
+      const req = httpMock.expectOne(`${BASE}/classrooms/cls-1/students?virtualExamDetailId=det-1`);
       req.flush({
         students: [
           {
@@ -266,9 +265,7 @@ describe('HttpTutorExamsApi', () => {
         classroomId: 'cls-1',
         virtualExamDetailId: 'det-1',
       });
-      const req = httpMock.expectOne(
-        `${BASE}/classrooms/cls-1/students?virtualExamDetailId=det-1`,
-      );
+      const req = httpMock.expectOne(`${BASE}/classrooms/cls-1/students?virtualExamDetailId=det-1`);
       req.flush({
         students: [
           {
@@ -291,9 +288,7 @@ describe('HttpTutorExamsApi', () => {
         classroomId: 'cls-1',
         virtualExamDetailId: 'det-1',
       });
-      const req = httpMock.expectOne(
-        `${BASE}/classrooms/cls-1/students?virtualExamDetailId=det-1`,
-      );
+      const req = httpMock.expectOne(`${BASE}/classrooms/cls-1/students?virtualExamDetailId=det-1`);
       req.flush({ message: 'forbidden' }, { status: 403, statusText: 'Forbidden' });
 
       await expect(pending).rejects.toBeInstanceOf(TutorExamForbiddenError);
@@ -403,10 +398,7 @@ describe('HttpTutorExamsApi', () => {
     it('HTTP 400 (duración fuera de rango) → rechaza con InvalidPayloadError', async () => {
       const pending = adapter.iniciar('rec-1', 30);
       const req = httpMock.expectOne(`${BASE}/virtual-exams/rec-1/start`);
-      req.flush(
-        { message: 'duration out of range' },
-        { status: 400, statusText: 'Bad Request' },
-      );
+      req.flush({ message: 'duration out of range' }, { status: 400, statusText: 'Bad Request' });
 
       await expect(pending).rejects.toBeInstanceOf(InvalidPayloadError);
     });
@@ -484,21 +476,30 @@ describe('HttpTutorExamsApi', () => {
     it('400 → InvalidPayloadError', async () => {
       const pending = adapter.getTutorExams();
       const req = httpMock.expectOne(`${BASE}/tutor/virtual-exams`);
-      req.flush({ message: 'bad request', code: 'any_code' }, { status: 400, statusText: 'Bad Request' });
+      req.flush(
+        { message: 'bad request', code: 'any_code' },
+        { status: 400, statusText: 'Bad Request' },
+      );
       await expect(pending).rejects.toBeInstanceOf(InvalidPayloadError);
     });
 
     it('403 → TutorExamForbiddenError', async () => {
       const pending = adapter.getTutorExams();
       const req = httpMock.expectOne(`${BASE}/tutor/virtual-exams`);
-      req.flush({ message: 'forbidden', code: 'forbidden' }, { status: 403, statusText: 'Forbidden' });
+      req.flush(
+        { message: 'forbidden', code: 'forbidden' },
+        { status: 403, statusText: 'Forbidden' },
+      );
       await expect(pending).rejects.toBeInstanceOf(TutorExamForbiddenError);
     });
 
     it('404 → VirtualExamNotFoundError', async () => {
       const pending = adapter.getTutorExams();
       const req = httpMock.expectOne(`${BASE}/tutor/virtual-exams`);
-      req.flush({ message: 'not found', code: 'not_found' }, { status: 404, statusText: 'Not Found' });
+      req.flush(
+        { message: 'not found', code: 'not_found' },
+        { status: 404, statusText: 'Not Found' },
+      );
       await expect(pending).rejects.toBeInstanceOf(VirtualExamNotFoundError);
     });
 
@@ -593,9 +594,7 @@ describe('HttpTutorExamsApi', () => {
     // deben seguir sin cambios. Se verifica importando el HttpExamsApi y
     // comprobando que sus métodos existen y no se tocaron.
     it('clasificadores del alumno son independientes — HttpExamsApi sigue sin cambios', async () => {
-      const { HttpExamsApi } = await import(
-        '../../../../src/L3_periphery/http/http-exams-api'
-      );
+      const { HttpExamsApi } = await import('../../../../src/L3_periphery/http/http-exams-api');
       expect(typeof HttpExamsApi).toBe('function');
       // Si hubiera un import erróneo en http-tutor-exams-api.ts que modificara
       // http-exams-api, este test fallaría.

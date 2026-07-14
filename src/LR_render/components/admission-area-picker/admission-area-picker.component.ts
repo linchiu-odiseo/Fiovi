@@ -6,10 +6,7 @@ import {
   Output,
   signal,
 } from '@angular/core';
-import {
-  ADMISSION_AREAS,
-  AdmissionArea,
-} from '../../../L1_domain/value-objects/admission-area';
+import { ADMISSION_AREAS, AdmissionArea } from '../../../L1_domain/value-objects/admission-area';
 
 // Duración mínima del press para que cuente como long-press. Estándar en
 // gestos táctiles (Material, iOS): 500ms es lo que se siente "deliberado"
