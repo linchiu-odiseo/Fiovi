@@ -1,5 +1,6 @@
 import { AuthRepository } from '../../L1_domain/ports/auth-repository';
 import { IdentityStorage } from '../../L1_domain/ports/identity-storage';
+import { TenantSlugCache } from '../../L1_domain/ports/tenant-slug-cache';
 import { Identity } from '../../L1_domain/entities/identity';
 import { SessionExpiredError } from '../../L1_domain/errors/session-expired.error';
 import { NetworkError } from '../../L1_domain/errors/network.error';
@@ -8,30 +9,51 @@ import { GetProfileUseCase } from './get-profile.use-case';
 
 // Use case del AppInitializer: valida la sesión al arrancar la app via GET /auth/me.
 //
-// Casos:
-// - me() OK → persiste identity, dispara profile fire-and-forget, devuelve Identity.
-// - me() 401 (SessionExpiredError) → limpia IdentityStorage, devuelve null.
-// - me() UnsupportedRoleError → cookies vivas pero rol no soportado (admin/teacher).
-//   Logout best-effort para invalidar cookies server-side + limpia storage local
-//   + devuelve null. Caller redirige a /login con form vacío.
-// - me() NetworkError → NO toca storage, propaga error (UI muestra pantalla offline).
+// Orden de hidratación (asegura que `me()` pueda armar el path tenant-scoped):
+//   1. Si SlugStore ya tiene slug (viene de SsoCallbackBootstrap con ?slug=X),
+//      ese slug + las cookies del callback bastan para llamar `me()`.
+//   2. Si SlugStore está vacío, intentamos leer una Identity persistida del
+//      IdentityStorage e hidratar el slug desde ahí (bootstrap normal con
+//      sesión previa).
+//   3. Si tampoco hay identity persistida → sin slug no hay endpoint que
+//      llamar; devolvemos null y el user cae a `/login`.
+//
+// Casos post-`me()`:
+// - OK → persiste identity, dispara profile fire-and-forget, devuelve Identity.
+// - 401 (SessionExpiredError) → limpia IdentityStorage + SlugCache, devuelve null.
+// - UnsupportedRoleError → cookies vivas pero rol no soportado (admin/teacher).
+//   Logout best-effort para invalidar cookies server-side + limpia local + null.
+// - NetworkError → NO toca storage, propaga (UI muestra pantalla offline).
 export class InitializeSessionUseCase {
   constructor(
     private readonly authRepo: AuthRepository,
     private readonly identityStorage: IdentityStorage,
+    private readonly slugCache: TenantSlugCache,
     private readonly getProfile: GetProfileUseCase,
   ) {}
 
   async execute(): Promise<Identity | null> {
+    if (!this.slugCache.current()) {
+      const stored = await this.identityStorage.read();
+      if (!stored) {
+        // Sin slug hidratado ni identity previa → asumimos no autenticado.
+        // No llamamos `me()` porque no podríamos armar el path.
+        return null;
+      }
+      this.slugCache.set(stored.tenantSlug);
+    }
+
     try {
       const identity = await this.authRepo.me();
       await this.identityStorage.write(identity);
+      this.slugCache.set(identity.tenantSlug);
       // Fire-and-forget: warm up del caché de perfil.
       void this.getProfile.execute(identity.role()).catch(() => undefined);
       return identity;
     } catch (err) {
       if (err instanceof SessionExpiredError) {
         await this.identityStorage.clear();
+        this.slugCache.clear();
         return null;
       }
       if (err instanceof UnsupportedRoleError) {
@@ -44,6 +66,7 @@ export class InitializeSessionUseCase {
           // ignorar — best-effort.
         }
         await this.identityStorage.clear();
+        this.slugCache.clear();
         return null;
       }
       if (err instanceof NetworkError) {

@@ -13,12 +13,7 @@ import { SimulacroNoAsignadoError } from '../../../src/L1_domain/errors/simulacr
 import { InvalidSubmissionTimeError } from '../../../src/L1_domain/errors/invalid-submission-time.error';
 import { InvalidPayloadError } from '../../../src/L1_domain/errors/invalid-payload.error';
 import { StudentNotEnrolledError } from '../../../src/L1_domain/errors/student-not-enrolled.error';
-import {
-  FakeClock,
-  FakeExamsApi,
-  FakeIdentityStorage,
-  InMemoryMarkingsStorage,
-} from './fakes';
+import { FakeClock, FakeExamsApi, FakeIdentityStorage, InMemoryMarkingsStorage } from './fakes';
 
 // Cubre `EnviarSimulacroUseCase` (L2) según los scenarios del spec
 // `exam-submission` del cambio `fase-3-exam-submit-learnex`:
@@ -50,6 +45,7 @@ describe('EnviarSimulacroUseCase', () => {
     new Identity(
       'user-id',
       'tenant-id',
+      'vonex',
       VALID_EMAIL,
       codigo,
       ['student'],
