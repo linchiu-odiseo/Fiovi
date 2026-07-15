@@ -1,7 +1,9 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { apiPath } from '../../../L3_periphery/http/api-paths';
+import { CAPTCHA_PROVIDER } from '../../../L3_periphery/tokens';
+import { CaptchaWidgetComponent } from '../../components/captcha-widget/captcha-widget.component';
 import { VersionFooterComponent } from '../../components/version-footer/version-footer.component';
 import { LoginViewModel } from '../../view-models/login.view-model';
 
@@ -29,7 +31,7 @@ const SSO_ERROR_MESSAGES: Readonly<Record<string, string>> = {
 
 @Component({
   selector: 'app-login-page',
-  imports: [ReactiveFormsModule, VersionFooterComponent],
+  imports: [ReactiveFormsModule, CaptchaWidgetComponent, VersionFooterComponent],
   templateUrl: './login.page.html',
   styleUrl: './login.page.scss',
   providers: [LoginViewModel],
@@ -37,12 +39,22 @@ const SSO_ERROR_MESSAGES: Readonly<Record<string, string>> = {
 export class LoginPage implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly route = inject(ActivatedRoute);
+  private readonly captchaProvider = inject(CAPTCHA_PROVIDER);
   protected readonly vm = inject(LoginViewModel);
 
   protected readonly form = this.fb.nonNullable.group({
     email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required]],
   });
+
+  // Snapshot al montar: si el provider está enabled, el LoginPage renderiza el
+  // widget y deshabilita el botón hasta que llegue el primer token. Con site
+  // key vacía (dev sin fricción) queda `false` y el submit funciona como antes.
+  protected readonly captchaEnabled = this.captchaProvider.isEnabled();
+  protected readonly captchaToken = signal<string | null>(null);
+  protected readonly passwordVisible = signal(false);
+
+  @ViewChild('captcha') private captchaWidget?: CaptchaWidgetComponent;
 
   ngOnInit(): void {
     // Si el backend redirigió a /login?ssoError=<code> tras un flow SSO
@@ -62,13 +74,36 @@ export class LoginPage implements OnInit {
 
   protected async submit(): Promise<void> {
     if (this.form.invalid || this.vm.isSubmitting()) return;
-    const outcome = await this.vm.submit(this.form.getRawValue());
+    // Cuando el captcha está activo, no permitimos el submit hasta tener token.
+    // El botón ya viene deshabilitado en el template — este guard cubre el path
+    // "Enter en el input" que evade el disabled del botón.
+    const token = this.captchaToken();
+    if (this.captchaEnabled && !token) return;
+    const outcome = await this.vm.submit({
+      ...this.form.getRawValue(),
+      captchaToken: token ?? undefined,
+    });
     if (outcome === 'ok' || outcome === 'selection') {
       this.form.reset({ email: '', password: '' });
     } else if (outcome === 'invalid') {
       this.form.patchValue({ password: '' });
     }
     // network: form values stay as-is para que el usuario reintente.
+
+    // Cualquier outcome distinto de éxito consume el token (los captcha tokens
+    // son de un solo uso). Resetear el widget pide uno nuevo al proveedor.
+    if (this.captchaEnabled && outcome !== 'ok' && outcome !== 'selection') {
+      this.captchaWidget?.reset();
+      this.captchaToken.set(null);
+    }
+  }
+
+  protected onCaptchaTokenChange(token: string | null): void {
+    this.captchaToken.set(token);
+  }
+
+  protected togglePasswordVisibility(): void {
+    this.passwordVisible.update((v) => !v);
   }
 
   protected onSsoProviderClick(provider: string): void {

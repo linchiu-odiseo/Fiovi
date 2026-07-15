@@ -11,7 +11,29 @@ import { SsoProvider } from '../../../../../src/L1_domain/value-objects/sso-prov
 import { InvalidCredentialsError } from '../../../../../src/L1_domain/errors/invalid-credentials.error';
 import { NetworkError } from '../../../../../src/L1_domain/errors/network.error';
 import { RateLimitError } from '../../../../../src/L1_domain/errors/rate-limit.error';
+import {
+  CaptchaProvider,
+  CaptchaWidgetId,
+} from '../../../../../src/L1_domain/ports/captcha-provider';
+import { CAPTCHA_PROVIDER } from '../../../../../src/L3_periphery/tokens';
 import { environment } from '../../../../../src/environments/environment';
+
+// Doble del port CaptchaProvider. Por default queda `disabled` para que estos
+// tests (que se escribieron pre-captcha) sigan funcionando idénticos — el
+// widget no se renderiza y el botón submit no requiere token. Los tests
+// específicos del path enabled arman su propio fake y lo bindean por override.
+class DisabledCaptchaProvider implements CaptchaProvider {
+  isEnabled(): boolean {
+    return false;
+  }
+  render(): Promise<CaptchaWidgetId> {
+    throw new Error('should not be called when disabled');
+  }
+  reset(): void {
+    /* no-op */
+  }
+}
+
 
 @Component({ template: '' })
 class StudentHomeStub {}
@@ -117,6 +139,7 @@ describe('LoginPage', () => {
         ]),
         { provide: LoginUseCase, useValue: fakeUseCase },
         { provide: ListSsoProvidersUseCase, useValue: fakeSsoProviders },
+        { provide: CAPTCHA_PROVIDER, useValue: new DisabledCaptchaProvider() },
       ],
     }).compileComponents();
   });
@@ -382,6 +405,7 @@ describe('LoginPage', () => {
             ]),
             { provide: LoginUseCase, useValue: fakeUseCase },
             { provide: ListSsoProvidersUseCase, useValue: fakeSsoProviders },
+            { provide: CAPTCHA_PROVIDER, useValue: new DisabledCaptchaProvider() },
             {
               provide: ActivatedRoute,
               useValue: { snapshot: { queryParams: { ssoError: code } } },
@@ -409,6 +433,7 @@ describe('LoginPage', () => {
           provideRouter([{ path: 'login', component: LoginPage }]),
           { provide: LoginUseCase, useValue: fakeUseCase },
           { provide: ListSsoProvidersUseCase, useValue: fakeSsoProviders },
+          { provide: CAPTCHA_PROVIDER, useValue: new DisabledCaptchaProvider() },
           {
             provide: ActivatedRoute,
             useValue: { snapshot: { queryParams: {} } },

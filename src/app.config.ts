@@ -43,6 +43,7 @@ import { GuardarDraftUseCase } from './L2_application/use-cases/guardar-draft.us
 import { SeleccionarAdmissionAreaUseCase } from './L2_application/use-cases/seleccionar-admission-area.use-case';
 
 // L3 implementaciones de los puertos.
+import { CloudflareTurnstileProvider } from './L3_periphery/captcha/cloudflare-turnstile-provider';
 import { HttpAuthRepository } from './L3_periphery/http/http-auth-repository';
 import { HttpExamsApi } from './L3_periphery/http/http-exams-api';
 import { HttpTutorExamsApi } from './L3_periphery/http/http-tutor-exams-api';
@@ -61,6 +62,7 @@ import { PwaUpdateService } from './L3_periphery/pwa/pwa-update.service';
 import { SlugStore } from './L3_periphery/http/slug-store';
 import { SsoCallbackBootstrap } from './L3_periphery/http/sso-callback-bootstrap';
 import {
+  CAPTCHA_PROVIDER,
   IDENTITY_STORAGE,
   PROFILE_STORAGE,
   OUTBOX_STORAGE,
@@ -123,6 +125,10 @@ export const appConfig: ApplicationConfig = {
     // HttpTutorExamsApi es @Injectable({ providedIn: 'root' }) — el useExisting
     // conecta el token con la instancia singleton ya creada por Angular.
     { provide: TUTOR_EXAMS_API, useExisting: HttpTutorExamsApi },
+    // Bind puerto CaptchaProvider → CloudflareTurnstileProvider. Con
+    // `CAPTCHA_SITE_KEY` vacío en `.env`, el provider queda `isEnabled()=false`
+    // y el LoginPage skipea el widget (dev sin fricción).
+    { provide: CAPTCHA_PROVIDER, useExisting: CloudflareTurnstileProvider },
     {
       provide: ROUTER_PORT,
       useFactory: makeRouterPort,

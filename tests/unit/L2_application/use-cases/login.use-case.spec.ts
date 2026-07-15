@@ -158,6 +158,24 @@ describe('LoginUseCase', () => {
     expect(written[0]).toBe(identity);
   });
 
+  it('propaga captchaToken al repositorio cuando viene en las credenciales', async () => {
+    const identity = makeStudentIdentity();
+    repo.willResolveLogin(identity);
+    repo.willRejectProfile(new Error('no profile'));
+    await useCase.execute({ ...credentials, captchaToken: 'turnstile-token-xyz' });
+    expect(repo.getLoginCalls()).toEqual([{ ...credentials, captchaToken: 'turnstile-token-xyz' }]);
+  });
+
+  it('omite captchaToken cuando no viene (dev con captcha deshabilitado)', async () => {
+    const identity = makeStudentIdentity();
+    repo.willResolveLogin(identity);
+    repo.willRejectProfile(new Error('no profile'));
+    await useCase.execute(credentials);
+    const [call] = repo.getLoginCalls();
+    expect(call).toEqual(credentials);
+    expect(call.captchaToken).toBeUndefined();
+  });
+
   it('fire-and-forget: execute devuelve identity sin esperar al profile fetch', async () => {
     const identity = makeStudentIdentity();
     repo.willResolveLogin(identity);

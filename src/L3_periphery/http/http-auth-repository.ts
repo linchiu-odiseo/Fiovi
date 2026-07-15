@@ -116,12 +116,24 @@ export class HttpAuthRepository implements AuthRepository {
   async login(credentials: {
     email: string;
     password: string;
+    captchaToken?: string;
   }): Promise<Identity | SelectionChallenge> {
+    // Body construido explícito: solo incluye `captchaToken` cuando viene con
+    // valor. Si estuviera siempre presente como `undefined`, algunos serializers
+    // lo mandarían como `null` — el back rechazaría el zod. Además evita mandar
+    // el campo cuando el captcha está deshabilitado (dev con site key vacía).
+    const body: { email: string; password: string; captchaToken?: string } = {
+      email: credentials.email,
+      password: credentials.password,
+    };
+    if (credentials.captchaToken) {
+      body.captchaToken = credentials.captchaToken;
+    }
     try {
       const dto = await firstValueFrom(
         this.http.post<PublicAuthResponseDto | PublicAuthSelectionResponseDto>(
           apiPath.login(),
-          credentials,
+          body,
         ),
       );
       if (isSelectionResponse(dto)) {

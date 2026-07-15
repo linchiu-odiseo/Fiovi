@@ -15,8 +15,17 @@ export interface AuthRepository {
    *   - `SelectionChallenge` cuando matchea >1 tenant (sin cookies; el flow
    *     se completa con `selectTenant()` tras elegir el slug).
    * El caller distingue con `'selectionToken' in outcome`.
+   *
+   * `captchaToken` es opcional: el backend lo exige solo cuando `CAPTCHA_SECRET`
+   * está seteado en learnex. Si el server rechaza el captcha, responde con el
+   * mismo 401 `TENANT_AUTH_INVALID_CREDENTIALS` que un password inválido — es
+   * política intencional anti-bot (no diferenciar la causa en el cliente).
    */
-  login(credentials: { email: string; password: string }): Promise<Identity | SelectionChallenge>;
+  login(credentials: {
+    email: string;
+    password: string;
+    captchaToken?: string;
+  }): Promise<Identity | SelectionChallenge>;
 
   /**
    * POST /auth/select-tenant (global). Cierra el flow multi-tenant tras el

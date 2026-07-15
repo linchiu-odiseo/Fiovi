@@ -248,6 +248,26 @@ describe('HttpAuthRepository', () => {
       });
       await expect(pending).rejects.toBeInstanceOf(UnsupportedRoleError);
     });
+
+    it('incluye captchaToken en el body cuando viene en las credenciales', async () => {
+      const pending = repo.login({ ...credentials, captchaToken: 'turnstile-token-abc' });
+      const req = httpMock.expectOne(LOGIN_URL);
+      expect(req.request.body).toEqual({ ...credentials, captchaToken: 'turnstile-token-abc' });
+      req.flush(STUDENT_LOGIN_RESPONSE);
+      await pending;
+    });
+
+    it('omite captchaToken del body cuando viene undefined (dev sin captcha)', async () => {
+      const pending = repo.login({ ...credentials, captchaToken: undefined });
+      const req = httpMock.expectOne(LOGIN_URL);
+      // El campo no aparece en absoluto — ni como key con undefined ni como null.
+      // Zod del back en dev sin CAPTCHA_SECRET puede rechazar `null`; ausencia
+      // total es siempre segura.
+      expect(req.request.body).toEqual(credentials);
+      expect('captchaToken' in (req.request.body as object)).toBe(false);
+      req.flush(STUDENT_LOGIN_RESPONSE);
+      await pending;
+    });
   });
 
   describe('login (N tenants → SelectionChallenge)', () => {

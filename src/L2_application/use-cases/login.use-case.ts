@@ -25,7 +25,11 @@ export class LoginUseCase {
     private readonly getProfile: GetProfileUseCase,
   ) {}
 
-  async execute(credentials: { email: string; password: string }): Promise<LoginOutcome> {
+  async execute(credentials: {
+    email: string;
+    password: string;
+    captchaToken?: string;
+  }): Promise<LoginOutcome> {
     const outcome = await this.authRepo.login(credentials);
     if ('selectionToken' in outcome) {
       return outcome;
