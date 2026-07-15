@@ -96,16 +96,7 @@ function buildIdentity(role: 'student' | 'tutor'): Identity {
   // Email coherente con el rol — no es load-bearing, pero mantiene el realismo.
   const email = role === 'student' ? '79507732@vonex.edu.pe' : 'tutor1@vonex.pe';
   const codigo = role === 'student' ? '79507732' : null;
-  return new Identity(
-    'user-id',
-    'tenant-id',
-    'vonex',
-    email,
-    codigo,
-    [role],
-    [],
-    Date.now() + 900_000,
-  );
+  return new Identity('user-id', 'tenant-id', 'vonex', email, codigo, [role], Date.now() + 900_000);
 }
 
 const validCredentials = { email: 'fulano@panda.test', password: '12345678' };

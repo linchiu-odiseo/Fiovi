@@ -39,7 +39,6 @@ function buildIdentity(): Identity {
     'fulano@panda.test',
     '79507732',
     ['student'],
-    [],
     Date.now() + 900_000,
   );
 }

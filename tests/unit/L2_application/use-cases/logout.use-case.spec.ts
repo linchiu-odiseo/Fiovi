@@ -20,7 +20,6 @@ const makeIdentity = (role: 'student' | 'tutor' = 'student') =>
     'alumno@vonex.edu.pe',
     '79507732',
     [role],
-    [],
     NOW + 900_000,
   );
 

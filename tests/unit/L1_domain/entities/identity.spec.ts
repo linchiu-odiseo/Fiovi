@@ -4,19 +4,14 @@ import { InvalidIdentityError } from '../../../../src/L1_domain/errors/invalid-i
 
 const NOW = 1_700_000_000_000; // ms timestamp fijo para tests
 
-const makeIdentity = (
-  overrides: Partial<
-    ConstructorParameters<typeof Identity>[5] extends never ? never : Record<string, unknown>
-  > = {},
-) => {
+const makeIdentity = (overrides: Record<string, unknown> = {}) => {
   const defaults = {
     id: 'user-uuid',
     tenantId: 'tenant-uuid',
     tenantSlug: 'vonex',
     email: 'alumno@vonex.edu.pe',
     codigo: '79507732' as string | null,
-    roles: ['student'] as ['student'],
-    permissions: ['student:exams:view', 'student:profile:view'],
+    roles: ['student'] as ['student'] | ['tutor'],
     expiresAt: NOW + 60_000,
   };
   const merged = { ...defaults, ...overrides };
@@ -27,7 +22,6 @@ const makeIdentity = (
     merged.email as string,
     merged.codigo as string | null,
     merged.roles as ['student'] | ['tutor'],
-    merged.permissions as string[],
     merged.expiresAt as number,
   );
 };
@@ -48,7 +42,7 @@ describe('Identity', () => {
 
     it('lanza InvalidIdentityError con 0 roles', () => {
       expect(
-        () => new Identity('id', 'tid', 'vonex', 'email@test.pe', null, [], [], NOW + 1000),
+        () => new Identity('id', 'tid', 'vonex', 'email@test.pe', null, [], NOW + 1000),
       ).toThrow(InvalidIdentityError);
     });
 
@@ -62,7 +56,6 @@ describe('Identity', () => {
             'email@test.pe',
             null,
             ['student', 'tutor'],
-            [],
             NOW + 1000,
           ),
       ).toThrow(InvalidIdentityError);
@@ -70,7 +63,7 @@ describe('Identity', () => {
 
     it('lanza InvalidIdentityError si tenantSlug es vacío', () => {
       expect(
-        () => new Identity('id', 'tid', '', 'email@test.pe', null, ['student'], [], NOW + 1000),
+        () => new Identity('id', 'tid', '', 'email@test.pe', null, ['student'], NOW + 1000),
       ).toThrow(InvalidIdentityError);
     });
 
@@ -124,23 +117,6 @@ describe('Identity', () => {
       // Con expiresAt NOW + 30_000 y default 60_000 → debe devolver true
       const identity = makeIdentity({ expiresAt: NOW + 30_000 });
       expect(identity.shouldRefresh(NOW)).toBe(true);
-    });
-  });
-
-  describe('hasPermission()', () => {
-    it('devuelve true si el permiso está presente', () => {
-      const identity = makeIdentity({ permissions: ['student:exams:view'] });
-      expect(identity.hasPermission('student:exams:view')).toBe(true);
-    });
-
-    it('devuelve false si el permiso está ausente', () => {
-      const identity = makeIdentity({ permissions: ['student:exams:view'] });
-      expect(identity.hasPermission('admin:panel:view')).toBe(false);
-    });
-
-    it('devuelve false con lista de permisos vacía', () => {
-      const identity = makeIdentity({ permissions: [] });
-      expect(identity.hasPermission('any:perm')).toBe(false);
     });
   });
 });

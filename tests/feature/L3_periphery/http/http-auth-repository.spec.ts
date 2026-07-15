@@ -36,6 +36,11 @@ const LOGOUT_URL = `${TENANT_BASE}/auth/logout`;
 const STUDENT_PROFILE_URL = `${TENANT_BASE}/student/me`;
 const TUTOR_PROFILE_URL = `${TENANT_BASE}/tutor/me`;
 
+// Fixtures del payload del back. Simulan la respuesta HTTP real de learnex,
+// que sigue incluyendo `permissions[]` — Fiovi lo ignora en el mapper (F5-03,
+// ver `http-auth-repository.ts` para la razón). Se mantiene en los fixtures
+// para reflejar fielmente lo que el server manda; el test verifica que no
+// aparece en la `Identity` construida por el adapter.
 const STUDENT_LOGIN_RESPONSE = {
   user: {
     id: '766aac21-71f9-4f48-a14a-5c2bcebc7d0b',

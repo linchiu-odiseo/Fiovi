@@ -86,5 +86,6 @@ Auto-generado por `.claude/hooks/log-agent-usage.ps1` en cada PostToolUse del to
 | 2026-07-09 11:26:33 | sdd-verify       | Verify restyle-tutor-pages                                       | opus-4-7 | 82,864       | --    | --       | $0.2246   |
 | 2026-07-09 11:36:08 | sdd-archive      | Archive restyle-tutor-pages                                      | opus-4-7 | 96,763       | --    | --       | $0.2819   |
 | 2026-07-09 12:46:30 | hexagonal-guard  | Guard google-sso change                                          | opus-4-7 | 35,397       | --    | --       | $0.1617   |
-| 2026-07-14 17:30:54 | Explore | Explore login flow for captcha feasibility | opus-4-7 | 69,729 | -- | -- | $0.5487 |
-| 2026-07-14 18:03:42 | hexagonal-guard | Hexagonal boundaries audit | opus-4-7 | 47,057 | -- | -- | $0.3554 |
+| 2026-07-14 17:30:54 | Explore          | Explore login flow for captcha feasibility                       | opus-4-7 | 69,729       | --    | --       | $0.5487   |
+| 2026-07-14 18:03:42 | hexagonal-guard  | Hexagonal boundaries audit                                       | opus-4-7 | 47,057       | --    | --       | $0.3554   |
+| 2026-07-14 22:36:13 | Explore          | Map all Identity property consumers                              | opus-4-7 | 40,265       | --    | --       | $0.2069   |

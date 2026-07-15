@@ -19,7 +19,6 @@ const makeIdentity = () =>
     '79507732@vonex.edu.pe',
     '79507732',
     ['student'],
-    [],
     NOW + 900_000,
   );
 
