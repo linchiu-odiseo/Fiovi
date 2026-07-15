@@ -36,7 +36,11 @@ import { CAPTCHA_PROVIDER } from '../../../L3_periphery/tokens';
   styles: [
     `
       :host {
-        display: contents;
+        display: block;
+      }
+      .captcha-widget {
+        display: flex;
+        justify-content: center;
       }
     `,
   ],
