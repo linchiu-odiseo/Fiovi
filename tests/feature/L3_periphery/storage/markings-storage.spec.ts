@@ -63,7 +63,6 @@ function makeIdentity(email: string): Identity {
     email,
     '79507732',
     ['student'],
-    [],
     Date.now() + 900_000,
   );
 }

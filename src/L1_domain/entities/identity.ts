@@ -1,7 +1,6 @@
 import { InvalidIdentityError } from '../errors/invalid-identity.error';
 
 export type Role = 'student' | 'tutor';
-export type Permission = string;
 
 // Entidad de dominio que representa la identidad autenticada del usuario.
 // Invariantes centrales:
@@ -9,6 +8,13 @@ export type Permission = string;
 //   - `tenantSlug` no vacío — arma las URLs `/t/{slug}/...` de todos los
 //     endpoints tenant-scoped (refresh, logout, me, exams, drafts).
 // El constructor lanza `InvalidIdentityError` si alguno se rompe.
+//
+// La autorización efectiva vive en el server (RLS + guards en learnex).
+// Esta entidad NO expone `permissions[]`: los permisos en cliente eran
+// sólo hints de UI nunca consumidos (F5-03 — PII/metadata mínima en
+// localStorage). Si en el futuro se necesita gating de UI por permiso,
+// consultar al servidor en el momento del render o modelar un capability
+// específico — no volver a hornear la lista completa en Identity.
 export class Identity {
   constructor(
     readonly id: string, // UUID del TenantUser
@@ -17,7 +23,6 @@ export class Identity {
     readonly email: string,
     readonly codigo: string | null, // presente en alumno, null en tutor (learnex actual)
     readonly roles: readonly Role[],
-    readonly permissions: readonly Permission[],
     readonly expiresAt: number, // timestamp ms
   ) {
     if (roles.length !== 1) {
@@ -38,9 +43,5 @@ export class Identity {
 
   shouldRefresh(now: number, thresholdMs = 60_000): boolean {
     return now >= this.expiresAt - thresholdMs;
-  }
-
-  hasPermission(perm: Permission): boolean {
-    return this.permissions.includes(perm);
   }
 }

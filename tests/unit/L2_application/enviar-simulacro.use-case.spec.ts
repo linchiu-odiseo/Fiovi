@@ -49,7 +49,6 @@ describe('EnviarSimulacroUseCase', () => {
       VALID_EMAIL,
       codigo,
       ['student'],
-      [],
       Date.now() + 900_000,
     );
 

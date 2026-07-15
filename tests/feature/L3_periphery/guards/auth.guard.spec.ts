@@ -31,7 +31,6 @@ function makeIdentity(role: 'student' | 'tutor' = 'student'): Identity {
     'alumno@vonex.edu.pe',
     '79507732',
     [role],
-    [],
     Date.now() + 900_000,
   );
 }

@@ -10,6 +10,12 @@ const STORAGE_KEY = 'fiovi.identity';
 //
 // `tenantSlug` es requerido — Identity fresca lo trae del login response
 // (`user.slug`) y todas las URLs `/t/{slug}/...` dependen de él.
+//
+// Nota (F5-03): NO se persiste `permissions[]`. La autoridad de
+// autorización vive en el server (RLS + guards en learnex); el catálogo
+// completo de permisos en localStorage era PII/metadata sin uso runtime.
+// Si en el futuro se agrega un campo capability específico, agregarlo
+// acá — pero primero considerar si puede vivir sólo en memoria.
 interface PersistedShape {
   id?: string;
   tenantId?: string;
@@ -17,7 +23,6 @@ interface PersistedShape {
   email?: string;
   codigo?: string | null;
   roles?: string[];
-  permissions?: string[];
   expiresAt?: number;
 }
 
@@ -41,7 +46,6 @@ export class LocalStorageIdentityStorage implements IdentityStorage {
       !parsed?.tenantSlug ||
       !parsed?.email ||
       !Array.isArray(parsed?.roles) ||
-      !Array.isArray(parsed?.permissions) ||
       typeof parsed?.expiresAt !== 'number'
     ) {
       localStorage.removeItem(STORAGE_KEY);
@@ -56,7 +60,6 @@ export class LocalStorageIdentityStorage implements IdentityStorage {
         parsed.email,
         parsed.codigo ?? null,
         parsed.roles as Role[],
-        parsed.permissions,
         parsed.expiresAt,
       );
     } catch {
@@ -75,7 +78,6 @@ export class LocalStorageIdentityStorage implements IdentityStorage {
       email: identity.email,
       codigo: identity.codigo,
       roles: [...identity.roles],
-      permissions: [...identity.permissions],
       expiresAt: identity.expiresAt,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));

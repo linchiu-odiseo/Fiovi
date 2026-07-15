@@ -11,6 +11,7 @@
 // - Key legacy `lugia.session` queda ignorada
 // - clear() elimina la key
 // - `codigo: null` (tutor real) es válido
+// - Payload legacy con `permissions` (pre F5-03) → se lee ignorando el campo
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { LocalStorageIdentityStorage } from '../../../../src/L3_periphery/storage/local-storage-identity-storage';
@@ -26,7 +27,6 @@ const VALID_PERSISTED = {
   email: '79507732@vonex.edu.pe',
   codigo: '79507732',
   roles: ['student'],
-  permissions: ['student:exams:view'],
   expiresAt: 1781458612856,
 };
 
@@ -49,7 +49,6 @@ describe('LocalStorageIdentityStorage', () => {
         '79507732@vonex.edu.pe',
         '79507732',
         ['student'],
-        ['student:exams:view'],
         1781458612856,
       );
       await storage.write(identity);
@@ -60,9 +59,25 @@ describe('LocalStorageIdentityStorage', () => {
       expect(restored?.email).toBe('79507732@vonex.edu.pe');
       expect(restored?.codigo).toBe('79507732');
       expect(restored?.roles).toEqual(['student']);
-      expect(restored?.permissions).toEqual(['student:exams:view']);
       expect(restored?.expiresAt).toBe(1781458612856);
       expect(restored?.role()).toBe('student');
+    });
+
+    it('NO persiste `permissions` en el JSON (F5-03: minimización de PII)', async () => {
+      const identity = new Identity(
+        'id',
+        'tenant',
+        'vonex',
+        'a@b.test',
+        '12345',
+        ['student'],
+        Date.now() + 60_000,
+      );
+      await storage.write(identity);
+      const raw = localStorage.getItem(STORAGE_KEY);
+      expect(raw).not.toBeNull();
+      const parsed = JSON.parse(raw as string);
+      expect(parsed).not.toHaveProperty('permissions');
     });
 
     it('usa la clave exacta `fiovi.identity`', async () => {
@@ -73,7 +88,6 @@ describe('LocalStorageIdentityStorage', () => {
         'a@b.test',
         '12345',
         ['student'],
-        [],
         Date.now() + 60_000,
       );
       await storage.write(identity);
@@ -88,7 +102,6 @@ describe('LocalStorageIdentityStorage', () => {
         'tutor1@vonex.pe',
         null, // tutor real: codigo viene null del back
         ['tutor'],
-        ['tutor:dashboard:view'],
         1781410002223,
       );
       await storage.write(tutor);
@@ -150,6 +163,23 @@ describe('LocalStorageIdentityStorage', () => {
     });
   });
 
+  describe('compatibilidad con instalaciones previas', () => {
+    it('payload legacy con `permissions` extra → se lee OK ignorando el campo', async () => {
+      // Instalaciones anteriores a F5-03 dejaron `permissions` en localStorage.
+      // Al bootear, la app debe rehidratar la Identity sin crashear ni descartar
+      // la sesión — el campo extra simplemente se ignora.
+      const legacy = { ...VALID_PERSISTED, permissions: ['student:exams:view'] };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(legacy));
+      const restored = await storage.read();
+      expect(restored).toBeInstanceOf(Identity);
+      expect(restored?.email).toBe(VALID_PERSISTED.email);
+      // Al reescribir después con write(), el campo legacy desaparece.
+      if (restored) await storage.write(restored);
+      const rewritten = JSON.parse(localStorage.getItem(STORAGE_KEY) as string);
+      expect(rewritten).not.toHaveProperty('permissions');
+    });
+  });
+
   describe('key legacy `lugia.session`', () => {
     it('data huérfana de la key vieja → null (no migra, no crashea, no la borra)', async () => {
       localStorage.setItem(
@@ -173,7 +203,6 @@ describe('LocalStorageIdentityStorage', () => {
         'a@b.test',
         null,
         ['student'],
-        [],
         Date.now() + 60_000,
       );
       await storage.write(identity);

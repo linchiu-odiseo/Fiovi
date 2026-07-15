@@ -25,6 +25,13 @@ const SUPPORTED_ROLES: ReadonlySet<Role> = new Set(['student', 'tutor']);
 
 // Shape del user en `PublicAuthResponse` (POST /auth/login 1 tenant, POST
 // /auth/select-tenant): incluye `slug` que hidrata `Identity.tenantSlug`.
+//
+// El backend puede seguir enviando `permissions[]` en el body — TypeScript
+// lo ignora por structural typing y Fiovi no lo consume (F5-03: dejamos
+// de horneárlo en Identity/localStorage; la autorización real es RLS +
+// guards server-side). Si en el futuro se necesita gating de UI por
+// permiso, agregarlo acá explícitamente y modelar un capability específico
+// en L1 — no volver al catálogo completo.
 interface PublicAuthResponseDto {
   user: {
     id: string;
@@ -33,7 +40,6 @@ interface PublicAuthResponseDto {
     email: string;
     codigo: string | null;
     roles: string[];
-    permissions: string[];
   };
   expiresAt: number;
 }
@@ -48,7 +54,6 @@ interface TenantAuthResponseDto {
     email: string;
     codigo: string | null;
     roles: string[];
-    permissions: string[];
   };
   expiresAt: number;
 }
@@ -250,7 +255,6 @@ export class HttpAuthRepository implements AuthRepository {
       email: dto.user.email,
       codigo: dto.user.codigo,
       roles: dto.user.roles,
-      permissions: dto.user.permissions,
       expiresAt: dto.expiresAt,
     });
   }
@@ -263,7 +267,6 @@ export class HttpAuthRepository implements AuthRepository {
       email: dto.user.email,
       codigo: dto.user.codigo,
       roles: dto.user.roles,
-      permissions: dto.user.permissions,
       expiresAt: dto.expiresAt,
     });
   }
@@ -275,7 +278,6 @@ export class HttpAuthRepository implements AuthRepository {
     email: string;
     codigo: string | null;
     roles: string[];
-    permissions: string[];
     expiresAt: number;
   }): Identity {
     // Validamos rol ANTES de construir Identity: el cast `as Role[]` sería
@@ -293,7 +295,6 @@ export class HttpAuthRepository implements AuthRepository {
       fields.email,
       fields.codigo,
       [rawRole as Role],
-      fields.permissions,
       fields.expiresAt,
     );
   }
