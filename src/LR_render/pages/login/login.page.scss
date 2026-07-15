@@ -229,6 +229,48 @@
     }
   }
 
+  // Variante para inputs con toggle a la derecha (ej. password con ojo).
+  // Amplía el padding derecho para que el texto no se cruce con el botón.
+  &__input--with-toggle {
+    padding-right: 2.75rem;
+  }
+
+  // Botón toggle absolute a la derecha del input-wrap. Touch target 40x48
+  // para cumplir con guideline de accesibilidad mobile sin agrandar el input.
+  &__toggle {
+    position: absolute;
+    right: 0.25rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    border-radius: var(--radius);
+    color: var(--color-outline);
+    cursor: pointer;
+    transition:
+      color 120ms ease,
+      background 120ms ease;
+
+    &:hover {
+      color: var(--color-on-surface-variant);
+      background: var(--color-surface-container);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+    }
+
+    .material-symbols-outlined {
+      font-size: 1.25rem;
+    }
+  }
+
   &__hint {
     color: var(--color-error);
     font-size: 0.8rem;

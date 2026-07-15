@@ -52,6 +52,7 @@ export class LoginPage implements OnInit {
   // key vacía (dev sin fricción) queda `false` y el submit funciona como antes.
   protected readonly captchaEnabled = this.captchaProvider.isEnabled();
   protected readonly captchaToken = signal<string | null>(null);
+  protected readonly passwordVisible = signal(false);
 
   @ViewChild('captcha') private captchaWidget?: CaptchaWidgetComponent;
 
@@ -99,6 +100,10 @@ export class LoginPage implements OnInit {
 
   protected onCaptchaTokenChange(token: string | null): void {
     this.captchaToken.set(token);
+  }
+
+  protected togglePasswordVisibility(): void {
+    this.passwordVisible.update((v) => !v);
   }
 
   protected onSsoProviderClick(provider: string): void {

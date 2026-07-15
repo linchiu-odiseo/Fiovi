@@ -79,12 +79,26 @@
       <div class="field__input-wrap">
         <span class="material-symbols-outlined field__icon" aria-hidden="true">lock</span>
         <input
-          type="password"
+          [type]="passwordVisible() ? 'text' : 'password'"
           formControlName="password"
           autocomplete="current-password"
           placeholder="••••••••"
-          class="field__input"
+          class="field__input field__input--with-toggle"
         />
+        <button
+          type="button"
+          class="field__toggle"
+          data-testid="btn-password-toggle"
+          [attr.aria-label]="
+            passwordVisible() ? 'Ocultar contraseña' : 'Mostrar contraseña'
+          "
+          [attr.aria-pressed]="passwordVisible()"
+          (click)="togglePasswordVisibility()"
+        >
+          <span class="material-symbols-outlined" aria-hidden="true">
+            {{ passwordVisible() ? 'visibility_off' : 'visibility' }}
+          </span>
+        </button>
       </div>
       @if (form.controls.password.touched && form.controls.password.errors?.['required']) {
         <small class="field__hint">La contraseña es obligatoria.</small>
