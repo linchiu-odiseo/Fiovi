@@ -38,67 +38,89 @@
     <section class="tutor-aula-semanas__error" role="alert">
       <p>No encontramos esta aula.</p>
     </section>
+  } @else if (!vm.hasSemanas()) {
+    <section class="tutor-aula-semanas__section">
+      <p class="tutor-aula-semanas__empty" data-testid="semanas-empty">
+        El ciclo de esta aula todavía no tiene semanas cargadas.
+      </p>
+    </section>
   } @else {
     <section class="tutor-aula-semanas__section">
       <h2 class="section-title">Semanas</h2>
-      @if (vm.hasSemanas()) {
-        <ul class="tutor-aula-semanas__list" data-testid="semanas-list">
-          @for (semana of vm.semanas(); track semana.periodId) {
-            <li
-              class="semana-card"
-              [class.semana-card--current]="esActual(semana)"
-              [class.semana-card--empty]="semana.estaVacia()"
-              data-testid="semana-card"
-              (click)="onSemanaClick(semana)"
-              (keydown.enter)="onSemanaClick(semana)"
-              role="button"
-              tabindex="0"
-            >
-              <span class="material-symbols-outlined semana-card__icon" aria-hidden="true">
-                {{ esActual(semana) ? 'radio_button_checked' : 'calendar_month' }}
-              </span>
-              <div class="semana-card__body">
-                <div class="semana-card__title-row">
-                  <h3 class="semana-card__name">{{ semana.name }}</h3>
-                  @if (esActual(semana)) {
-                    <span class="semana-card__badge semana-card__badge--current">Actual</span>
+
+      <div class="wheel" role="listbox" aria-label="Semanas del ciclo" data-testid="semanas-wheel">
+        <!-- "Lens" fijo: banda central que resalta el item bajo ella. Es
+             puramente visual (pointer-events:none) — la selección real se
+             calcula por IntersectionObserver sobre los items. -->
+        <div class="wheel__lens" aria-hidden="true"></div>
+
+        <div class="wheel__viewport" #viewport>
+          <div class="wheel__spacer" aria-hidden="true"></div>
+          <ul class="wheel__list">
+            @for (semana of vm.semanas(); track semana.periodId; let i = $index) {
+              <li
+                class="wheel-item"
+                [class.wheel-item--selected]="i === vm.selectedIndex()"
+                [class.wheel-item--near]="distanceFromCenter(i) === 1"
+                [class.wheel-item--far]="distanceFromCenter(i) === 2"
+                [attr.data-index]="i"
+                [attr.aria-selected]="i === vm.selectedIndex()"
+                role="option"
+                tabindex="-1"
+                data-testid="semana-item"
+                (click)="onItemClick(i, semana)"
+                (keydown.enter)="onItemClick(i, semana)"
+              >
+                <span class="wheel-item__icon material-symbols-outlined" aria-hidden="true">
+                  {{ isToday(i) ? 'radio_button_checked' : 'calendar_month' }}
+                </span>
+                <div class="wheel-item__body">
+                  <div class="wheel-item__title-row">
+                    <h3 class="wheel-item__name">{{ semana.name }}</h3>
+                    @if (isToday(i)) {
+                      <span class="wheel-item__today-badge">HOY</span>
+                    }
+                  </div>
+                  @if (i === vm.selectedIndex()) {
+                    <p class="wheel-item__dates">{{ semana.startDate }} — {{ semana.endDate }}</p>
+                    @if (semana.estaVacia()) {
+                      <p class="wheel-item__meta wheel-item__meta--empty">Sin exámenes</p>
+                    } @else {
+                      <p class="wheel-item__meta">
+                        <span>{{ semana.examCount }} exámenes</span>
+                        @if (semana.byStatus.in_progress > 0) {
+                          <span aria-hidden="true">·</span>
+                          <span class="wheel-item__meta-strong">
+                            {{ semana.byStatus.in_progress }} en curso
+                          </span>
+                        }
+                        @if (semana.byStatus.finalized > 0) {
+                          <span aria-hidden="true">·</span>
+                          <span>{{ semana.byStatus.finalized }} finalizados</span>
+                        }
+                      </p>
+                    }
                   }
                 </div>
-                <p class="semana-card__dates">{{ semana.startDate }} — {{ semana.endDate }}</p>
-                @if (semana.estaVacia()) {
-                  <p class="semana-card__chips-empty">Sin exámenes</p>
-                } @else {
-                  <ul class="semana-card__chips" aria-label="Contadores por estado">
-                    <li class="chip chip--total">
-                      <strong>{{ semana.examCount }}</strong>
-                      <span>{{ semana.examCount === 1 ? 'examen' : 'exámenes' }}</span>
-                    </li>
-                    @if (semana.byStatus.in_progress > 0) {
-                      <li class="chip chip--progress">
-                        <strong>{{ semana.byStatus.in_progress }}</strong>
-                        <span>en curso</span>
-                      </li>
-                    }
-                    @if (semana.byStatus.finalized > 0) {
-                      <li class="chip chip--done">
-                        <strong>{{ semana.byStatus.finalized }}</strong>
-                        <span>finalizados</span>
-                      </li>
-                    }
-                  </ul>
+                @if (i === vm.selectedIndex()) {
+                  <button
+                    type="button"
+                    class="wheel-item__enter"
+                    aria-label="Entrar a la semana"
+                    data-testid="btn-enter"
+                    (click)="$event.stopPropagation(); onEnter(semana)"
+                  >
+                    <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
+                  </button>
                 }
-              </div>
-              <span class="material-symbols-outlined semana-card__chevron" aria-hidden="true">
-                chevron_right
-              </span>
-            </li>
-          }
-        </ul>
-      } @else {
-        <p class="tutor-aula-semanas__empty" data-testid="semanas-empty">
-          El ciclo de esta aula todavía no tiene semanas cargadas.
-        </p>
-      }
+              </li>
+            }
+          </ul>
+          <div class="wheel__spacer" aria-hidden="true"></div>
+        </div>
+      </div>
+
+      <p class="wheel__hint" aria-hidden="true">↕ desplazá para elegir</p>
     </section>
   }
 </main>

@@ -29,11 +29,37 @@ export class TutorAulaSemanasViewModel {
   readonly loading = signal(true);
   readonly error = signal<'network' | 'forbidden' | 'notFound' | null>(null);
 
+  /**
+   * Índice de la semana centrada en la rueda. `-1` mientras no hay data
+   * cargada. La page mantiene este signal sincronizado con la posición
+   * del scroll via IntersectionObserver.
+   */
+  readonly selectedIndex = signal<number>(-1);
+
   // Semana que contiene el "hoy" (según reloj server-anchored). null cuando no
   // hay match — típicamente entre ciclos o cuando el ciclo aún no arrancó.
   readonly semanaActual = computed<AulaSemana | null>(() => {
     const now = this.clock.now();
     return this.semanas().find((s) => s.esSemanaActual(now)) ?? null;
+  });
+
+  /**
+   * Índice de la semana "HOY" en el array `semanas()`. `-1` cuando no hay
+   * ninguna que contenga la fecha actual del servidor.
+   */
+  readonly todayIndex = computed<number>(() => {
+    const now = this.clock.now();
+    return this.semanas().findIndex((s) => s.esSemanaActual(now));
+  });
+
+  /**
+   * Semana actualmente centrada en la rueda. `null` mientras no cargó o si
+   * `selectedIndex` cae fuera del rango.
+   */
+  readonly selectedSemana = computed<AulaSemana | null>(() => {
+    const idx = this.selectedIndex();
+    if (idx < 0) return null;
+    return this.semanas()[idx] ?? null;
   });
 
   readonly hasSemanas = computed(() => this.semanas().length > 0);
@@ -74,5 +100,28 @@ export class TutorAulaSemanasViewModel {
 
   goBack(): void {
     void this.router.navigate(['/tutor/home']);
+  }
+
+  /** Actualizado por la page cuando cambia la semana centrada en la rueda. */
+  selectByIndex(index: number): void {
+    if (index < 0 || index >= this.semanas().length) return;
+    this.selectedIndex.set(index);
+  }
+
+  /**
+   * Índice inicial al que la rueda debe hacer scroll al montar:
+   *   1. Semana "HOY" si existe.
+   *   2. Primera semana con exámenes.
+   *   3. Índice 0 (primera del ciclo).
+   * Devuelve `-1` si no hay semanas (la page renderiza empty state).
+   */
+  initialSelectedIndex(): number {
+    const list = this.semanas();
+    if (list.length === 0) return -1;
+    const today = this.todayIndex();
+    if (today >= 0) return today;
+    const firstWithContent = list.findIndex((s) => !s.estaVacia());
+    if (firstWithContent >= 0) return firstWithContent;
+    return 0;
   }
 }
