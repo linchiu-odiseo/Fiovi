@@ -1,3 +1,5 @@
+// Container principal ocupa toda la pantalla en mobile (100dvh) para que la
+// rueda pueda expandirse. En desktop max-width mantiene el layout centrado.
 .tutor-aula-semanas {
   display: flex;
   flex-direction: column;
@@ -5,9 +7,12 @@
   padding: var(--space-md);
   max-width: 32rem;
   margin: 0 auto;
+  min-height: 100dvh;
+  box-sizing: border-box;
 
   &__nav {
     display: flex;
+    flex: 0 0 auto;
   }
 
   &__btn-volver {
@@ -27,6 +32,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.15rem;
+    flex: 0 0 auto;
   }
 
   &__kicker {
@@ -70,39 +76,43 @@
     cursor: pointer;
   }
 
+  // La sección con la rueda ocupa TODO el alto disponible tras el header.
+  // La rueda adentro es flex: 1 → llena el section verticalmente.
   &__section {
     display: flex;
     flex-direction: column;
     gap: var(--space-sm);
+    flex: 1 1 auto;
+    min-height: 0;
   }
 }
 
 // ── Rueda de semanas ────────────────────────────────────────────────────
 //
-// Layout tipo UIPickerView de iOS: el usuario scrollea vertical dentro de un
-// viewport de altura fija, cada item hace snap al centro, y el item centrado
-// se muestra nítido/grande mientras los adyacentes se desenfocan y opacan.
+// Layout tipo UIPickerView de iOS. La altura de la rueda se adapta al alto
+// disponible (flex: 1). El spacer arriba y abajo se calcula por JS con
+// ResizeObserver — CSS puro no puede computar (100% - 80px)/2 dentro de un
+// flex column con overflow, así que dejamos que la page setee los px exactos.
 //
-// Contract con .page.ts: WHEEL_ITEM_HEIGHT es 80px y el viewport muestra
-// exactamente 5 items (2 arriba blur, 1 center, 2 abajo blur). Cambiar acá
-// requiere actualizar los spacers proporcionalmente.
+// Contract con la page.ts: WHEEL_ITEM_HEIGHT_PX = 80. Cambiar acá requiere
+// actualizarlo allá.
 
 $wheel-item-height: 80px;
-$wheel-visible-items: 5;
 
 .wheel {
   position: relative;
-  height: $wheel-item-height * $wheel-visible-items;
+  flex: 1 1 auto;
+  min-height: $wheel-item-height * 3; // fallback si el layout externo colapsa
   border-radius: var(--radius-md);
   border: 1px solid var(--color-outline-variant);
   background: var(--color-surface-container-lowest);
   overflow: hidden;
   isolation: isolate;
 
-  // "Lens" fijo: una banda central que resalta el item bajo ella. Puramente
-  // decorativa (pointer-events:none). Bordes suaves top/bottom + fondo
-  // primary-container tenue. El item real, al estar sin blur, "aparece"
-  // encima de esta banda por z-index natural.
+  // Lens: solo dos líneas horizontales para marcar el slot del item centrado.
+  // Sin fill de fondo — el center highlight visual sale exclusivamente de la
+  // NITIDEZ (los demás items están blurreados). Zero contraste añadido =
+  // zero fatiga visual (Apple HIG picker pattern).
   &__lens {
     position: absolute;
     top: 50%;
@@ -110,13 +120,11 @@ $wheel-visible-items: 5;
     right: var(--space-sm);
     height: $wheel-item-height;
     transform: translateY(-50%);
-    border-top: 1px solid var(--color-primary);
-    border-bottom: 1px solid var(--color-primary);
-    background: var(--color-primary-container, rgba(26, 86, 219, 0.08));
-    border-radius: var(--radius);
+    border-top: 1px solid var(--color-outline);
+    border-bottom: 1px solid var(--color-outline);
+    background: transparent;
     pointer-events: none;
     z-index: 0;
-    opacity: 0.55;
   }
 
   &__viewport {
@@ -128,16 +136,18 @@ $wheel-visible-items: 5;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-y;
     scrollbar-width: none;
+    z-index: 1;
 
     &::-webkit-scrollbar {
       display: none;
     }
   }
 
-  // Spacers arriba y abajo: dejan espacio para que el primer y el último
-  // item puedan alcanzar el centro. Altura = (viewport - item) / 2.
+  // Spacers: la altura la setea JS (syncSpacerHeight) al mount y en resize
+  // porque depende del alto real del viewport. Fallback CSS: 0 hasta que JS
+  // corra (un flash tolerable).
   &__spacer {
-    height: calc(($wheel-item-height * $wheel-visible-items - $wheel-item-height) / 2);
+    height: 0;
     flex: 0 0 auto;
   }
 
@@ -155,6 +165,7 @@ $wheel-visible-items: 5;
     font-size: 0.75rem;
     color: var(--color-outline);
     letter-spacing: 0.02em;
+    flex: 0 0 auto;
   }
 }
 
@@ -172,13 +183,14 @@ $wheel-visible-items: 5;
   position: relative;
   z-index: 1;
   color: var(--color-on-surface);
+  background: transparent;
   transition:
     filter 200ms ease,
     opacity 200ms ease,
     transform 200ms ease;
 
-  // Estados por distancia al centro. La page component setea las clases
-  // en función de `distanceFromCenter(i)`:
+  // Estados por distancia al centro. La page setea las clases según
+  // distanceFromCenter(i):
   //   0 → --selected  (nítido, escala 1)
   //   1 → --near      (blur 1.5px, opacity 0.6)
   //   2 → --far       (blur 3px, opacity 0.3)
@@ -282,9 +294,7 @@ $wheel-visible-items: 5;
   }
 
   // Botón chevron a la derecha — CTA "entrar a esta semana". Solo aparece
-  // en el item centrado. Stop-propagation en el (click) para no confundir
-  // con el click del <li> (que también navega — misma acción, doble entry
-  // por accesibilidad de touch target más grande).
+  // en el item centrado.
   &__enter {
     appearance: none;
     background: var(--color-primary);

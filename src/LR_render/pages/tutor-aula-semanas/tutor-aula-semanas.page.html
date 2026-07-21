@@ -49,22 +49,22 @@
       <h2 class="section-title">Semanas</h2>
 
       <div class="wheel" role="listbox" aria-label="Semanas del ciclo" data-testid="semanas-wheel">
-        <!-- "Lens" fijo: banda central que resalta el item bajo ella. Es
-             puramente visual (pointer-events:none) — la selección real se
-             calcula por IntersectionObserver sobre los items. -->
+        <!-- Lens: dos líneas horizontales que demarcan el slot del item
+             centrado. Sin fill de fondo — el highlight visual del centro
+             viene solo de la nitidez del item (los demás están blurreados). -->
         <div class="wheel__lens" aria-hidden="true"></div>
 
         <div class="wheel__viewport" #viewport>
           <div class="wheel__spacer" aria-hidden="true"></div>
           <ul class="wheel__list">
-            @for (semana of vm.semanas(); track semana.periodId; let i = $index) {
+            @for (semana of virtualSemanas(); track $index; let i = $index) {
               <li
                 class="wheel-item"
-                [class.wheel-item--selected]="i === vm.selectedIndex()"
+                [class.wheel-item--selected]="i === observedVirtualIndex()"
                 [class.wheel-item--near]="distanceFromCenter(i) === 1"
                 [class.wheel-item--far]="distanceFromCenter(i) === 2"
-                [attr.data-index]="i"
-                [attr.aria-selected]="i === vm.selectedIndex()"
+                [attr.data-virtual-index]="i"
+                [attr.aria-selected]="i === observedVirtualIndex()"
                 role="option"
                 tabindex="-1"
                 data-testid="semana-item"
@@ -81,7 +81,7 @@
                       <span class="wheel-item__today-badge">HOY</span>
                     }
                   </div>
-                  @if (i === vm.selectedIndex()) {
+                  @if (i === observedVirtualIndex()) {
                     <p class="wheel-item__dates">{{ semana.startDate }} — {{ semana.endDate }}</p>
                     @if (semana.estaVacia()) {
                       <p class="wheel-item__meta wheel-item__meta--empty">Sin exámenes</p>
@@ -102,7 +102,7 @@
                     }
                   }
                 </div>
-                @if (i === vm.selectedIndex()) {
+                @if (i === observedVirtualIndex()) {
                   <button
                     type="button"
                     class="wheel-item__enter"
