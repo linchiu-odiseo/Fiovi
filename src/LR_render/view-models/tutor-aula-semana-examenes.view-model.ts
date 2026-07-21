@@ -29,7 +29,30 @@ export class TutorAulaSemanaExamenesViewModel {
   readonly loading = signal(true);
   readonly error = signal<'network' | 'forbidden' | 'notFound' | null>(null);
 
+  /**
+   * Curso actualmente expandido en el acordeón. `null` = todos colapsados.
+   * Convención "one open at a time" (iOS Settings): abrir uno colapsa el
+   * anterior. Como los cursos general-entry tienen courseId=null, la key
+   * sintética `__general__` lo distingue del "ninguno abierto".
+   */
+  readonly openCourseKey = signal<string | null>(null);
+
   readonly hasCursos = computed(() => this.cursos().length > 0);
+
+  /** Key estable de un grupo para el estado open/closed. */
+  courseKey(grupo: AulaSemanaExamGrupo): string {
+    return grupo.courseId ?? '__general__';
+  }
+
+  /** Toggle del acordeón — abrir uno colapsa el anterior. */
+  toggleCourse(grupo: AulaSemanaExamGrupo): void {
+    const key = this.courseKey(grupo);
+    this.openCourseKey.set(this.openCourseKey() === key ? null : key);
+  }
+
+  isCourseOpen(grupo: AulaSemanaExamGrupo): boolean {
+    return this.openCourseKey() === this.courseKey(grupo);
+  }
 
   async load(): Promise<void> {
     const classroomId = this.route.snapshot.paramMap.get('classroomId') ?? '';
@@ -46,6 +69,11 @@ export class TutorAulaSemanaExamenesViewModel {
       this.startDate.set(result.week.startDate);
       this.endDate.set(result.week.endDate);
       this.cursos.set(result.cursos);
+
+      // Abre el primer curso como affordance UX — señala al tutor que las
+      // cards son accordions. Si prefiere colapsarlo, un tap lo cierra.
+      const first = result.cursos[0];
+      this.openCourseKey.set(first ? this.courseKey(first) : null);
 
       // Popular TutorExamsStore con los TutorExam de esta semana. Cuando el
       // tutor tape un examen y navegue a /tutor/exams/:recordId, el warm

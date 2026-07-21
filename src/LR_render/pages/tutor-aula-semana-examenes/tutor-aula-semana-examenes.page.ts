@@ -2,7 +2,14 @@ import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { TutorAulaSemanaExamenesViewModel } from '../../view-models/tutor-aula-semana-examenes.view-model';
 import { TutorExam } from '../../../L1_domain/entities/tutor-exam';
+import { AulaSemanaExamGrupo } from '../../../L1_domain/entities/aula-semana-exam-grupo';
 import { ExamServerStatusValue } from '../../../L1_domain/value-objects/exam-server-status';
+
+interface StatusCounts {
+  readonly scheduled: number;
+  readonly in_progress: number;
+  readonly finalized: number;
+}
 
 // Pantalla /tutor/aulas/:classroomId/semanas/:periodId — nivel 3 del nav.
 // Muestra los exámenes de la semana ya agrupados por curso. Cada card de
@@ -31,6 +38,28 @@ export class TutorAulaSemanaExamenesPage {
 
   protected onExamClick(exam: TutorExam): void {
     void this.router.navigate(['/tutor/exams', exam.recordId]);
+  }
+
+  protected onCourseClick(grupo: AulaSemanaExamGrupo): void {
+    this.vm.toggleCourse(grupo);
+  }
+
+  /**
+   * Cuenta los exámenes de un grupo por status. Alimenta las pills del header
+   * del acordeón — cero JS extra en el hot path porque el grupo tiene ≤4
+   * items (fichas EXFE/EXF1/EXF2/EXF3).
+   */
+  protected statusCounts(grupo: AulaSemanaExamGrupo): StatusCounts {
+    let scheduled = 0;
+    let inProgress = 0;
+    let finalized = 0;
+    for (const exam of grupo.examenes) {
+      const s = exam.serverStatus.value;
+      if (s === 'scheduled') scheduled++;
+      else if (s === 'in_progress') inProgress++;
+      else if (s === 'finalized') finalized++;
+    }
+    return { scheduled, in_progress: inProgress, finalized };
   }
 
   protected statusLabel(exam: TutorExam): string {
