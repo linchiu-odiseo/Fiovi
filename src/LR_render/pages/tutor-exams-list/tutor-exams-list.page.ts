@@ -1,14 +1,16 @@
 import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { TutorExamsListViewModel } from '../../view-models/tutor-exams-list.view-model';
-import { TutorExam } from '../../../L1_domain/entities/tutor-exam';
+import { ExamEnCurso } from '../../../L1_domain/entities/exam-en-curso';
 import { PwaUpdateService } from '../../../L3_periphery/pwa/pwa-update.service';
 import { UpdateBannerComponent } from '../../components/update-banner/update-banner.component';
 import { UpdateConfirmModalComponent } from '../../components/update-confirm-modal/update-confirm-modal.component';
 import { VersionFooterComponent } from '../../components/version-footer/version-footer.component';
 
-// Lista de exámenes virtuales del tutor en /tutor/home.
-// El VM se provee localmente — cada montaje arranca limpio sus timers.
+// Home del tutor en /tutor/home. Muestra las aulas asignadas + una lista
+// corta de exámenes actualmente in_progress (via /tutor/exams/en-curso).
+// Al tocar una aula se navega al nivel de semanas (AULA → SEMANA → CURSO →
+// EXÁMENES).
 @Component({
   selector: 'app-tutor-exams-list-page',
   templateUrl: './tutor-exams-list.page.html',
@@ -41,26 +43,20 @@ export class TutorExamsListPage {
     void this.pwa.applyUpdate();
   }
 
-  protected onExamCardClick(exam: TutorExam): void {
+  protected onExamCardClick(exam: ExamEnCurso): void {
     void this.router.navigate(['/tutor/exams', exam.recordId]);
   }
 
   protected onClassroomClick(classroomId: string): void {
-    void this.router.navigate(['/tutor/aulas', classroomId]);
+    void this.router.navigate(['/tutor/aulas', classroomId, 'semanas']);
   }
 
-  protected statusLabel(exam: TutorExam): string {
-    switch (exam.serverStatus.value) {
-      case 'scheduled':
-        return 'Programado';
-      case 'in_progress':
-        return 'En curso';
-      case 'finalized':
-        return 'Finalizado';
-    }
+  /** Duración en minutos para display, coherente con TutorExam.durationInMinutes. */
+  protected durationInMinutes(exam: ExamEnCurso): number {
+    return Math.round(exam.duration / 60);
   }
 
-  protected countDisplay(exam: TutorExam): string {
+  protected countDisplay(exam: ExamEnCurso): string {
     return exam.count === null ? '—' : String(exam.count);
   }
 

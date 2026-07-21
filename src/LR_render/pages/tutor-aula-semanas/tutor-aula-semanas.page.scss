@@ -1,0 +1,347 @@
+// Container principal ocupa toda la pantalla en mobile (100dvh) para que la
+// rueda pueda expandirse. En desktop max-width mantiene el layout centrado.
+.tutor-aula-semanas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  max-width: 32rem;
+  margin: 0 auto;
+  min-height: 100dvh;
+  box-sizing: border-box;
+
+  &__nav {
+    display: flex;
+    flex: 0 0 auto;
+  }
+
+  &__btn-volver {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    appearance: none;
+    background: transparent;
+    border: none;
+    color: var(--color-on-surface-variant);
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  &__header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    flex: 0 0 auto;
+  }
+
+  &__kicker {
+    margin: 0;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-on-surface-variant);
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--color-on-surface);
+  }
+
+  &__subtitle {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--color-on-surface-variant);
+  }
+
+  &__loading,
+  &__error,
+  &__empty {
+    padding: var(--space-md);
+    text-align: center;
+    color: var(--color-on-surface-variant);
+    font-size: 0.9rem;
+  }
+
+  &__error button {
+    margin-top: var(--space-sm);
+    appearance: none;
+    border: 1px solid var(--color-outline);
+    background: transparent;
+    padding: 0.45rem 1rem;
+    border-radius: var(--radius-sm);
+    color: var(--color-on-surface);
+    cursor: pointer;
+  }
+
+  // La sección con la rueda ocupa TODO el alto disponible tras el header.
+  // La rueda adentro es flex: 1 → llena el section verticalmente.
+  //
+  // CRÍTICO: `flex: 1 1 0` (basis 0, no auto). Con basis:auto el ítem crece
+  // al tamaño de su contenido, y como la rueda tiene scroll interno gigante,
+  // eso dispara un loop CSS: contenido inflado → basis inflado → clientHeight
+  // inflado → syncSpacerHeight setea spacers gigantes → contenido aún más
+  // grande → clientHeight en millones de px. Con basis:0 el flex item nace
+  // en 0 y solo crece por el `flex-grow: 1` hasta llenar el espacio del
+  // padre — nada más.
+  &__section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    flex: 1 1 0;
+    min-height: 0;
+  }
+}
+
+// ── Rueda de semanas ────────────────────────────────────────────────────
+//
+// Layout tipo UIPickerView de iOS. La altura de la rueda se adapta al alto
+// disponible (flex: 1). El spacer arriba y abajo se calcula por JS con
+// ResizeObserver — CSS puro no puede computar (100% - 80px)/2 dentro de un
+// flex column con overflow, así que dejamos que la page setee los px exactos.
+//
+// Contract con la page.ts: WHEEL_ITEM_HEIGHT_PX = 80. Cambiar acá requiere
+// actualizarlo allá.
+
+$wheel-item-height: 80px;
+
+.wheel {
+  position: relative;
+  // flex: 1 1 0 (NO auto) para evitar el feedback loop CSS descrito arriba.
+  // basis 0 → el wheel crece desde 0 por flex-grow hasta llenar el section,
+  // sin inflarse por el tamaño del contenido interno (que es la lista
+  // scrollable con miles de px de items + spacers).
+  flex: 1 1 0;
+  min-height: $wheel-item-height * 3; // fallback si el section colapsa
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-outline-variant);
+  background: var(--color-surface-container-lowest);
+  overflow: hidden;
+  isolation: isolate;
+
+  // Lens: solo dos líneas horizontales para marcar el slot del item centrado.
+  // Sin fill de fondo — el center highlight visual sale exclusivamente de la
+  // NITIDEZ (los demás items están blurreados). Zero contraste añadido =
+  // zero fatiga visual (Apple HIG picker pattern).
+  &__lens {
+    position: absolute;
+    top: 50%;
+    left: var(--space-sm);
+    right: var(--space-sm);
+    height: $wheel-item-height;
+    transform: translateY(-50%);
+    border-top: 1px solid var(--color-outline);
+    border-bottom: 1px solid var(--color-outline);
+    background: transparent;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  &__viewport {
+    position: relative;
+    height: 100%;
+    overflow-y: auto;
+    scroll-snap-type: y mandatory;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    scrollbar-width: none;
+    z-index: 1;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  // Spacers: la altura la setea JS (syncSpacerHeight) al mount y en resize
+  // porque depende del alto real del viewport. Fallback CSS: 0 hasta que JS
+  // corra (un flash tolerable).
+  &__spacer {
+    height: 0;
+    flex: 0 0 auto;
+  }
+
+  &__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__hint {
+    margin: 0;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--color-outline);
+    letter-spacing: 0.02em;
+    flex: 0 0 auto;
+  }
+
+  // Chevron FIJO en el slot central de la rueda — no viaja con los items.
+  // Al tap navega a la semana actualmente centrada (vm.selectedSemana()).
+  // Está sobre el lens (z-index 3) y sobre los items (z-index 1). El disabled
+  // aparece brevemente al primer render antes de que observedVirtualIndex
+  // apunte a algo.
+  &__enter-btn {
+    position: absolute;
+    top: 50%;
+    right: var(--space-md);
+    transform: translateY(-50%);
+    z-index: 3;
+    appearance: none;
+    background: var(--color-primary);
+    border: none;
+    color: var(--color-on-primary, #fff);
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+
+    .material-symbols-outlined {
+      font-size: 1.4rem;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-on-surface);
+      outline-offset: 2px;
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+  }
+}
+
+.wheel-item {
+  flex: 0 0 auto;
+  height: $wheel-item-height;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+  padding: 0 var(--space-md);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  z-index: 1;
+  color: var(--color-on-surface);
+  background: transparent;
+  transition:
+    filter 200ms ease,
+    opacity 200ms ease,
+    transform 200ms ease;
+
+  // Estados por distancia al centro. La page setea las clases según
+  // distanceFromCenter(i):
+  //   0 → --selected  (nítido, escala 1)
+  //   1 → --near      (blur 1.5px, opacity 0.6)
+  //   2 → --far       (blur 3px, opacity 0.3)
+  //   ≥3 → default    (blur 5px, opacity 0.12)
+  filter: blur(5px);
+  opacity: 0.12;
+  transform: scale(0.9);
+
+  &--far {
+    filter: blur(3px);
+    opacity: 0.3;
+    transform: scale(0.93);
+  }
+
+  &--near {
+    filter: blur(1.5px);
+    opacity: 0.6;
+    transform: scale(0.97);
+  }
+
+  &--selected {
+    filter: none;
+    opacity: 1;
+    transform: scale(1);
+    font-weight: 600;
+    z-index: 2;
+  }
+
+  &__icon {
+    color: var(--color-primary);
+    font-size: 1.3rem;
+    flex: 0 0 auto;
+  }
+
+  &__body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    overflow: hidden;
+  }
+
+  &__title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  &__name {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-on-surface);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__today-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 0.1rem 0.4rem;
+    border-radius: var(--radius-sm);
+    background: var(--color-success);
+    color: var(--color-on-primary, #fff);
+    flex: 0 0 auto;
+  }
+
+  &__dates {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--color-on-surface-variant);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__meta {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--color-on-surface-variant);
+    display: flex;
+    gap: 0.35rem;
+    align-items: baseline;
+    flex-wrap: nowrap;
+    overflow: hidden;
+
+    &--empty {
+      color: var(--color-outline);
+      font-style: italic;
+    }
+  }
+
+  &__meta-strong {
+    color: var(--color-primary);
+    font-weight: 700;
+  }
+}
