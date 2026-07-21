@@ -50,6 +50,15 @@ export const apiPath = {
   // ---- Tutor (virtual exams) -------------------------------------------
 
   tutorVirtualExams: (slug: string): string => `${tenantBase(slug)}/tutor/virtual-exams`,
+  // Nav mobile AULA → SEMANA → CURSO → EXÁMENES (PR tutor-aulas-semanas-view).
+  // classroomId y periodId son UUID v4; encodeURIComponent como defensa básica.
+  tutorAulaSemanas: (slug: string, classroomId: string): string =>
+    `${tenantBase(slug)}/tutor/aulas/${encodeURIComponent(classroomId)}/semanas`,
+  tutorAulaSemanaExamenes: (slug: string, classroomId: string, periodId: string): string =>
+    `${tenantBase(slug)}/tutor/aulas/${encodeURIComponent(classroomId)}` +
+    `/semanas/${encodeURIComponent(periodId)}/examenes`,
+  // Shortcut cross-aula: exámenes actualmente in_progress del tutor logueado.
+  tutorExamsEnCurso: (slug: string): string => `${tenantBase(slug)}/tutor/exams/en-curso`,
   virtualExam: (slug: string, recordId: string): string =>
     `${tenantBase(slug)}/virtual-exams/${encodeURIComponent(recordId)}`,
   classroomStudents: (slug: string, classroomId: string, virtualExamDetailId: string): string =>

@@ -47,6 +47,7 @@ import { CloudflareTurnstileProvider } from './L3_periphery/captcha/cloudflare-t
 import { HttpAuthRepository } from './L3_periphery/http/http-auth-repository';
 import { HttpExamsApi } from './L3_periphery/http/http-exams-api';
 import { HttpTutorExamsApi } from './L3_periphery/http/http-tutor-exams-api';
+import { HttpTutorNavigationApi } from './L3_periphery/http/http-tutor-navigation-api';
 import { LocalStorageIdentityStorage } from './L3_periphery/storage/local-storage-identity-storage';
 import { IndexedDbProfileStorage } from './L3_periphery/storage/indexed-db-profile-storage';
 import { IndexedDbMarkingsStorage } from './L3_periphery/storage/indexed-db-markings-storage';
@@ -67,6 +68,7 @@ import {
   PROFILE_STORAGE,
   OUTBOX_STORAGE,
   TUTOR_EXAMS_API,
+  TUTOR_NAVIGATION_API,
 } from './L3_periphery/tokens';
 import { environment } from './environments/environment';
 
@@ -77,7 +79,11 @@ import { ListClassroomStudentsUseCase } from './L2_application/use-cases/list-cl
 import { IniciarExamenUseCase } from './L2_application/use-cases/iniciar-examen.use-case';
 import { FinalizarExamenUseCase } from './L2_application/use-cases/finalizar-examen.use-case';
 import { ActualizarAlumnosHabilitadosUseCase } from './L2_application/use-cases/actualizar-alumnos-habilitados.use-case';
+import { GetAulaSemanasUseCase } from './L2_application/use-cases/get-aula-semanas.use-case';
+import { GetAulaSemanaExamenesUseCase } from './L2_application/use-cases/get-aula-semana-examenes.use-case';
+import { GetExamsEnCursoUseCase } from './L2_application/use-cases/get-exams-en-curso.use-case';
 import { TutorExamsApi } from './L1_domain/ports/tutor-exams-api';
+import { TutorNavigationApi } from './L1_domain/ports/tutor-navigation-api';
 
 // Tokens DI para ports de Fase 2 que aún no migraron a src/L3_periphery/tokens.ts.
 // Se mantienen acá hasta que un change futuro los consolide.
@@ -125,6 +131,9 @@ export const appConfig: ApplicationConfig = {
     // HttpTutorExamsApi es @Injectable({ providedIn: 'root' }) — el useExisting
     // conecta el token con la instancia singleton ya creada por Angular.
     { provide: TUTOR_EXAMS_API, useExisting: HttpTutorExamsApi },
+    // Bind puerto TutorNavigationApi → HttpTutorNavigationApi. Mismo patrón
+    // que el bind de TUTOR_EXAMS_API.
+    { provide: TUTOR_NAVIGATION_API, useExisting: HttpTutorNavigationApi },
     // Bind puerto CaptchaProvider → CloudflareTurnstileProvider. Con
     // `CAPTCHA_SITE_KEY` vacío en `.env`, el provider queda `isEnabled()=false`
     // y el LoginPage skipea el widget (dev sin fricción).
@@ -297,6 +306,24 @@ export const appConfig: ApplicationConfig = {
       provide: ActualizarAlumnosHabilitadosUseCase,
       useFactory: (api: TutorExamsApi) => new ActualizarAlumnosHabilitadosUseCase(api),
       deps: [TUTOR_EXAMS_API],
+    },
+    // Use-cases del nav mobile del tutor (change tutor-aulas-semanas-view).
+    // Todos anclan el Clock con serverTime del response — patrón GetTodaysExamsUseCase.
+    {
+      provide: GetAulaSemanasUseCase,
+      useFactory: (api: TutorNavigationApi, clock: Clock) => new GetAulaSemanasUseCase(api, clock),
+      deps: [TUTOR_NAVIGATION_API, CLOCK],
+    },
+    {
+      provide: GetAulaSemanaExamenesUseCase,
+      useFactory: (api: TutorNavigationApi, clock: Clock) =>
+        new GetAulaSemanaExamenesUseCase(api, clock),
+      deps: [TUTOR_NAVIGATION_API, CLOCK],
+    },
+    {
+      provide: GetExamsEnCursoUseCase,
+      useFactory: (api: TutorNavigationApi, clock: Clock) => new GetExamsEnCursoUseCase(api, clock),
+      deps: [TUTOR_NAVIGATION_API, CLOCK],
     },
 
     // Provider del dispatcher de draft. Con draftEnabled=true se instancia el
