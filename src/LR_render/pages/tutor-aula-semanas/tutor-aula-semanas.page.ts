@@ -64,6 +64,7 @@ export class TutorAulaSemanasPage {
   private resizeObserver: ResizeObserver | null = null;
   private scrollEndTimer: ReturnType<typeof setTimeout> | null = null;
   private wheelInitialized = false;
+  private initialLayoutDone = false;
   private reanchorInFlight = false;
 
   constructor() {
@@ -140,27 +141,38 @@ export class TutorAulaSemanasPage {
     const viewportEl = this.viewport()?.nativeElement;
     if (!viewportEl) return;
 
+    // Observers e listeners se attachean YA — no requieren tamaño.
     this.attachIntersectionObserver(viewportEl);
     this.attachResizeObserver(viewportEl);
     this.attachScrollListener(viewportEl);
 
-    this.syncSpacerHeight();
-
-    // Auto-scroll a la selección inicial (HOY o primera con contenido) en la
-    // copia CENTRAL del array virtual — deja copias arriba y abajo para el
-    // scroll cíclico.
-    const N = this.vm.semanas().length;
-    const initialReal = this.vm.initialSelectedIndex();
-    if (initialReal >= 0 && N > 0) {
-      const initialVirtual = N + initialReal;
-      this.vm.selectByIndex(initialReal);
-      this.observedVirtualIndex.set(initialVirtual);
-      // 'instant' para que al abrir la página no se vea la animación de scroll
-      // desde el tope hasta HOY.
-      this.scrollToVirtualIndex(initialVirtual, 'instant');
+    // El layout inicial (spacer height + scroll a HOY) depende del alto real
+    // del viewport. Como Angular acaba de renderizar los items pero el browser
+    // aún no hizo layout, viewportEl.clientHeight puede ser 0 acá. En ese
+    // caso el ResizeObserver dispara `performInitialLayout` cuando el viewport
+    // reciba tamaño real. Si ya lo tiene (caso feliz en navegaciones rápidas),
+    // lo hacemos ahora mismo.
+    if (viewportEl.clientHeight > 0) {
+      this.syncSpacerHeight();
+      this.performInitialLayout();
     }
 
     this.wheelInitialized = true;
+  }
+
+  private performInitialLayout(): void {
+    if (this.initialLayoutDone) return;
+    const N = this.vm.semanas().length;
+    const initialReal = this.vm.initialSelectedIndex();
+    if (initialReal < 0 || N === 0) return;
+
+    const initialVirtual = N + initialReal;
+    this.vm.selectByIndex(initialReal);
+    this.observedVirtualIndex.set(initialVirtual);
+    // 'instant' para que al abrir la página no se vea la animación de scroll
+    // desde el tope hasta HOY.
+    this.scrollToVirtualIndex(initialVirtual, 'instant');
+    this.initialLayoutDone = true;
   }
 
   private attachIntersectionObserver(viewportEl: HTMLElement): void {
@@ -193,11 +205,20 @@ export class TutorAulaSemanasPage {
   }
 
   private attachResizeObserver(viewportEl: HTMLElement): void {
-    // La rueda usa flex: 1 para ocupar el alto disponible; cuando el viewport
-    // cambia (rotación mobile, resize desktop, teclado on-screen), hay que
-    // recomputar el spacer y re-centrar el item seleccionado.
+    // Doble propósito:
+    //   1. Layout inicial diferido: la primera vez que viewportEl reciba
+    //      un tamaño real (post-primer-paint), hacemos syncSpacerHeight +
+    //      centrado inicial. Sin esto la rueda queda vacía en pantalla
+    //      porque el scrollTop se calculó contra clientHeight=0.
+    //   2. Resize continuo: rotación mobile, resize desktop, teclado on-screen
+    //      → recomputar spacer y re-centrar el item seleccionado.
     this.resizeObserver = new ResizeObserver(() => {
+      if (viewportEl.clientHeight === 0) return;
       this.syncSpacerHeight();
+      if (!this.initialLayoutDone) {
+        this.performInitialLayout();
+        return;
+      }
       const virtualIdx = this.observedVirtualIndex();
       // Instant scroll para no animar durante el resize.
       this.scrollToVirtualIndex(virtualIdx, 'instant');
