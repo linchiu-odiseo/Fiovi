@@ -18,11 +18,20 @@ import { TutorAulaSemanasViewModel } from '../../view-models/tutor-aula-semanas.
 // Se usa para calcular el spacer necesario para centrar el primer/último item.
 const WHEEL_ITEM_HEIGHT_PX = 80;
 
-// Cantidad de copias del array de semanas renderizadas para simular scroll
-// cíclico. 3 es el mínimo que permite re-anclaje sin gap visual: el usuario
-// scrollea en la copia central; al acercarse al borde de una copia, saltamos
-// silenciosamente al item equivalente en la copia central.
-const WHEEL_COPIES = 3;
+// Umbral para activar el modo cíclico. Con N ≤ CYCLIC_THRESHOLD el usuario
+// notaría rápidamente la repetición (subir/bajar recorre pocos items y
+// vuelve a ver los mismos), así que la rueda pasa a modo lineal con topes
+// naturales (rubber band del navegador). Solo con N > CYCLIC_THRESHOLD
+// tiene sentido ciclar porque el usuario percibe un flujo continuo antes
+// de completar una vuelta.
+const CYCLIC_THRESHOLD = 6;
+
+// Copias del array real cuando el modo cíclico está activo. 3 es el mínimo:
+// bloque anterior + bloque central + bloque siguiente. El re-anclaje al
+// bloque central es invisible siempre y cuando ocurra antes de que el
+// usuario alcance el borde exterior de las copias vecinas — el margen de 1
+// copia entera de buffer alcanza para cualquier fling humano.
+const WHEEL_COPIES_CYCLIC = 3;
 
 @Component({
   selector: 'app-tutor-aula-semanas-page',
@@ -39,7 +48,7 @@ export class TutorAulaSemanasPage {
 
   /**
    * Índice virtual del item actualmente centrado, en el array `virtualSemanas`
-   * (0 .. N*WHEEL_COPIES - 1). La page mantiene este signal separado del
+   * (0 .. copies*N - 1). La page mantiene este signal separado del
    * `vm.selectedIndex()` (que trabaja en índices reales 0..N-1) porque las
    * clases CSS de blur necesitan comparar con el item virtual centrado, no
    * con el real (que se repite entre copias).
@@ -47,15 +56,33 @@ export class TutorAulaSemanasPage {
   protected readonly observedVirtualIndex = signal<number>(0);
 
   /**
-   * Array de semanas concatenado WHEEL_COPIES veces. La rueda scrollea sobre
-   * este array; cuando el observer detecta un cambio de centro, extraemos el
-   * índice real vía módulo y lo empujamos al VM.
+   * True cuando la rueda debe operar en modo cíclico (N > CYCLIC_THRESHOLD).
+   * Debajo del umbral el scroll es lineal con topes naturales.
+   */
+  protected readonly isCyclic = computed(() => this.vm.semanas().length > CYCLIC_THRESHOLD);
+
+  /**
+   * Copias del array real. En modo cíclico son 3 (bloque anterior/central/
+   * siguiente); en modo lineal es 1 (una sola copia, scroll de tope a tope).
+   */
+  protected readonly wheelCopies = computed<number>(() => {
+    const N = this.vm.semanas().length;
+    if (N === 0) return 0;
+    return this.isCyclic() ? WHEEL_COPIES_CYCLIC : 1;
+  });
+
+  /**
+   * Array de semanas concatenado `wheelCopies` veces. La rueda scrollea sobre
+   * este array; en modo cíclico el scroll handler re-ancla al bloque medio
+   * cuando el usuario cruza al bloque anterior/siguiente.
    */
   protected readonly virtualSemanas = computed<readonly AulaSemana[]>(() => {
     const source = this.vm.semanas();
     if (source.length === 0) return [];
+    const copies = this.wheelCopies();
+    if (copies <= 1) return [...source];
     const out: AulaSemana[] = [];
-    for (let c = 0; c < WHEEL_COPIES; c++) out.push(...source);
+    for (let c = 0; c < copies; c++) out.push(...source);
     return out;
   });
 
@@ -63,11 +90,12 @@ export class TutorAulaSemanasPage {
   protected readonly distanceFromCenter = (virtualIndex: number): number =>
     Math.abs(virtualIndex - this.observedVirtualIndex());
 
-  private observer: IntersectionObserver | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private wheelInitialized = false;
   private initialLayoutDone = false;
   private reanchorInFlight = false;
+  private scrollRafPending = false;
+  private lastVirtualCount = 0;
 
   constructor() {
     void this.vm.load();
@@ -86,6 +114,28 @@ export class TutorAulaSemanasPage {
       const count = this.vm.semanas().length;
       if (!viewportEl || count === 0 || this.wheelInitialized) return;
       afterNextRender(() => this.initializeWheel(), { injector: this.injector });
+    });
+
+    // Si el conteo virtual cambia post-init (raro: solo si `wheelCopies` se
+    // recomputa, típicamente por resize brusco que cambie N), re-centrar al
+    // nuevo bloque medio manteniendo el item real seleccionado.
+    effect(() => {
+      const virtualCount = this.virtualSemanas().length;
+      if (!this.wheelInitialized || virtualCount === this.lastVirtualCount) return;
+      this.lastVirtualCount = virtualCount;
+      afterNextRender(
+        () => {
+          const N = this.vm.semanas().length;
+          if (N === 0) return;
+          const realIdx = this.vm.selectedIndex();
+          if (realIdx < 0) return;
+          const middleStart = this.middleCopyIndex() * N;
+          const virtualIdx = middleStart + realIdx;
+          this.observedVirtualIndex.set(virtualIdx);
+          this.scrollToVirtualIndex(virtualIdx, 'instant');
+        },
+        { injector: this.injector },
+      );
     });
 
     this.destroyRef.onDestroy(() => this.teardown());
@@ -144,7 +194,7 @@ export class TutorAulaSemanasPage {
     this.onEnter(semana);
   }
 
-  /** True si la semana en `virtualIndex` corresponde a la semana "HOY". */
+  /** True si la semana virtualIndex es la semana "HOY". */
   protected isToday(virtualIndex: number): boolean {
     const N = this.vm.semanas().length;
     if (N === 0) return false;
@@ -153,19 +203,23 @@ export class TutorAulaSemanasPage {
 
   // ── Wheel internals ──────────────────────────────────────────────────
 
+  private middleCopyIndex(): number {
+    // Con `copies` impares el bloque medio es el del medio geométrico. En
+    // modo lineal (copies=1) el bloque medio es el único (0).
+    return Math.floor(this.wheelCopies() / 2);
+  }
+
   private initializeWheel(): void {
     const viewportEl = this.viewport()?.nativeElement;
     if (!viewportEl) return;
 
-    // Observers e listeners se attachean YA — no requieren tamaño.
-    this.attachIntersectionObserver(viewportEl);
     this.attachResizeObserver(viewportEl);
     this.attachScrollListener(viewportEl);
 
     // Fuerzo layout leyendo offsetHeight (evita el caso donde el navegador
     // aún no calculó dimensiones tras el @for). Si aún así clientHeight es 0
-    // (elemento colapsado por CSS o oculto), el ResizeObserver toma el
-    // relevo cuando el tamaño cambie.
+    // (elemento colapsado por CSS o oculto), el ResizeObserver toma el relevo
+    // cuando el tamaño cambie.
     void viewportEl.offsetHeight;
 
     if (viewportEl.clientHeight > 0) {
@@ -173,6 +227,7 @@ export class TutorAulaSemanasPage {
       this.performInitialLayout();
     }
 
+    this.lastVirtualCount = this.virtualSemanas().length;
     this.wheelInitialized = true;
   }
 
@@ -182,42 +237,14 @@ export class TutorAulaSemanasPage {
     const initialReal = this.vm.initialSelectedIndex();
     if (initialReal < 0 || N === 0) return;
 
-    const initialVirtual = N + initialReal;
+    const middleStart = this.middleCopyIndex() * N;
+    const initialVirtual = middleStart + initialReal;
     this.vm.selectByIndex(initialReal);
     this.observedVirtualIndex.set(initialVirtual);
     // 'instant' para que al abrir la página no se vea la animación de scroll
     // desde el tope hasta HOY.
     this.scrollToVirtualIndex(initialVirtual, 'instant');
     this.initialLayoutDone = true;
-  }
-
-  private attachIntersectionObserver(viewportEl: HTMLElement): void {
-    // rootMargin negativo comprime el "hit-area" de intersección a solo la
-    // franja central del viewport, así solo un item a la vez califica.
-    this.observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (!entry.isIntersecting) continue;
-          const el = entry.target as HTMLElement;
-          const rawVirtual = el.dataset['virtualIndex'];
-          if (rawVirtual === undefined) continue;
-          const virtualIdx = Number(rawVirtual);
-          if (!Number.isFinite(virtualIdx)) continue;
-          const N = this.vm.semanas().length;
-          if (N === 0) continue;
-          this.observedVirtualIndex.set(virtualIdx);
-          this.vm.selectByIndex(virtualIdx % N);
-        }
-      },
-      {
-        root: viewportEl,
-        rootMargin: '-45% 0px -45% 0px',
-        threshold: 0,
-      },
-    );
-
-    const items = viewportEl.querySelectorAll<HTMLLIElement>('.wheel-item');
-    items.forEach((item) => this.observer!.observe(item));
   }
 
   private attachResizeObserver(viewportEl: HTMLElement): void {
@@ -254,29 +281,35 @@ export class TutorAulaSemanasPage {
   }
 
   private attachScrollListener(viewportEl: HTMLElement): void {
-    // Re-anclaje SÍNCRONO en cada scroll event (no debounced). Motivo: el
-    // debounce de 120ms permitía que el momentum de un fling atravesara
-    // la copia superior/inferior COMPLETA antes de reaccionar. El usuario
-    // veía la rueda "spinnear" por todos los items intermedios antes del
-    // salto invisible.
+    // Un único handler para (a) mantener `observedVirtualIndex` sincronizado
+    // con el item que ocupa el centro visual y (b) re-anclar al bloque medio
+    // cuando el usuario se acerca a los bordes del contenido virtualizado.
     //
-    // Con la lógica síncrona ajustamos scrollTop en cuanto el item
-    // centrado cruza el borde entre copias. El delta que aplicamos es
-    // exactamente `N * itemHeight` → posición final visualmente idéntica
-    // (mismo item, otra copia) → el momentum del navegador continúa desde
-    // la nueva scrollTop sin cortarse (Chrome/Safari/Firefox garantizan
-    // esto porque el ajuste se hace dentro del handler).
-    viewportEl.addEventListener('scroll', this.handleScrollReanchor, {
-      passive: true,
-    });
+    // Reemplaza al ex-IntersectionObserver: éste tenía un race contra el
+    // re-anclaje que provocaba desyncs (item mostrado con detalle no coincidía
+    // con el chevron), saltos aparentes hacia atrás, y comportamiento errático
+    // en fling rápido. Un solo handler síncrono sobre `scroll` es más simple y
+    // más preciso porque calcula el centro exacto en cada tick.
+    viewportEl.addEventListener('scroll', this.handleScroll, { passive: true });
   }
 
-  private handleScrollReanchor = (): void => {
+  private handleScroll = (): void => {
+    if (this.scrollRafPending) return;
+    this.scrollRafPending = true;
+    requestAnimationFrame(() => {
+      this.scrollRafPending = false;
+      this.processScrollTick();
+    });
+  };
+
+  private processScrollTick(): void {
     if (this.reanchorInFlight) return;
     const viewportEl = this.viewport()?.nativeElement;
     if (!viewportEl) return;
     const N = this.vm.semanas().length;
     if (N === 0) return;
+    const copies = this.wheelCopies();
+    if (copies === 0) return;
 
     const itemH = WHEEL_ITEM_HEIGHT_PX;
     const centerY = viewportEl.scrollTop + viewportEl.clientHeight / 2;
@@ -288,24 +321,50 @@ export class TutorAulaSemanasPage {
     );
     if (!firstItem) return;
     const firstItemTop = firstItem.offsetTop;
-    const virtualAtCenter = Math.round((centerY - firstItemTop - itemH / 2) / itemH);
-    if (!Number.isFinite(virtualAtCenter)) return;
+    const rawVirtual = Math.round((centerY - firstItemTop - itemH / 2) / itemH);
+    if (!Number.isFinite(rawVirtual)) return;
+    const totalVirtual = copies * N;
+    // Clampeo defensivo — el clamp del navegador contra bordes puede devolver
+    // un centro fuera de rango durante ajustes bruscos.
+    const virtualAtCenter = Math.max(0, Math.min(totalVirtual - 1, rawVirtual));
 
-    const middleStart = N;
-    const middleEnd = N * 2;
-    if (virtualAtCenter >= middleStart && virtualAtCenter < middleEnd) return;
+    // 1) Sincronizar índice observado con posición real del scroll. Sustituye
+    //    al IntersectionObserver — evita el desync visual (detalles del item
+    //    seleccionado se muestran en un slot distinto al del chevron fijo).
+    if (virtualAtCenter !== this.observedVirtualIndex()) {
+      this.observedVirtualIndex.set(virtualAtCenter);
+      const realIdx = ((virtualAtCenter % N) + N) % N;
+      this.vm.selectByIndex(realIdx);
+    }
 
-    const delta = virtualAtCenter < middleStart ? N * itemH : -N * itemH;
+    // 2) Re-anclar SOLO en modo cíclico. En modo lineal el scroll topa
+    //    naturalmente con los extremos del contenido y el rubber band del
+    //    navegador da el rebote elástico que espera el usuario.
+    if (!this.isCyclic()) return;
+
+    // Re-anclar al bloque medio si estamos a más de 1 copia de él. Con
+    // WHEEL_COPIES_CYCLIC = 3 y el centro inicial en la copia media, esto
+    // significa: re-anclar tan pronto el usuario cruza al bloque anterior o
+    // siguiente. Como el bloque medio tiene N items completos de buffer a
+    // cada lado, el momentum del fling nunca choca contra el clamp del
+    // navegador → adiós rebote violento 28 → 27 → ... → 1.
+    const middleCopyIdx = this.middleCopyIndex();
+    const currentCopyIdx = Math.floor(virtualAtCenter / N);
+    if (currentCopyIdx === middleCopyIdx) return;
+
+    const delta = (middleCopyIdx - currentCopyIdx) * N * itemH;
     this.reanchorInFlight = true;
-    viewportEl.scrollTop += delta;
-    // Adelanto el signal para que las clases CSS de blur se actualicen sin
-    // esperar el observer.
-    this.observedVirtualIndex.set(virtualAtCenter + delta / itemH);
+    // `behavior: 'instant'` explícito: aunque el CSS tenga `scroll-behavior:
+    // smooth` en el viewport, forzamos teleport atómico. Con smooth el reanchor
+    // se animaría → el usuario vería la rueda "girando" en la dirección opuesta
+    // durante el ajuste, exactamente el bug que queremos eliminar.
+    viewportEl.scrollTo({ top: viewportEl.scrollTop + delta, behavior: 'instant' });
+    this.observedVirtualIndex.set(virtualAtCenter + Math.floor(delta / itemH));
     // Libero el guard en el siguiente frame — evita cascada de re-ajustes.
     requestAnimationFrame(() => {
       this.reanchorInFlight = false;
     });
-  };
+  }
 
   private syncSpacerHeight(): void {
     const viewportEl = this.viewport()?.nativeElement;
@@ -349,7 +408,7 @@ export class TutorAulaSemanasPage {
     if (virtualIdx < 0) return;
     const N = this.vm.semanas().length;
     if (N === 0) return;
-    const totalVirtual = N * WHEEL_COPIES;
+    const totalVirtual = this.wheelCopies() * N;
     const next = virtualIdx + delta;
     // Los bordes son manejados por el re-anclaje — si next queda fuera del
     // rango virtual, dejo que el navegador clampee a 0/max, el re-anclaje
@@ -359,11 +418,9 @@ export class TutorAulaSemanasPage {
   }
 
   private teardown(): void {
-    this.observer?.disconnect();
-    this.observer = null;
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
     const viewportEl = this.viewport()?.nativeElement;
-    viewportEl?.removeEventListener('scroll', this.handleScrollReanchor);
+    viewportEl?.removeEventListener('scroll', this.handleScroll);
   }
 }
