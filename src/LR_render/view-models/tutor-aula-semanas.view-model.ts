@@ -74,10 +74,11 @@ export class TutorAulaSemanasViewModel {
       const result = await this.getSemanas.execute(classroomId);
       this.classroomName.set(result.classroom.name);
       this.cycleName.set(result.cycle.name);
-      // Orden cronológico descendente: última semana arriba, semana 1 al final.
-      // Mantiene la card destacada de "semana actual" cerca del top en la mayoría
-      // de casos sin necesidad de fixed-pinning.
-      const sorted = [...result.semanas].sort((a, b) => b.order - a.order);
+      // Orden cronológico ascendente: Semana 1 primero, última al final.
+      // Convención iOS/Apple para pickers de tiempo: scroll up = avanzar en
+      // el tiempo. Combinado con el cíclico, al llegar a la última semana y
+      // seguir swipeando up, el next visible es Semana 1 (wrap forward).
+      const sorted = [...result.semanas].sort((a, b) => a.order - b.order);
       this.semanas.set(sorted);
     } catch (err) {
       if (err instanceof VirtualExamNotFoundError) {

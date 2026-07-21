@@ -78,11 +78,19 @@
 
   // La sección con la rueda ocupa TODO el alto disponible tras el header.
   // La rueda adentro es flex: 1 → llena el section verticalmente.
+  //
+  // CRÍTICO: `flex: 1 1 0` (basis 0, no auto). Con basis:auto el ítem crece
+  // al tamaño de su contenido, y como la rueda tiene scroll interno gigante,
+  // eso dispara un loop CSS: contenido inflado → basis inflado → clientHeight
+  // inflado → syncSpacerHeight setea spacers gigantes → contenido aún más
+  // grande → clientHeight en millones de px. Con basis:0 el flex item nace
+  // en 0 y solo crece por el `flex-grow: 1` hasta llenar el espacio del
+  // padre — nada más.
   &__section {
     display: flex;
     flex-direction: column;
     gap: var(--space-sm);
-    flex: 1 1 auto;
+    flex: 1 1 0;
     min-height: 0;
   }
 }
@@ -101,8 +109,12 @@ $wheel-item-height: 80px;
 
 .wheel {
   position: relative;
-  flex: 1 1 auto;
-  min-height: $wheel-item-height * 3; // fallback si el layout externo colapsa
+  // flex: 1 1 0 (NO auto) para evitar el feedback loop CSS descrito arriba.
+  // basis 0 → el wheel crece desde 0 por flex-grow hasta llenar el section,
+  // sin inflarse por el tamaño del contenido interno (que es la lista
+  // scrollable con miles de px de items + spacers).
+  flex: 1 1 0;
+  min-height: $wheel-item-height * 3; // fallback si el section colapsa
   border-radius: var(--radius-md);
   border: 1px solid var(--color-outline-variant);
   background: var(--color-surface-container-lowest);
@@ -166,6 +178,46 @@ $wheel-item-height: 80px;
     color: var(--color-outline);
     letter-spacing: 0.02em;
     flex: 0 0 auto;
+  }
+
+  // Chevron FIJO en el slot central de la rueda — no viaja con los items.
+  // Al tap navega a la semana actualmente centrada (vm.selectedSemana()).
+  // Está sobre el lens (z-index 3) y sobre los items (z-index 1). El disabled
+  // aparece brevemente al primer render antes de que observedVirtualIndex
+  // apunte a algo.
+  &__enter-btn {
+    position: absolute;
+    top: 50%;
+    right: var(--space-md);
+    transform: translateY(-50%);
+    z-index: 3;
+    appearance: none;
+    background: var(--color-primary);
+    border: none;
+    color: var(--color-on-primary, #fff);
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+
+    .material-symbols-outlined {
+      font-size: 1.4rem;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-on-surface);
+      outline-offset: 2px;
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
   }
 }
 
@@ -291,31 +343,5 @@ $wheel-item-height: 80px;
   &__meta-strong {
     color: var(--color-primary);
     font-weight: 700;
-  }
-
-  // Botón chevron a la derecha — CTA "entrar a esta semana". Solo aparece
-  // en el item centrado.
-  &__enter {
-    appearance: none;
-    background: var(--color-primary);
-    border: none;
-    color: var(--color-on-primary, #fff);
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: 50%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    flex: 0 0 auto;
-
-    .material-symbols-outlined {
-      font-size: 1.3rem;
-    }
-
-    &:focus-visible {
-      outline: 2px solid var(--color-on-surface);
-      outline-offset: 2px;
-    }
   }
 }

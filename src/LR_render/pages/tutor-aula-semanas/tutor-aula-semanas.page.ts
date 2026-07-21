@@ -3,6 +3,8 @@ import {
   DestroyRef,
   ElementRef,
   HostListener,
+  Injector,
+  afterNextRender,
   computed,
   effect,
   inject,
@@ -31,6 +33,7 @@ const WHEEL_COPIES = 3;
 export class TutorAulaSemanasPage {
   protected readonly vm = inject(TutorAulaSemanasViewModel);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly injector = inject(Injector);
 
   private readonly viewport = viewChild<ElementRef<HTMLDivElement>>('viewport');
 
@@ -62,7 +65,6 @@ export class TutorAulaSemanasPage {
 
   private observer: IntersectionObserver | null = null;
   private resizeObserver: ResizeObserver | null = null;
-  private scrollEndTimer: ReturnType<typeof setTimeout> | null = null;
   private wheelInitialized = false;
   private initialLayoutDone = false;
   private reanchorInFlight = false;
@@ -70,13 +72,20 @@ export class TutorAulaSemanasPage {
   constructor() {
     void this.vm.load();
 
-    // Setup de la rueda cuando `semanas` está poblada. Corre una única vez
-    // gracias al guard `wheelInitialized`. Usa queueMicrotask para dejar que
-    // Angular renderice los <li> antes de attachar los observers.
+    // Setup de la rueda cuando (a) semanas está poblada Y (b) el elemento
+    // #viewport ya está en el DOM. El viewChild signal actualiza recién
+    // cuando Angular commiteó el @if que renderiza la rueda — usarlo como
+    // dependencia del effect evita el race con la fase de render.
+    //
+    // `afterNextRender` es la API oficial de Angular para diferir trabajo
+    // que depende de DOM + layout hasta después de la próxima paint. Sin
+    // esto, viewport.clientHeight puede ser 0 al momento de configurar
+    // spacers y scroll inicial, dejando la rueda vacía en pantalla.
     effect(() => {
+      const viewportEl = this.viewport()?.nativeElement;
       const count = this.vm.semanas().length;
-      if (count === 0 || this.wheelInitialized) return;
-      queueMicrotask(() => this.initializeWheel());
+      if (!viewportEl || count === 0 || this.wheelInitialized) return;
+      afterNextRender(() => this.initializeWheel(), { injector: this.injector });
     });
 
     this.destroyRef.onDestroy(() => this.teardown());
@@ -106,6 +115,13 @@ export class TutorAulaSemanasPage {
   /** Tap en el botón chevron / CTA "Entrar" — navega sin doble tap. */
   protected onEnter(semana: AulaSemana): void {
     this.vm.goToSemana(semana.periodId);
+  }
+
+  /** Tap en el chevron fijo del lens central — entra a la semana centrada. */
+  protected onEnterCentered(): void {
+    const semana = this.vm.selectedSemana();
+    if (!semana) return;
+    this.onEnter(semana);
   }
 
   @HostListener('keydown.arrowUp', ['$event'])
@@ -146,12 +162,12 @@ export class TutorAulaSemanasPage {
     this.attachResizeObserver(viewportEl);
     this.attachScrollListener(viewportEl);
 
-    // El layout inicial (spacer height + scroll a HOY) depende del alto real
-    // del viewport. Como Angular acaba de renderizar los items pero el browser
-    // aún no hizo layout, viewportEl.clientHeight puede ser 0 acá. En ese
-    // caso el ResizeObserver dispara `performInitialLayout` cuando el viewport
-    // reciba tamaño real. Si ya lo tiene (caso feliz en navegaciones rápidas),
-    // lo hacemos ahora mismo.
+    // Fuerzo layout leyendo offsetHeight (evita el caso donde el navegador
+    // aún no calculó dimensiones tras el @for). Si aún así clientHeight es 0
+    // (elemento colapsado por CSS o oculto), el ResizeObserver toma el
+    // relevo cuando el tamaño cambie.
+    void viewportEl.offsetHeight;
+
     if (viewportEl.clientHeight > 0) {
       this.syncSpacerHeight();
       this.performInitialLayout();
@@ -212,61 +228,97 @@ export class TutorAulaSemanasPage {
     //      porque el scrollTop se calculó contra clientHeight=0.
     //   2. Resize continuo: rotación mobile, resize desktop, teclado on-screen
     //      → recomputar spacer y re-centrar el item seleccionado.
+    //
+    // El trabajo del callback se difiere con requestAnimationFrame por dos
+    // razones críticas:
+    //   a) Mutar DOM (setear style.height en spacers) dentro del propio callback
+    //      del observer causa el error "ResizeObserver loop completed with
+    //      undelivered notifications". Angular lo intercepta como error y
+    //      puede cortar renders subsecuentes → rueda queda visualmente vacía.
+    //   b) rAF garantiza que el trabajo corre después de que el navegador
+    //      terminó de procesar el redimensionamiento actual.
     this.resizeObserver = new ResizeObserver(() => {
-      if (viewportEl.clientHeight === 0) return;
-      this.syncSpacerHeight();
-      if (!this.initialLayoutDone) {
-        this.performInitialLayout();
-        return;
-      }
-      const virtualIdx = this.observedVirtualIndex();
-      // Instant scroll para no animar durante el resize.
-      this.scrollToVirtualIndex(virtualIdx, 'instant');
+      requestAnimationFrame(() => {
+        if (!viewportEl.isConnected) return;
+        if (viewportEl.clientHeight === 0) return;
+        this.syncSpacerHeight();
+        if (!this.initialLayoutDone) {
+          this.performInitialLayout();
+          return;
+        }
+        const virtualIdx = this.observedVirtualIndex();
+        this.scrollToVirtualIndex(virtualIdx, 'instant');
+      });
     });
     this.resizeObserver.observe(viewportEl);
   }
 
   private attachScrollListener(viewportEl: HTMLElement): void {
-    // El re-anclaje del scroll cíclico ocurre cuando el usuario se queda
-    // quieto (scroll-end). Usamos debounce de 120ms — evita que un fling
-    // largo dispare múltiples re-anclajes mid-scroll.
-    viewportEl.addEventListener('scroll', () => {
-      if (this.scrollEndTimer !== null) clearTimeout(this.scrollEndTimer);
-      this.scrollEndTimer = setTimeout(() => this.maybeReanchor(), 120);
+    // Re-anclaje SÍNCRONO en cada scroll event (no debounced). Motivo: el
+    // debounce de 120ms permitía que el momentum de un fling atravesara
+    // la copia superior/inferior COMPLETA antes de reaccionar. El usuario
+    // veía la rueda "spinnear" por todos los items intermedios antes del
+    // salto invisible.
+    //
+    // Con la lógica síncrona ajustamos scrollTop en cuanto el item
+    // centrado cruza el borde entre copias. El delta que aplicamos es
+    // exactamente `N * itemHeight` → posición final visualmente idéntica
+    // (mismo item, otra copia) → el momentum del navegador continúa desde
+    // la nueva scrollTop sin cortarse (Chrome/Safari/Firefox garantizan
+    // esto porque el ajuste se hace dentro del handler).
+    viewportEl.addEventListener('scroll', this.handleScrollReanchor, {
+      passive: true,
     });
   }
 
-  /**
-   * Si el item virtual centrado cayó en la copia superior o inferior, salta
-   * (sin animación) al item equivalente en la copia central. El contenido
-   * de las copias es idéntico → el usuario no percibe el salto.
-   */
-  private maybeReanchor(): void {
+  private handleScrollReanchor = (): void => {
     if (this.reanchorInFlight) return;
+    const viewportEl = this.viewport()?.nativeElement;
+    if (!viewportEl) return;
     const N = this.vm.semanas().length;
     if (N === 0) return;
-    const virtualIdx = this.observedVirtualIndex();
+
+    const itemH = WHEEL_ITEM_HEIGHT_PX;
+    const centerY = viewportEl.scrollTop + viewportEl.clientHeight / 2;
+
+    // Uso el item 0 para computar por aritmética la posición de cualquier
+    // virtual index — evita un querySelectorAll caro en el hot path.
+    const firstItem = viewportEl.querySelector<HTMLLIElement>(
+      '.wheel-item[data-virtual-index="0"]',
+    );
+    if (!firstItem) return;
+    const firstItemTop = firstItem.offsetTop;
+    const virtualAtCenter = Math.round((centerY - firstItemTop - itemH / 2) / itemH);
+    if (!Number.isFinite(virtualAtCenter)) return;
+
     const middleStart = N;
     const middleEnd = N * 2;
-    if (virtualIdx >= middleStart && virtualIdx < middleEnd) return;
+    if (virtualAtCenter >= middleStart && virtualAtCenter < middleEnd) return;
 
-    const targetVirtual = virtualIdx < middleStart ? virtualIdx + N : virtualIdx - N;
-
+    const delta = virtualAtCenter < middleStart ? N * itemH : -N * itemH;
     this.reanchorInFlight = true;
-    this.scrollToVirtualIndex(targetVirtual, 'instant');
-    this.observedVirtualIndex.set(targetVirtual);
-    // Libero el guard al final del tick para dar tiempo a que el observer
-    // reporte el nuevo center y no dispare otro re-anclaje inmediato.
-    queueMicrotask(() => {
+    viewportEl.scrollTop += delta;
+    // Adelanto el signal para que las clases CSS de blur se actualicen sin
+    // esperar el observer.
+    this.observedVirtualIndex.set(virtualAtCenter + delta / itemH);
+    // Libero el guard en el siguiente frame — evita cascada de re-ajustes.
+    requestAnimationFrame(() => {
       this.reanchorInFlight = false;
     });
-  }
+  };
 
   private syncSpacerHeight(): void {
     const viewportEl = this.viewport()?.nativeElement;
     if (!viewportEl) return;
     const viewportH = viewportEl.clientHeight;
-    if (viewportH === 0) return;
+    // Guards:
+    //   - viewportH === 0: aún sin layout válido, dejamos que ResizeObserver
+    //     nos vuelva a llamar cuando el navegador determine el tamaño real.
+    //   - viewportH > 10000: sanity check — un viewport de más de 10k px es
+    //     casi seguro un feedback loop CSS (flex-basis: auto con contenido
+    //     scrollable inflando su propio contenedor). Refuse to compute o
+    //     seteo un spacer astronómico que empeoraría el loop.
+    if (viewportH === 0 || viewportH > 10_000) return;
     const spacerH = Math.max(0, (viewportH - WHEEL_ITEM_HEIGHT_PX) / 2);
     const spacers = viewportEl.querySelectorAll<HTMLElement>('.wheel__spacer');
     spacers.forEach((s) => {
@@ -311,9 +363,7 @@ export class TutorAulaSemanasPage {
     this.observer = null;
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
-    if (this.scrollEndTimer !== null) {
-      clearTimeout(this.scrollEndTimer);
-      this.scrollEndTimer = null;
-    }
+    const viewportEl = this.viewport()?.nativeElement;
+    viewportEl?.removeEventListener('scroll', this.handleScrollReanchor);
   }
 }

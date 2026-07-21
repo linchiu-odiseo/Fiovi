@@ -48,7 +48,15 @@
     <section class="tutor-aula-semanas__section">
       <h2 class="section-title">Semanas</h2>
 
-      <div class="wheel" role="listbox" aria-label="Semanas del ciclo" data-testid="semanas-wheel">
+      <div
+        class="wheel"
+        role="listbox"
+        aria-label="Semanas del ciclo"
+        data-testid="semanas-wheel"
+        [attr.data-debug-items]="virtualSemanas().length"
+        [attr.data-debug-selected]="observedVirtualIndex()"
+        [attr.data-debug-semanas-count]="vm.semanas().length"
+      >
         <!-- Lens: dos líneas horizontales que demarcan el slot del item
              centrado. Sin fill de fondo — el highlight visual del centro
              viene solo de la nitidez del item (los demás están blurreados). -->
@@ -102,22 +110,24 @@
                     }
                   }
                 </div>
-                @if (i === observedVirtualIndex()) {
-                  <button
-                    type="button"
-                    class="wheel-item__enter"
-                    aria-label="Entrar a la semana"
-                    data-testid="btn-enter"
-                    (click)="$event.stopPropagation(); onEnter(semana)"
-                  >
-                    <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
-                  </button>
-                }
               </li>
             }
           </ul>
           <div class="wheel__spacer" aria-hidden="true"></div>
         </div>
+
+        <!-- Chevron fijo en el slot central de la rueda. NO viaja con los
+             items — su tap siempre entra a la semana actualmente centrada. -->
+        <button
+          type="button"
+          class="wheel__enter-btn"
+          aria-label="Entrar a la semana"
+          data-testid="btn-enter"
+          [disabled]="!vm.selectedSemana()"
+          (click)="onEnterCentered()"
+        >
+          <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
+        </button>
       </div>
 
       <p class="wheel__hint" aria-hidden="true">↕ desplazá para elegir</p>
