@@ -50,20 +50,29 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./pages/tutor-exams-list/tutor-exams-list.page').then((m) => m.TutorExamsListPage),
   },
+  // Nav mobile AULA → SEMANA → CURSO → EXÁMENES (change tutor-aulas-semanas-view).
+  // La ruta legacy `/tutor/aulas/:classroomId` (que apuntaba a la lista plana de
+  // cursos) redirige a la nueva vista de semanas — deep-links viejos siguen
+  // funcionando sin 404.
   {
     path: 'tutor/aulas/:classroomId',
+    pathMatch: 'full',
+    redirectTo: 'tutor/aulas/:classroomId/semanas',
+  },
+  {
+    path: 'tutor/aulas/:classroomId/semanas',
     canActivate: [authGuard, roleGuard('tutor')],
     loadComponent: () =>
-      import('./pages/tutor-aula-courses/tutor-aula-courses.page').then(
-        (m) => m.TutorAulaCoursesPage,
+      import('./pages/tutor-aula-semanas/tutor-aula-semanas.page').then(
+        (m) => m.TutorAulaSemanasPage,
       ),
   },
   {
-    path: 'tutor/aulas/:classroomId/curso/:course',
+    path: 'tutor/aulas/:classroomId/semanas/:periodId',
     canActivate: [authGuard, roleGuard('tutor')],
     loadComponent: () =>
-      import('./pages/tutor-aula-course-exams/tutor-aula-course-exams.page').then(
-        (m) => m.TutorAulaCourseExamsPage,
+      import('./pages/tutor-aula-semana-examenes/tutor-aula-semana-examenes.page').then(
+        (m) => m.TutorAulaSemanaExamenesPage,
       ),
   },
   {

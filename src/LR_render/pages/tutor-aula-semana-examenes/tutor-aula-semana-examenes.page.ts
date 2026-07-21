@@ -1,16 +1,21 @@
 import { Component, inject } from '@angular/core';
-import { TutorAulaCourseExamsViewModel } from '../../view-models/tutor-aula-course-exams.view-model';
+import { Router } from '@angular/router';
+import { TutorAulaSemanaExamenesViewModel } from '../../view-models/tutor-aula-semana-examenes.view-model';
 import { TutorExam } from '../../../L1_domain/entities/tutor-exam';
 import { ExamServerStatusValue } from '../../../L1_domain/value-objects/exam-server-status';
 
+// Pantalla /tutor/aulas/:classroomId/semanas/:periodId — nivel 3 del nav.
+// Muestra los exámenes de la semana ya agrupados por curso. Cada card de
+// curso expande sus exámenes inline (sin request adicional al hacer tap).
 @Component({
-  selector: 'app-tutor-aula-course-exams-page',
-  templateUrl: './tutor-aula-course-exams.page.html',
-  styleUrl: './tutor-aula-course-exams.page.scss',
-  providers: [TutorAulaCourseExamsViewModel],
+  selector: 'app-tutor-aula-semana-examenes-page',
+  templateUrl: './tutor-aula-semana-examenes.page.html',
+  styleUrl: './tutor-aula-semana-examenes.page.scss',
+  providers: [TutorAulaSemanaExamenesViewModel],
 })
-export class TutorAulaCourseExamsPage {
-  protected readonly vm = inject(TutorAulaCourseExamsViewModel);
+export class TutorAulaSemanaExamenesPage {
+  protected readonly vm = inject(TutorAulaSemanaExamenesViewModel);
+  private readonly router = inject(Router);
 
   constructor() {
     void this.vm.load();
@@ -20,12 +25,12 @@ export class TutorAulaCourseExamsPage {
     this.vm.goBack();
   }
 
-  protected onExamClick(exam: TutorExam): void {
-    this.vm.goToExam(exam);
-  }
-
   protected onRetry(): void {
     void this.vm.load();
+  }
+
+  protected onExamClick(exam: TutorExam): void {
+    void this.router.navigate(['/tutor/exams', exam.recordId]);
   }
 
   protected statusLabel(exam: TutorExam): string {

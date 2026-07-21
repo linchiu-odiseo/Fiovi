@@ -1,0 +1,100 @@
+<main class="tutor-aula-semana-examenes">
+  <nav class="tutor-aula-semana-examenes__nav">
+    <button
+      type="button"
+      class="tutor-aula-semana-examenes__btn-volver"
+      data-testid="btn-volver"
+      (click)="onVolver()"
+    >
+      <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+      Semanas
+    </button>
+  </nav>
+
+  <header class="tutor-aula-semana-examenes__header">
+    <p class="tutor-aula-semana-examenes__kicker">
+      {{ vm.classroomName() ?? 'Aula' }}
+    </p>
+    <h1 class="tutor-aula-semana-examenes__title">
+      {{ vm.semanaName() ?? 'Semana' }}
+    </h1>
+    @if (vm.startDate() && vm.endDate()) {
+      <p class="tutor-aula-semana-examenes__dates">{{ vm.startDate() }} — {{ vm.endDate() }}</p>
+    }
+  </header>
+
+  @if (vm.loading()) {
+    <section class="tutor-aula-semana-examenes__loading" aria-busy="true">
+      <p>Cargando exámenes…</p>
+    </section>
+  } @else if (vm.error() === 'network') {
+    <section class="tutor-aula-semana-examenes__error" role="alert">
+      <p>Sin conexión. Revisá tu red y reintentá.</p>
+      <button type="button" data-testid="btn-retry" (click)="onRetry()">Reintentar</button>
+    </section>
+  } @else if (vm.error() === 'forbidden') {
+    <section class="tutor-aula-semana-examenes__error" role="alert">
+      <p>No estás asignado a esta aula.</p>
+    </section>
+  } @else if (vm.error() === 'notFound') {
+    <section class="tutor-aula-semana-examenes__error" role="alert">
+      <p>No encontramos esta semana en el aula.</p>
+    </section>
+  } @else if (!vm.hasCursos()) {
+    <section class="tutor-aula-semana-examenes__section">
+      <p class="tutor-aula-semana-examenes__empty" data-testid="cursos-empty">
+        Esta semana todavía no tiene exámenes programados.
+      </p>
+    </section>
+  } @else {
+    <section class="tutor-aula-semana-examenes__section">
+      <h2 class="section-title">Cursos</h2>
+      <ul class="tutor-aula-semana-examenes__list" data-testid="cursos-list">
+        @for (grupo of vm.cursos(); track grupo.courseId ?? '__general__') {
+          <li class="curso-card" data-testid="curso-card">
+            <header class="curso-card__header">
+              <div class="curso-card__title-block">
+                <h3 class="curso-card__name">{{ grupo.displayName }}</h3>
+                @if (grupo.area) {
+                  <p class="curso-card__area">{{ grupo.area }}</p>
+                }
+              </div>
+              <span class="curso-card__count">
+                {{ grupo.total }} {{ grupo.total === 1 ? 'examen' : 'exámenes' }}
+              </span>
+            </header>
+            <ul class="curso-card__exams">
+              @for (exam of grupo.examenes; track exam.recordId) {
+                <li
+                  class="exam-row exam-row--{{ statusModifier(exam) }}"
+                  data-testid="exam-row"
+                  (click)="onExamClick(exam)"
+                  (keydown.enter)="onExamClick(exam)"
+                  role="button"
+                  tabindex="0"
+                >
+                  <div class="exam-row__body">
+                    <p class="exam-row__name">{{ exam.name }}</p>
+                    <p class="exam-row__meta">
+                      <span>{{ countDisplay(exam) }} preguntas</span>
+                      <span>·</span>
+                      <span>{{ exam.durationInMinutes }} min</span>
+                    </p>
+                  </div>
+                  <span
+                    class="exam-row__status-badge exam-row__status-badge--{{
+                      statusModifier(exam)
+                    }}"
+                    data-testid="status-badge"
+                  >
+                    {{ statusLabel(exam) }}
+                  </span>
+                </li>
+              }
+            </ul>
+          </li>
+        }
+      </ul>
+    </section>
+  }
+</main>

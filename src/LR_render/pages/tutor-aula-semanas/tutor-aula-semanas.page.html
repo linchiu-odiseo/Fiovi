@@ -1,0 +1,104 @@
+<main class="tutor-aula-semanas">
+  <nav class="tutor-aula-semanas__nav">
+    <button
+      type="button"
+      class="tutor-aula-semanas__btn-volver"
+      data-testid="btn-volver"
+      (click)="onVolver()"
+    >
+      <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+      Aulas
+    </button>
+  </nav>
+
+  <header class="tutor-aula-semanas__header">
+    <p class="tutor-aula-semanas__kicker">Aula</p>
+    <h1 class="tutor-aula-semanas__title">
+      {{ vm.classroomName() ?? 'Aula sin nombre' }}
+    </h1>
+    @if (vm.cycleName()) {
+      <p class="tutor-aula-semanas__subtitle">{{ vm.cycleName() }}</p>
+    }
+  </header>
+
+  @if (vm.loading()) {
+    <section class="tutor-aula-semanas__loading" aria-busy="true">
+      <p>Cargando semanas…</p>
+    </section>
+  } @else if (vm.error() === 'network') {
+    <section class="tutor-aula-semanas__error" role="alert">
+      <p>Sin conexión. Revisá tu red y reintentá.</p>
+      <button type="button" data-testid="btn-retry" (click)="onRetry()">Reintentar</button>
+    </section>
+  } @else if (vm.error() === 'forbidden') {
+    <section class="tutor-aula-semanas__error" role="alert">
+      <p>No estás asignado a esta aula.</p>
+    </section>
+  } @else if (vm.error() === 'notFound') {
+    <section class="tutor-aula-semanas__error" role="alert">
+      <p>No encontramos esta aula.</p>
+    </section>
+  } @else {
+    <section class="tutor-aula-semanas__section">
+      <h2 class="section-title">Semanas</h2>
+      @if (vm.hasSemanas()) {
+        <ul class="tutor-aula-semanas__list" data-testid="semanas-list">
+          @for (semana of vm.semanas(); track semana.periodId) {
+            <li
+              class="semana-card"
+              [class.semana-card--current]="esActual(semana)"
+              [class.semana-card--empty]="semana.estaVacia()"
+              data-testid="semana-card"
+              (click)="onSemanaClick(semana)"
+              (keydown.enter)="onSemanaClick(semana)"
+              role="button"
+              tabindex="0"
+            >
+              <span class="material-symbols-outlined semana-card__icon" aria-hidden="true">
+                {{ esActual(semana) ? 'radio_button_checked' : 'calendar_month' }}
+              </span>
+              <div class="semana-card__body">
+                <div class="semana-card__title-row">
+                  <h3 class="semana-card__name">{{ semana.name }}</h3>
+                  @if (esActual(semana)) {
+                    <span class="semana-card__badge semana-card__badge--current">Actual</span>
+                  }
+                </div>
+                <p class="semana-card__dates">{{ semana.startDate }} — {{ semana.endDate }}</p>
+                @if (semana.estaVacia()) {
+                  <p class="semana-card__chips-empty">Sin exámenes</p>
+                } @else {
+                  <ul class="semana-card__chips" aria-label="Contadores por estado">
+                    <li class="chip chip--total">
+                      <strong>{{ semana.examCount }}</strong>
+                      <span>{{ semana.examCount === 1 ? 'examen' : 'exámenes' }}</span>
+                    </li>
+                    @if (semana.byStatus.in_progress > 0) {
+                      <li class="chip chip--progress">
+                        <strong>{{ semana.byStatus.in_progress }}</strong>
+                        <span>en curso</span>
+                      </li>
+                    }
+                    @if (semana.byStatus.finalized > 0) {
+                      <li class="chip chip--done">
+                        <strong>{{ semana.byStatus.finalized }}</strong>
+                        <span>finalizados</span>
+                      </li>
+                    }
+                  </ul>
+                }
+              </div>
+              <span class="material-symbols-outlined semana-card__chevron" aria-hidden="true">
+                chevron_right
+              </span>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="tutor-aula-semanas__empty" data-testid="semanas-empty">
+          El ciclo de esta aula todavía no tiene semanas cargadas.
+        </p>
+      }
+    </section>
+  }
+</main>

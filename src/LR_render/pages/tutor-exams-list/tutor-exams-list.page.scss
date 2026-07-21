@@ -281,11 +281,38 @@
     gap: 0.15rem;
   }
 
+  &__title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
   &__name {
     margin: 0;
     font-size: 1.05rem;
     font-weight: 700;
     color: var(--color-on-surface);
+  }
+
+  // Badge "N en curso" derivado client-side de /tutor/exams/en-curso.
+  // Solo aparece cuando hay >0 exámenes in_progress en el aula — señala al
+  // tutor qué aula tiene actividad activa sin que tenga que entrar.
+  &__badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.5rem;
+    border-radius: var(--radius-pill);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    white-space: nowrap;
+
+    &--in-progress {
+      background: var(--color-success);
+      color: var(--color-on-primary);
+    }
   }
 
   &__cycle {
@@ -441,5 +468,13 @@
     gap: 0.75rem;
     font-size: 0.875rem;
     color: var(--color-on-surface-variant);
+    flex-wrap: wrap;
+  }
+
+  // Nombre del aula dentro del meta de la card "en curso" — el shortcut del
+  // home es cross-aula, por eso mostramos a qué aula pertenece cada examen.
+  &__classroom {
+    font-weight: 600;
+    color: var(--color-on-surface);
   }
 }
