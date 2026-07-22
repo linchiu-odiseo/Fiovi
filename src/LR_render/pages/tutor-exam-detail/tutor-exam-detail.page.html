@@ -91,35 +91,37 @@
           </div>
         </div>
       }
-      @if (detail.finishedAt) {
-        <div class="tutor-exam-detail__bp-row tutor-exam-detail__bp-row--2">
-          <div class="tutor-exam-detail__bp-cell">
-            <p class="tutor-exam-detail__bp-label">Fecha fin</p>
-            <p class="tutor-exam-detail__bp-value">{{ formatDate(detail.finishedAt) }}</p>
-          </div>
-          <div class="tutor-exam-detail__bp-cell">
-            <p class="tutor-exam-detail__bp-label">Hora fin</p>
-            <p class="tutor-exam-detail__bp-value">{{ formatTime(detail.finishedAt) }}</p>
-          </div>
-        </div>
-      }
+      <!-- Nota: no repetimos "Fecha fin / Hora fin" — la celda countdown
+           de abajo ya muestra "Cerrado a las HH:MM" cuando finaliza. -->
 
       <!-- Celda countdown: destaca dentro del cajetín. Aparece solo cuando
-           hay cierre determinable (started !== null). El label pasa de
-           "Cierra a las" (in_progress) a "Cerrado a las" (finalized) — el
-           countdown queda en "00:00" congelado. -->
+           hay cierre determinable (started !== null). Mientras el examen
+           está en curso muestra "Cierra a las HH:MM" + MM:SS + "Tiempo
+           restante". Una vez finalizado, colapsa a solo "Cerrado a las
+           HH:MM" — el 00:00 congelado no aporta información y el label
+           basta como cierre visual. -->
       @if (vm.closeTimeText()) {
         <div
           class="tutor-exam-detail__bp-cell tutor-exam-detail__bp-cell--countdown"
+          [class.tutor-exam-detail__bp-cell--countdown-finalized]="!canFinalizar()"
           data-testid="tutor-countdown"
         >
-          <p class="tutor-exam-detail__bp-label">
-            {{ vm.closeLabelPrefix() }} {{ vm.closeTimeText() }}
-          </p>
-          <p class="tutor-exam-detail__bp-countdown">{{ vm.countdownRestante() }}</p>
-          <p class="tutor-exam-detail__bp-label tutor-exam-detail__bp-label--sub">
-            Tiempo restante
-          </p>
+          @if (canFinalizar()) {
+            <p class="tutor-exam-detail__bp-label">
+              {{ vm.closeLabelPrefix() }} {{ vm.closeTimeText() }}
+            </p>
+            <p class="tutor-exam-detail__bp-countdown">{{ vm.countdownRestante() }}</p>
+            <p class="tutor-exam-detail__bp-label tutor-exam-detail__bp-label--sub">
+              Tiempo restante
+            </p>
+          } @else {
+            <!-- Post-finalize: una sola línea grande con "CERRADO A LAS HH:MM"
+                 — sin partir el label del valor. Tipografía uppercase mono
+                 más grande que el label chico, para que sea el foco visual. -->
+            <p class="tutor-exam-detail__bp-closed-line">
+              {{ vm.closeLabelPrefix() }} {{ vm.closeTimeText() }}
+            </p>
+          }
         </div>
       }
     </section>
@@ -285,34 +287,39 @@
         </span>
       </div>
       <!-- Lista compacta estilo iOS Settings: una sola card contenedora con
-           dividers internos, filas densas (~44px) para escanear cómodamente
-           60+ alumnos sin scroll infinito. -->
+           dividers internos, filas densas para escanear cómodamente 60+
+           alumnos sin scroll infinito. Cada fila es un label que envuelve
+           el checkbox custom + nombre — click en cualquier parte del label
+           toggle el checkbox (área táctil grande). El input real está
+           visualmente oculto pero accesible por teclado y screen readers. -->
       <ul class="tutor-exam-detail__student-list">
         @for (student of vm.students(); track student.studentId) {
           <li class="tutor-exam-detail__student-item" data-testid="student-item">
-            <!--
-              Checkbox pausado hasta definir la UX de "desactivar alumno" en
-              curso. El toggle sigue existiendo en el VM (`onToggleStudent`)
-              y en los tests; solo se ocultó del DOM. Cuando se defina el
-              flujo, descomentar y volver a testear.
-
+            <label class="tutor-exam-detail__student-label">
               <input
                 type="checkbox"
+                class="tutor-exam-detail__student-checkbox-input"
                 data-testid="student-checkbox"
                 [checked]="isStudentEnabled(student.studentId)"
                 [disabled]="isCheckboxDisabled(student)"
                 (change)="onToggleStudent(student.studentId)"
               />
-            -->
-            <span class="tutor-exam-detail__student-name">
-              {{ student.firstName }} {{ student.lastName }}
-            </span>
-            @if (student.hasSubmitted) {
-              <span class="tutor-exam-detail__submitted-badge">
-                <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
-                Entregado
+              <span
+                class="tutor-exam-detail__student-checkbox"
+                aria-hidden="true"
+              >
+                <span class="material-symbols-outlined">check</span>
               </span>
-            }
+              <span class="tutor-exam-detail__student-name">
+                {{ student.firstName }} {{ student.lastName }}
+              </span>
+              @if (student.hasSubmitted) {
+                <span class="tutor-exam-detail__submitted-badge">
+                  <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+                  Entregado
+                </span>
+              }
+            </label>
           </li>
         } @empty {
           <li class="tutor-exam-detail__no-students">
@@ -361,6 +368,51 @@
           Archivar
         </button>
       </section>
+    }
+
+    <!-- Modal: confirmar deshabilitar alumno mientras el examen está en curso.
+         El alumno queda fuera del set de habilitados; al finalizar el grader
+         lo ignora (sin nota). Pedimos confirmación explícita para evitar
+         cambios accidentales con exam en vivo. -->
+    @if (vm.desactivarModalOpen()) {
+      <div
+        class="tutor-exam-detail__modal-backdrop"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="desactivar-modal-title"
+        data-testid="desactivar-modal"
+      >
+        <div class="tutor-exam-detail__modal">
+          <h2 id="desactivar-modal-title" class="tutor-exam-detail__modal-title">
+            Deshabilitar alumno
+          </h2>
+          <p class="tutor-exam-detail__modal-hint">
+            ¿Seguro que querés deshabilitar a
+            <strong>{{ pendingDesactivarStudentName() }}</strong>? El examen ya
+            está en curso — el alumno no aparecerá en las notas al finalizar.
+          </p>
+          <div class="tutor-exam-detail__modal-actions tutor-exam-detail__modal-actions--stacked">
+            <button
+              type="button"
+              class="tutor-exam-detail__modal-confirm tutor-exam-detail__modal-confirm--danger tutor-exam-detail__modal-confirm--large"
+              data-testid="btn-confirm-desactivar"
+              [disabled]="vm.isSaving()"
+              (click)="onConfirmDesactivar()"
+            >
+              Sí, deshabilitar
+            </button>
+            <button
+              type="button"
+              class="tutor-exam-detail__modal-cancel tutor-exam-detail__modal-cancel--large"
+              data-testid="btn-cancel-desactivar"
+              [disabled]="vm.isSaving()"
+              (click)="onCancelDesactivar()"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
     }
 
     <!-- Modal: confirmar archivar (irreversible desde la vista del tutor). -->

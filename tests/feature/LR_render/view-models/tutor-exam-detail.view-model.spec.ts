@@ -793,6 +793,136 @@ describe('TutorExamDetailViewModel', () => {
     });
   });
 
+  describe('Scenario: requestToggleStudent — modal confirmación al deshabilitar en curso', () => {
+    it('scheduled + activar: toggle directo, no abre modal', async () => {
+      const { vm, store, fakeGetDetail, fakeListStudents, fakeActualizar } = setup('rec-1');
+
+      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1' })]);
+      fakeGetDetail.willResolve(
+        buildDetail({
+          status: new ExamServerStatus('scheduled'),
+          enabledStudentIds: ['s-1'],
+        }),
+      );
+      fakeListStudents.willResolve([
+        buildStudent({ studentId: 's-1' }),
+        buildStudent({ studentId: 's-2' }),
+      ]);
+      fakeActualizar.willResolve();
+
+      await vm.load();
+      vm.requestToggleStudent('s-2');
+
+      // Modal cerrado, PATCH lanzado inmediatamente.
+      expect(vm.desactivarModalOpen()).toBe(false);
+      // Esperar al microtask del toggle async.
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(fakeActualizar.callCount).toBe(1);
+    });
+
+    it('in_progress + activar: toggle directo (habilitar es acción segura)', async () => {
+      const { vm, store, fakeGetDetail, fakeListStudents, fakeActualizar } = setup('rec-1');
+
+      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1' })]);
+      fakeGetDetail.willResolve(
+        buildDetail({
+          status: new ExamServerStatus('in_progress'),
+          enabledStudentIds: ['s-1'],
+        }),
+      );
+      fakeListStudents.willResolve([
+        buildStudent({ studentId: 's-1' }),
+        buildStudent({ studentId: 's-2', enabled: false }),
+      ]);
+      fakeActualizar.willResolve();
+
+      await vm.load();
+      vm.requestToggleStudent('s-2'); // s-2 no está enabled → activar
+
+      expect(vm.desactivarModalOpen()).toBe(false);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(fakeActualizar.callCount).toBe(1);
+    });
+
+    it('in_progress + desactivar: abre modal, NO dispara PATCH aún', async () => {
+      const { vm, store, fakeGetDetail, fakeListStudents, fakeActualizar } = setup('rec-1');
+
+      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1' })]);
+      fakeGetDetail.willResolve(
+        buildDetail({
+          status: new ExamServerStatus('in_progress'),
+          enabledStudentIds: ['s-1', 's-2'],
+        }),
+      );
+      fakeListStudents.willResolve([
+        buildStudent({ studentId: 's-1' }),
+        buildStudent({ studentId: 's-2' }),
+      ]);
+      fakeActualizar.willResolve();
+
+      await vm.load();
+      vm.requestToggleStudent('s-2'); // s-2 está enabled → desactivar
+
+      expect(vm.desactivarModalOpen()).toBe(true);
+      expect(vm.desactivarPendingStudentId()).toBe('s-2');
+      expect(fakeActualizar.callCount).toBe(0);
+    });
+
+    it('confirmDesactivarStudent aplica el toggle real y cierra el modal', async () => {
+      const { vm, store, fakeGetDetail, fakeListStudents, fakeActualizar } = setup('rec-1');
+
+      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1' })]);
+      fakeGetDetail.willResolve(
+        buildDetail({
+          status: new ExamServerStatus('in_progress'),
+          enabledStudentIds: ['s-1', 's-2'],
+        }),
+      );
+      fakeListStudents.willResolve([
+        buildStudent({ studentId: 's-1' }),
+        buildStudent({ studentId: 's-2' }),
+      ]);
+      fakeActualizar.willResolve();
+
+      await vm.load();
+      vm.requestToggleStudent('s-2');
+      await vm.confirmDesactivarStudent();
+
+      expect(vm.desactivarModalOpen()).toBe(false);
+      expect(vm.desactivarPendingStudentId()).toBeNull();
+      expect(fakeActualizar.callCount).toBe(1);
+      expect(vm.enabledStudentIds()).not.toContain('s-2');
+    });
+
+    it('cancelDesactivarStudent cierra el modal sin PATCH', async () => {
+      const { vm, store, fakeGetDetail, fakeListStudents, fakeActualizar } = setup('rec-1');
+
+      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1' })]);
+      fakeGetDetail.willResolve(
+        buildDetail({
+          status: new ExamServerStatus('in_progress'),
+          enabledStudentIds: ['s-1', 's-2'],
+        }),
+      );
+      fakeListStudents.willResolve([
+        buildStudent({ studentId: 's-1' }),
+        buildStudent({ studentId: 's-2' }),
+      ]);
+      fakeActualizar.willResolve();
+
+      await vm.load();
+      vm.requestToggleStudent('s-2');
+      vm.cancelDesactivarStudent();
+
+      expect(vm.desactivarModalOpen()).toBe(false);
+      expect(vm.desactivarPendingStudentId()).toBeNull();
+      expect(fakeActualizar.callCount).toBe(0);
+      expect(vm.enabledStudentIds()).toContain('s-2'); // sin cambios
+    });
+  });
+
   describe('Scenario: PATCH falla — enabledStudentIds se revierte', () => {
     it('ExamConflictError → enabledStudentIds vuelve al valor anterior', async () => {
       const { vm, store, fakeGetDetail, fakeListStudents, fakeActualizar } = setup('rec-1');

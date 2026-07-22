@@ -65,6 +65,9 @@ class FakeTutorExamDetailViewModel {
   readonly finalizarModalOpen: WritableSignal<boolean> = signal(false);
   // Modal "confirmar archivar" (post-finalize).
   readonly archivarModalOpen: WritableSignal<boolean> = signal(false);
+  // Modal "confirmar deshabilitar alumno en curso".
+  readonly desactivarModalOpen: WritableSignal<boolean> = signal(false);
+  readonly desactivarPendingStudentId: WritableSignal<string | null> = signal(null);
   // Contadores del panel de alumnos.
   readonly enabledCount = () => this.enabledStudentIds().length;
   readonly totalStudents = () => this.students().length;
@@ -100,6 +103,15 @@ class FakeTutorExamDetailViewModel {
   });
   confirmArchivarModal = vi.fn(async () => {
     this.archivarModalOpen.set(false);
+  });
+  requestToggleStudent = vi.fn();
+  confirmDesactivarStudent = vi.fn(async () => {
+    this.desactivarModalOpen.set(false);
+    this.desactivarPendingStudentId.set(null);
+  });
+  cancelDesactivarStudent = vi.fn(() => {
+    this.desactivarModalOpen.set(false);
+    this.desactivarPendingStudentId.set(null);
   });
 
   // Countdown en vivo (mismo shape que el simulacro del alumno). En el fake
@@ -321,11 +333,7 @@ describe('TutorExamDetailPage', () => {
   // ── Checkbox disabled states ───────────────────────────────────────────────
 
   describe('Scenario: Checkbox de alumno con hasSubmitted deshabilitado (D5)', () => {
-    // SKIP: el checkbox está comentado en el HTML mientras se define la UX
-    // de "desactivar alumno en curso". El guard sigue en `isCheckboxDisabled`
-    // (view-model) y en su spec. Al descomentar el input en la page,
-    // reactivar este test también.
-    it.skip('checkbox de alumno con hasSubmitted=true está disabled', async () => {
+    it('checkbox de alumno con hasSubmitted=true está disabled', async () => {
       const submitted = buildStudent({ studentId: 's-sub', hasSubmitted: true });
       fakeVm.students.set([submitted]);
       fakeVm.detail.set(buildDetail({ status: new ExamServerStatus('scheduled') }));
@@ -346,9 +354,7 @@ describe('TutorExamDetailPage', () => {
   });
 
   describe('Scenario: Checkboxes deshabilitados en modo finalized (D5)', () => {
-    // SKIP: mismo motivo — checkbox pausado en el HTML hasta definir UX.
-    // Reactivar al descomentar el input.
-    it.skip('todos los checkboxes disabled cuando status=finalized', async () => {
+    it('todos los checkboxes disabled cuando status=finalized', async () => {
       fakeVm.students.set([
         buildStudent({ studentId: 's-1', hasSubmitted: false }),
         buildStudent({ studentId: 's-2', hasSubmitted: false }),

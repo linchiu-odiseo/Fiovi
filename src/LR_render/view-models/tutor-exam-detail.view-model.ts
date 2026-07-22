@@ -24,10 +24,11 @@ import { TutorExamForbiddenError } from '../../L1_domain/errors/tutor-exam-forbi
 // alumno — la referencia es el `Clock` server-anchored, nunca Date.now().
 const COUNTDOWN_TICK_MS = 1_000;
 
-// Umbral de formato del countdown. Mismo que en simulacro.view-model.ts —
-// arriba de 5 min mostramos texto verbal ("X min restantes"), abajo el
-// MM:SS digital que da sensación de urgencia y actualiza cada segundo.
-const SHOW_SECONDS_BELOW_MS = 5 * 60_000;
+// El countdown del tutor siempre corre en formato digital (MM:SS o HH:MM:SS
+// según duración) — a diferencia del simulacro del alumno, que arriba de 5
+// min degrada a "X min restantes" para no distraer al que está marcando.
+// Acá el tutor es un observador, y ver el reloj corriendo entero da un
+// feedback más claro del estado del examen.
 
 // Un único refresh diferido tras cruzar el cierre local del countdown:
 // da al back el tiempo del grace del auto-finalize (5s post-cierre) + un
@@ -155,6 +156,13 @@ export class TutorExamDetailViewModel {
   // del tutor — el back retorna sólo no-archived — por eso pedimos confirmación
   // explícita antes de sacarlo de la vista.
   readonly archivarModalOpen = signal(false);
+
+  // Modal de confirmación para deshabilitar un alumno mientras el examen
+  // está EN CURSO. Mientras scheduled, el toggle es directo sin modal.
+  // `desactivarPendingStudentId` guarda el id del alumno cuyo toggle está
+  // pendiente de confirmación — null cuando el modal no está abierto.
+  readonly desactivarModalOpen = signal(false);
+  readonly desactivarPendingStudentId = signal<string | null>(null);
 
   // Cuenta de alumnos habilitados en tiempo real (lo que el tutor ve en la
   // lista con checkboxes). Total = alumnos del aula.
@@ -461,6 +469,47 @@ export class TutorExamDetailViewModel {
     }
   }
 
+  /**
+   * Punto de entrada del toggle desde el UI. Decide si abrir el modal de
+   * confirmación o aplicar el toggle directo:
+   *   - `scheduled` → toggle directo (activar/desactivar sin fricción).
+   *   - `in_progress` + está ACTIVO → abre modal (desactivar en curso es
+   *     irreversible en la práctica: el alumno queda sin nota al finalizar).
+   *   - `in_progress` + está INACTIVO → toggle directo (habilitar no
+   *     necesita confirmación, es una acción "segura").
+   *   - `finalized` → no llega acá (el guard visual bloquea el input).
+   */
+  requestToggleStudent(studentId: string): void {
+    const d = this.detail();
+    if (!d) return;
+    const isCurrentlyEnabled = this.enabledStudentIds().includes(studentId);
+    if (d.status.is('in_progress') && isCurrentlyEnabled) {
+      this.desactivarPendingStudentId.set(studentId);
+      this.desactivarModalOpen.set(true);
+      return;
+    }
+    void this.toggleStudent(studentId);
+  }
+
+  /**
+   * Confirma la deshabilitación pendiente desde el modal. Cierra el modal
+   * y dispara el toggle real. Silencioso si no hay pending (defensa por
+   * doble click).
+   */
+  async confirmDesactivarStudent(): Promise<void> {
+    const studentId = this.desactivarPendingStudentId();
+    this.desactivarModalOpen.set(false);
+    this.desactivarPendingStudentId.set(null);
+    if (studentId === null) return;
+    await this.toggleStudent(studentId);
+  }
+
+  /** Cierra el modal sin aplicar cambios. El checkbox visual queda como estaba. */
+  cancelDesactivarStudent(): void {
+    this.desactivarModalOpen.set(false);
+    this.desactivarPendingStudentId.set(null);
+  }
+
   // Alterna el estado habilitado de un alumno.
   // Actualiza enabledStudentIds localmente (optimistic) y dispara el PATCH.
   // En error → revierte enabledStudentIds y setea actionError (D5 rollback).
@@ -647,15 +696,35 @@ export class TutorExamDetailViewModel {
    * countdown, con jitter simétrico para dispersar el pico cuando 500
    * clientes cruzan el cierre a la misma hora. `Math.random()` alcanza:
    * no necesitamos jitter criptográfico, sólo dispersión estadística.
+   *
+   * Reintento condicional: si el refresh falla (network) o si el back
+   * responde todavía en `in_progress` (auto-finalize del backend aún no
+   * procesó por lag), liberamos el guard para que el próximo tick del
+   * countdown pueda re-agendar. El setTimeout de 10s + jitter actúa como
+   * throttle natural, así que "reintento" no es spam.
    */
   private schedulePostCierreRefresh(recordId: string): void {
     if (this.stopped) return;
     const jitter = Math.random() * 2 * POST_CIERRE_JITTER_MS - POST_CIERRE_JITTER_MS;
     const delay = POST_CIERRE_REFRESH_MS + jitter;
-    this.postCierreTimer = setTimeout(() => {
+    this.postCierreTimer = setTimeout(async () => {
       this.postCierreTimer = null;
       if (this.stopped) return;
-      void this.reloadDetail(recordId);
+      try {
+        await this.reloadDetail(recordId);
+        const d = this.detail();
+        if (d && d.status.is('in_progress')) {
+          // Back aún no finalizó (lag del auto-finalize). Liberá el guard
+          // para permitir un segundo intento en el próximo tick.
+          this.postCierreRefreshDone.delete(recordId);
+        }
+      } catch {
+        // Error de red / timeout: liberamos el guard para permitir reintento.
+        // No mostramos actionError — el poll normal / navegación posterior
+        // levantará el estado real; molestar al tutor con un banner por un
+        // refresh diferido interno sería confuso.
+        this.postCierreRefreshDone.delete(recordId);
+      }
     }, delay);
   }
 
@@ -692,14 +761,13 @@ function formatHHMM(d: Date): string {
 
 function formatRestante(ms: number): string {
   if (ms <= 0) return '00:00';
-  if (ms >= SHOW_SECONDS_BELOW_MS) {
-    const mins = Math.ceil(ms / 60_000);
-    return `${mins} min restantes`;
-  }
   const totalSeconds = Math.ceil(ms / 1_000);
-  const mm = Math.floor(totalSeconds / 60)
-    .toString()
-    .padStart(2, '0');
-  const ss = (totalSeconds % 60).toString().padStart(2, '0');
-  return `${mm}:${ss}`;
+  const hh = Math.floor(totalSeconds / 3600);
+  const mm = Math.floor((totalSeconds % 3600) / 60);
+  const ss = totalSeconds % 60;
+  const pad = (n: number): string => n.toString().padStart(2, '0');
+  // Solo mostramos las horas cuando aportan — un examen de 15 min no debería
+  // ver "00:15:00", pero uno de 90 min sí "01:30:00" (más natural que 90:00).
+  if (hh > 0) return `${pad(hh)}:${pad(mm)}:${pad(ss)}`;
+  return `${pad(mm)}:${pad(ss)}`;
 }

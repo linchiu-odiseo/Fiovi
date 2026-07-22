@@ -139,7 +139,24 @@ export class TutorExamDetailPage {
   }
 
   protected onToggleStudent(studentId: string): void {
-    void this.vm.toggleStudent(studentId);
+    this.vm.requestToggleStudent(studentId);
+  }
+
+  protected onConfirmDesactivar(): void {
+    void this.vm.confirmDesactivarStudent();
+  }
+
+  protected onCancelDesactivar(): void {
+    this.vm.cancelDesactivarStudent();
+  }
+
+  /** Nombre del alumno cuyo desactivar está pendiente — para el copy del modal. */
+  protected pendingDesactivarStudentName(): string {
+    const id = this.vm.desactivarPendingStudentId();
+    if (id === null) return '';
+    const s = this.vm.students().find((x) => x.studentId === id);
+    if (!s) return '';
+    return `${s.firstName} ${s.lastName}`;
   }
 
   protected onRetry(): void {
