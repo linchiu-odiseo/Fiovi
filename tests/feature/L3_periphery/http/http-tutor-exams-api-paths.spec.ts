@@ -69,6 +69,20 @@ describe('apiPath — helpers del tutor (con slug dinámico)', () => {
     });
   });
 
+  describe('virtualExamArchive(slug, recordId)', () => {
+    it('retorna <base>/virtual-exams/rec-1/archive', () => {
+      expect(apiPath.virtualExamArchive(TEST_SLUG, 'rec-1')).toBe(
+        `${BASE}/virtual-exams/rec-1/archive`,
+      );
+    });
+
+    it('aplica encodeURIComponent sobre recordId con "/" especial', () => {
+      expect(apiPath.virtualExamArchive(TEST_SLUG, 'foo/bar')).toBe(
+        `${BASE}/virtual-exams/foo%2Fbar/archive`,
+      );
+    });
+  });
+
   describe('coexistencia con helpers pre-existentes', () => {
     it('los helpers del tutor conviven con los globales y del alumno', () => {
       // Globales (sin slug).
@@ -86,6 +100,7 @@ describe('apiPath — helpers del tutor (con slug dinámico)', () => {
       expect(typeof apiPath.virtualExamEnabledStudents).toBe('function');
       expect(typeof apiPath.virtualExamStart).toBe('function');
       expect(typeof apiPath.virtualExamFinalize).toBe('function');
+      expect(typeof apiPath.virtualExamArchive).toBe('function');
     });
   });
 });

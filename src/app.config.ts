@@ -78,6 +78,7 @@ import { GetTutorExamDetailUseCase } from './L2_application/use-cases/get-tutor-
 import { ListClassroomStudentsUseCase } from './L2_application/use-cases/list-classroom-students.use-case';
 import { IniciarExamenUseCase } from './L2_application/use-cases/iniciar-examen.use-case';
 import { FinalizarExamenUseCase } from './L2_application/use-cases/finalizar-examen.use-case';
+import { ArchivarExamenUseCase } from './L2_application/use-cases/archivar-examen.use-case';
 import { ActualizarAlumnosHabilitadosUseCase } from './L2_application/use-cases/actualizar-alumnos-habilitados.use-case';
 import { GetAulaSemanasUseCase } from './L2_application/use-cases/get-aula-semanas.use-case';
 import { GetAulaSemanaExamenesUseCase } from './L2_application/use-cases/get-aula-semana-examenes.use-case';
@@ -300,6 +301,11 @@ export const appConfig: ApplicationConfig = {
     {
       provide: FinalizarExamenUseCase,
       useFactory: (api: TutorExamsApi) => new FinalizarExamenUseCase(api),
+      deps: [TUTOR_EXAMS_API],
+    },
+    {
+      provide: ArchivarExamenUseCase,
+      useFactory: (api: TutorExamsApi) => new ArchivarExamenUseCase(api),
       deps: [TUTOR_EXAMS_API],
     },
     {

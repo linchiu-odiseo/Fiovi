@@ -122,5 +122,5 @@ Hoy no hay change activo (último archivado: `2026-06-19-draft-auto-save`).
 - **Credenciales seed de dev**:
   - Alumno: `79507732@vonex.edu.pe` / `79507732`.
   - Tutor: `tutor1@vonex.pe` / `tutor123`.
-- **`.env`** tiene solo `API_BASE_URL` y `APP_VERSION` como requeridos (más flags opcionales: `DRAFT_ENABLED`, `DEV_TOOLS`). Si faltan, el dev server falla en el hook `predev` con mensaje claro. `TENANT_SLUG` quedó deprecado — el slug se descubre en runtime post-login (ver regla #6).
+- **`.env`** tiene solo `API_BASE_URL` como requerido (más flags opcionales: `DRAFT_ENABLED`, `DEV_TOOLS`, `CAPTCHA_PROVIDER`, `PUBLIC_CAPTCHA_SITE_KEY`). Si falta el requerido, el dev server falla en el hook `predev` con mensaje claro. `TENANT_SLUG` quedó deprecado — el slug se descubre en runtime post-login (ver regla #6). `APP_VERSION` salió de `.env` y ahora vive en `package.json.version`: bumpear con `npm version patch|minor|major`.
 - **Plataforma de dev**: Windows + PowerShell. Comandos POSIX vía Bash tool funcionan; usar `/` en paths.

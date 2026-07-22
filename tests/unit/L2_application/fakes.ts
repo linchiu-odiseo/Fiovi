@@ -482,6 +482,32 @@ export class FakeTutorExamsApi implements TutorExamsApi {
     if (this.nextFinalizar.kind === 'reject') throw this.nextFinalizar.error;
     return this.nextFinalizar.result;
   }
+
+  // --- archivar ---
+  private nextArchivar: { kind: 'resolve' } | { kind: 'reject'; error: Error } | null = null;
+  private archivarCalls: string[] = [];
+
+  willResolveArchivar(): void {
+    this.nextArchivar = { kind: 'resolve' };
+  }
+
+  willRejectArchivar(error: Error): void {
+    this.nextArchivar = { kind: 'reject', error };
+  }
+
+  getArchivarCalls(): readonly string[] {
+    return this.archivarCalls;
+  }
+
+  async archivar(recordId: string): Promise<void> {
+    this.archivarCalls.push(recordId);
+    if (!this.nextArchivar) {
+      throw new Error(
+        'FakeTutorExamsApi: configurar willResolveArchivar o willRejectArchivar antes de llamar archivar()',
+      );
+    }
+    if (this.nextArchivar.kind === 'reject') throw this.nextArchivar.error;
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -71,4 +71,7 @@ export const apiPath = {
   // Response 200 (no 202/204) con `{transitioned, jobId?}` — ver design R2.
   virtualExamFinalize: (slug: string, recordId: string): string =>
     `${tenantBase(slug)}/virtual-exams/${encodeURIComponent(recordId)}/finalize`,
+  // Transición finalized → archived. Response 204 No Content, sin body.
+  virtualExamArchive: (slug: string, recordId: string): string =>
+    `${tenantBase(slug)}/virtual-exams/${encodeURIComponent(recordId)}/archive`,
 };

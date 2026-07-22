@@ -8,6 +8,7 @@ import { GetTutorExamDetailUseCase } from '../../../../src/L2_application/use-ca
 import { ListClassroomStudentsUseCase } from '../../../../src/L2_application/use-cases/list-classroom-students.use-case';
 import { IniciarExamenUseCase } from '../../../../src/L2_application/use-cases/iniciar-examen.use-case';
 import { FinalizarExamenUseCase } from '../../../../src/L2_application/use-cases/finalizar-examen.use-case';
+import { ArchivarExamenUseCase } from '../../../../src/L2_application/use-cases/archivar-examen.use-case';
 import { ActualizarAlumnosHabilitadosUseCase } from '../../../../src/L2_application/use-cases/actualizar-alumnos-habilitados.use-case';
 import { TutorExam } from '../../../../src/L1_domain/entities/tutor-exam';
 import { TutorExamDetail } from '../../../../src/L1_domain/value-objects/tutor-exam-detail';
@@ -17,6 +18,25 @@ import { NetworkError } from '../../../../src/L1_domain/errors/network.error';
 import { ExamConflictError } from '../../../../src/L1_domain/errors/exam-conflict.error';
 import { ExamPreconditionError } from '../../../../src/L1_domain/errors/exam-precondition.error';
 import { FinalizeResult } from '../../../../src/L1_domain/ports/tutor-exams-api';
+import { CLOCK } from '../../../../src/app.config';
+import { Clock } from '../../../../src/L1_domain/ports/clock';
+import { ServerTime } from '../../../../src/L1_domain/value-objects/server-time';
+
+// FakeClock — el VM inyecta CLOCK para el countdown de "cierra a las HH:MM".
+// setNow() alcanza; setServerTime es no-op porque los tests no ejercitan el
+// server-time-sync (eso lo cubre el spec de simulacro).
+class FakeClock implements Clock {
+  private current: Date = new Date('2026-06-11T10:00:00Z');
+  setNow(d: Date) {
+    this.current = d;
+  }
+  now(): Date {
+    return this.current;
+  }
+  setServerTime(_st: ServerTime): void {
+    /* no-op */
+  }
+}
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -171,6 +191,24 @@ class FakeFinalizarExamenUseCase {
   }
 }
 
+class FakeArchivarExamenUseCase {
+  callCount = 0;
+  lastRecordId: string | null = null;
+  private _next: { kind: 'resolve' } | { kind: 'reject'; error: Error } = { kind: 'resolve' };
+
+  willResolve() {
+    this._next = { kind: 'resolve' };
+  }
+  willReject(error: Error) {
+    this._next = { kind: 'reject', error };
+  }
+  async execute(req: { recordId: string }): Promise<void> {
+    this.callCount++;
+    this.lastRecordId = req.recordId;
+    if (this._next.kind === 'reject') throw this._next.error;
+  }
+}
+
 class FakeActualizarAlumnosHabilitadosUseCase {
   callCount = 0;
   lastCall: { recordId: string; enabledStudentIds: readonly string[] } | null = null;
@@ -199,6 +237,7 @@ function setup(recordId = 'rec-1') {
   const fakeListStudents = new FakeListClassroomStudentsUseCase();
   const fakeIniciar = new FakeIniciarExamenUseCase();
   const fakeFinalizar = new FakeFinalizarExamenUseCase();
+  const fakeArchivar = new FakeArchivarExamenUseCase();
   const fakeActualizar = new FakeActualizarAlumnosHabilitadosUseCase();
 
   TestBed.resetTestingModule();
@@ -210,7 +249,9 @@ function setup(recordId = 'rec-1') {
       { provide: ListClassroomStudentsUseCase, useValue: fakeListStudents },
       { provide: IniciarExamenUseCase, useValue: fakeIniciar },
       { provide: FinalizarExamenUseCase, useValue: fakeFinalizar },
+      { provide: ArchivarExamenUseCase, useValue: fakeArchivar },
       { provide: ActualizarAlumnosHabilitadosUseCase, useValue: fakeActualizar },
+      { provide: CLOCK, useValue: new FakeClock() },
       {
         provide: ActivatedRoute,
         useValue: { snapshot: { paramMap: { get: () => recordId } } },
@@ -229,6 +270,7 @@ function setup(recordId = 'rec-1') {
     fakeListStudents,
     fakeIniciar,
     fakeFinalizar,
+    fakeArchivar,
     fakeActualizar,
   };
 }
@@ -748,6 +790,136 @@ describe('TutorExamDetailViewModel', () => {
       await vm.toggleStudent('s-2');
 
       expect(vm.actionError()).toBeNull();
+    });
+  });
+
+  describe('Scenario: requestToggleStudent — modal confirmación al deshabilitar en curso', () => {
+    it('scheduled + activar: toggle directo, no abre modal', async () => {
+      const { vm, store, fakeGetDetail, fakeListStudents, fakeActualizar } = setup('rec-1');
+
+      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1' })]);
+      fakeGetDetail.willResolve(
+        buildDetail({
+          status: new ExamServerStatus('scheduled'),
+          enabledStudentIds: ['s-1'],
+        }),
+      );
+      fakeListStudents.willResolve([
+        buildStudent({ studentId: 's-1' }),
+        buildStudent({ studentId: 's-2' }),
+      ]);
+      fakeActualizar.willResolve();
+
+      await vm.load();
+      vm.requestToggleStudent('s-2');
+
+      // Modal cerrado, PATCH lanzado inmediatamente.
+      expect(vm.desactivarModalOpen()).toBe(false);
+      // Esperar al microtask del toggle async.
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(fakeActualizar.callCount).toBe(1);
+    });
+
+    it('in_progress + activar: toggle directo (habilitar es acción segura)', async () => {
+      const { vm, store, fakeGetDetail, fakeListStudents, fakeActualizar } = setup('rec-1');
+
+      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1' })]);
+      fakeGetDetail.willResolve(
+        buildDetail({
+          status: new ExamServerStatus('in_progress'),
+          enabledStudentIds: ['s-1'],
+        }),
+      );
+      fakeListStudents.willResolve([
+        buildStudent({ studentId: 's-1' }),
+        buildStudent({ studentId: 's-2', enabled: false }),
+      ]);
+      fakeActualizar.willResolve();
+
+      await vm.load();
+      vm.requestToggleStudent('s-2'); // s-2 no está enabled → activar
+
+      expect(vm.desactivarModalOpen()).toBe(false);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(fakeActualizar.callCount).toBe(1);
+    });
+
+    it('in_progress + desactivar: abre modal, NO dispara PATCH aún', async () => {
+      const { vm, store, fakeGetDetail, fakeListStudents, fakeActualizar } = setup('rec-1');
+
+      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1' })]);
+      fakeGetDetail.willResolve(
+        buildDetail({
+          status: new ExamServerStatus('in_progress'),
+          enabledStudentIds: ['s-1', 's-2'],
+        }),
+      );
+      fakeListStudents.willResolve([
+        buildStudent({ studentId: 's-1' }),
+        buildStudent({ studentId: 's-2' }),
+      ]);
+      fakeActualizar.willResolve();
+
+      await vm.load();
+      vm.requestToggleStudent('s-2'); // s-2 está enabled → desactivar
+
+      expect(vm.desactivarModalOpen()).toBe(true);
+      expect(vm.desactivarPendingStudentId()).toBe('s-2');
+      expect(fakeActualizar.callCount).toBe(0);
+    });
+
+    it('confirmDesactivarStudent aplica el toggle real y cierra el modal', async () => {
+      const { vm, store, fakeGetDetail, fakeListStudents, fakeActualizar } = setup('rec-1');
+
+      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1' })]);
+      fakeGetDetail.willResolve(
+        buildDetail({
+          status: new ExamServerStatus('in_progress'),
+          enabledStudentIds: ['s-1', 's-2'],
+        }),
+      );
+      fakeListStudents.willResolve([
+        buildStudent({ studentId: 's-1' }),
+        buildStudent({ studentId: 's-2' }),
+      ]);
+      fakeActualizar.willResolve();
+
+      await vm.load();
+      vm.requestToggleStudent('s-2');
+      await vm.confirmDesactivarStudent();
+
+      expect(vm.desactivarModalOpen()).toBe(false);
+      expect(vm.desactivarPendingStudentId()).toBeNull();
+      expect(fakeActualizar.callCount).toBe(1);
+      expect(vm.enabledStudentIds()).not.toContain('s-2');
+    });
+
+    it('cancelDesactivarStudent cierra el modal sin PATCH', async () => {
+      const { vm, store, fakeGetDetail, fakeListStudents, fakeActualizar } = setup('rec-1');
+
+      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1' })]);
+      fakeGetDetail.willResolve(
+        buildDetail({
+          status: new ExamServerStatus('in_progress'),
+          enabledStudentIds: ['s-1', 's-2'],
+        }),
+      );
+      fakeListStudents.willResolve([
+        buildStudent({ studentId: 's-1' }),
+        buildStudent({ studentId: 's-2' }),
+      ]);
+      fakeActualizar.willResolve();
+
+      await vm.load();
+      vm.requestToggleStudent('s-2');
+      vm.cancelDesactivarStudent();
+
+      expect(vm.desactivarModalOpen()).toBe(false);
+      expect(vm.desactivarPendingStudentId()).toBeNull();
+      expect(fakeActualizar.callCount).toBe(0);
+      expect(vm.enabledStudentIds()).toContain('s-2'); // sin cambios
     });
   });
 

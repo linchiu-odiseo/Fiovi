@@ -63,12 +63,18 @@ class FakeTutorExamDetailViewModel {
   };
   // Modal "confirmar finalización antes de tiempo".
   readonly finalizarModalOpen: WritableSignal<boolean> = signal(false);
+  // Modal "confirmar archivar" (post-finalize).
+  readonly archivarModalOpen: WritableSignal<boolean> = signal(false);
+  // Modal "confirmar deshabilitar alumno en curso".
+  readonly desactivarModalOpen: WritableSignal<boolean> = signal(false);
+  readonly desactivarPendingStudentId: WritableSignal<string | null> = signal(null);
   // Contadores del panel de alumnos.
   readonly enabledCount = () => this.enabledStudentIds().length;
   readonly totalStudents = () => this.students().length;
 
   canIniciar = vi.fn().mockReturnValue(false);
   canFinalizar = vi.fn().mockReturnValue(false);
+  canArchivar = vi.fn().mockReturnValue(false);
   isCheckboxDisabled = vi.fn().mockReturnValue(false);
 
   openIniciarModal = vi.fn(() => {
@@ -89,6 +95,32 @@ class FakeTutorExamDetailViewModel {
   confirmFinalizarModal = vi.fn(async () => {
     this.finalizarModalOpen.set(false);
   });
+  openArchivarModal = vi.fn(() => {
+    this.archivarModalOpen.set(true);
+  });
+  cancelArchivarModal = vi.fn(() => {
+    this.archivarModalOpen.set(false);
+  });
+  confirmArchivarModal = vi.fn(async () => {
+    this.archivarModalOpen.set(false);
+  });
+  requestToggleStudent = vi.fn();
+  confirmDesactivarStudent = vi.fn(async () => {
+    this.desactivarModalOpen.set(false);
+    this.desactivarPendingStudentId.set(null);
+  });
+  cancelDesactivarStudent = vi.fn(() => {
+    this.desactivarModalOpen.set(false);
+    this.desactivarPendingStudentId.set(null);
+  });
+
+  // Countdown en vivo (mismo shape que el simulacro del alumno). En el fake
+  // exponemos strings vacíos porque el fake no arranca el ticker — la lógica
+  // real vive en el VM y está cubierta por su propio spec.
+  readonly effectiveCloseAt = () => null;
+  readonly countdownRestante = () => '';
+  readonly closeTimeText = () => '';
+  readonly closeLabelPrefix = () => 'Cierra a las';
 
   async load(): Promise<void> {
     /* no-op */
@@ -102,8 +134,14 @@ class FakeTutorExamDetailViewModel {
   async finalizar(): Promise<void> {
     /* no-op */
   }
+  async archivar(): Promise<void> {
+    /* no-op */
+  }
   async toggleStudent(_studentId: string): Promise<void> {
     /* no-op */
+  }
+  stop(): void {
+    /* no-op — el fake no arranca timers */
   }
 }
 

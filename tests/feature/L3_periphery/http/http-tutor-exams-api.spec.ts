@@ -467,6 +467,49 @@ describe('HttpTutorExamsApi', () => {
   });
 
   // ===========================================================================
+  // archivar()
+  // ===========================================================================
+  describe('archivar()', () => {
+    it('hace POST a <base>/virtual-exams/rec-1/archive sin body', async () => {
+      const pending = adapter.archivar('rec-1');
+
+      const req = httpMock.expectOne(`${BASE}/virtual-exams/rec-1/archive`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toBeNull();
+      req.flush(null, { status: 204, statusText: 'No Content' });
+      await expect(pending).resolves.toBeUndefined();
+    });
+
+    it('HTTP 404 → rechaza con VirtualExamNotFoundError', async () => {
+      const pending = adapter.archivar('rec-1');
+      const req = httpMock.expectOne(`${BASE}/virtual-exams/rec-1/archive`);
+      req.flush({ message: 'not found' }, { status: 404, statusText: 'Not Found' });
+      await expect(pending).rejects.toBeInstanceOf(VirtualExamNotFoundError);
+    });
+
+    it('HTTP 409 → rechaza con ExamConflictError (ya archivado o aún no finalizado)', async () => {
+      const pending = adapter.archivar('rec-1');
+      const req = httpMock.expectOne(`${BASE}/virtual-exams/rec-1/archive`);
+      req.flush({ message: 'conflict' }, { status: 409, statusText: 'Conflict' });
+      await expect(pending).rejects.toBeInstanceOf(ExamConflictError);
+    });
+
+    it('HTTP 403 → rechaza con TutorExamForbiddenError', async () => {
+      const pending = adapter.archivar('rec-1');
+      const req = httpMock.expectOne(`${BASE}/virtual-exams/rec-1/archive`);
+      req.flush({ message: 'forbidden' }, { status: 403, statusText: 'Forbidden' });
+      await expect(pending).rejects.toBeInstanceOf(TutorExamForbiddenError);
+    });
+
+    it('HTTP 500 → rechaza con NetworkError', async () => {
+      const pending = adapter.archivar('rec-1');
+      const req = httpMock.expectOne(`${BASE}/virtual-exams/rec-1/archive`);
+      req.flush('boom', { status: 500, statusText: 'Internal Server Error' });
+      await expect(pending).rejects.toBeInstanceOf(NetworkError);
+    });
+  });
+
+  // ===========================================================================
   // classifyTutorError() — todas las filas del mapa de status
   // ===========================================================================
   describe('classifyTutorError() — clasificación por status HTTP', () => {

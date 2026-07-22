@@ -145,6 +145,9 @@ $wheel-item-height: 80px;
     overflow-y: auto;
     scroll-snap-type: y mandatory;
     scroll-behavior: smooth;
+    // Contiene el rubber band al viewport de la rueda — impide que el overscroll
+    // en modo lineal (N≤6) propague scroll a la página padre en móvil.
+    overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-y;
     scrollbar-width: none;
@@ -345,3 +348,4 @@ $wheel-item-height: 80px;
     font-weight: 700;
   }
 }
+

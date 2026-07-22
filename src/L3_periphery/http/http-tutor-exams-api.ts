@@ -189,6 +189,19 @@ export class HttpTutorExamsApi implements TutorExamsApi {
     }
   }
 
+  // POST /t/:slug/virtual-exams/:recordId/archive — sin body. Respuesta: 204 void.
+  async archivar(recordId: string): Promise<void> {
+    try {
+      await firstValueFrom(
+        this.http
+          .post<void>(apiPath.virtualExamArchive(this.requireSlug(), recordId), null)
+          .pipe(timeout(10_000)),
+      );
+    } catch (err) {
+      throw this.classifyTutorError(err);
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Clasificación de errores por HTTP status (design.md D2).
   //
