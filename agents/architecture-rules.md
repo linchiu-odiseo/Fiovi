@@ -152,9 +152,9 @@ Los view-models exponen Signals, no Observables. El template lee `viewModel.isSu
 
 ### Inyección de `appData.version` en `ngsw.json` post-build (change `pwa-auto-update`)
 
-`scripts/build-env.mjs` muta `dist/**/browser/ngsw.json` post-`ng build` para inyectar `appData: { version: APP_VERSION }`. Esto permite que `SwUpdate.versionUpdates` exponga la versión SemVer humana al cliente (modal de actualización).
+`scripts/inject-ngsw-appdata.mjs` (hook `postbuild`) muta `dist/**/browser/ngsw.json` post-`ng build` para inyectar `appData: { version: <package.json.version> }`. Esto permite que `SwUpdate.versionUpdates` exponga la versión SemVer humana al cliente (modal de actualización).
 
-**¿Por qué workaround?** `ngsw-config.json` no soporta variables de entorno. La alternativa "oficial" sería hardcodear `appData` en `ngsw-config.json`, pero eso obliga a editar dos archivos en cada release (`.env` + `ngsw-config.json`), y el segundo termina olvidado.
+**¿Por qué workaround?** `ngsw-config.json` no soporta variables de entorno. La alternativa "oficial" sería hardcodear `appData` en `ngsw-config.json`, pero eso obliga a editar dos archivos en cada release (`package.json` + `ngsw-config.json`), y el segundo termina olvidado.
 
 **Riesgo:** si Angular cambia el shape de `ngsw.json` en una versión mayor, el script falla en build. Mitigación: el servicio `PwaUpdateService` tiene fallback (`VERSION_FALLBACK = '—'`) si `appData.version` falta, así que el cliente no se rompe en producción aunque el script tenga un bug.
 

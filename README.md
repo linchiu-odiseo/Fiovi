@@ -91,14 +91,16 @@ Hexagonal estricta en 4 capas. Las reglas de import están enforzadas por ESLint
 
 Todas las variables las consume `scripts/build-env.mjs` y termina en `src/environments/environment.ts`. Si falta alguna requerida, el hook `predev`/`prebuild` falla con mensaje claro.
 
-| Variable        | Requerida | Origen | Ejemplo dev             | Notas                                                                                                                                                                    |
-| --------------- | --------- | ------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `API_BASE_URL`  | sí        | `.env` | `http://localhost:2001` | URL del backend learnex. En prod tiene que ser **HTTPS** (cookies HttpOnly + `SameSite=None` lo exigen).                                                                 |
-| `TENANT_SLUG`   | sí        | `.env` | `vonex`                 | Slug multi-tenant. Se inyecta en todas las URLs `/t/{slug}/...` vía `src/L3_periphery/http/api-paths.ts`. Cualquier mención literal de un slug en `src/` está prohibida. |
-| `DRAFT_ENABLED` | sí        | `.env` | `true`                  | Si `false`, el dispatcher de draft auto-save usa la implementación `Noop` (no llama al backend).                                                                         |
-| `APP_VERSION`   | sí        | `.env` | `1.0.0`                 | SemVer humana. Se inyecta en `ngsw.json` post-build y dispara el modal "hay versión nueva" en clientes con la PWA cacheada. **Bumpear en cada release.**                 |
+| Variable        | Requerida | Origen         | Ejemplo dev             | Notas                                                                                                                                                                    |
+| --------------- | --------- | -------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `API_BASE_URL`  | sí        | `.env`         | `http://localhost:2001` | URL del backend learnex. En prod tiene que ser **HTTPS** (cookies HttpOnly + `SameSite=None` lo exigen).                                                                 |
+| `DRAFT_ENABLED` | no        | `.env`         | `true`                  | Si `false` o ausente, el dispatcher de draft auto-save usa la implementación `Noop` (no llama al backend).                                                               |
+| `DEV_TOOLS`     | no        | `.env`         | `true`                  | Habilita atajos de UI de desarrollo (botón dado, cartilla prueba). Dejar `false` en release.                                                                             |
+| `version`       | sí        | `package.json` | `1.2.1`                 | SemVer humana. Se inyecta en `environment.appVersion` y en `ngsw.json` post-build; dispara el modal "hay versión nueva". **Bumpear con `npm version patch\|minor\|major`.** |
 
 `.env` está en `.gitignore`. Documentación viva de las variables en `.env.example`.
+
+> **Sobre la versión.** No vive en `.env` porque no es config por entorno: es la versión del bundle, la misma en local y en prod. Vive en `package.json.version` para que producción no tenga que tocar `.env` en cada release — sólo desplegar el `dist/` que ya trae la versión horneada.
 
 ---
 
@@ -131,7 +133,7 @@ Pase lo que pase con la pipeline, el server productivo necesita:
 - **HTTPS** delante del container. El `compose.yml` solo expone HTTP en `3006`. Hace falta un reverse proxy con TLS (Traefik, Caddy, nginx anfitrión, Cloudflare). Sin HTTPS las cookies HttpOnly con `SameSite=None` no funcionan.
 - **CORS en learnex** configurado con el dominio público de la PWA y `Access-Control-Allow-Credentials: true`. Sin esto el login falla con error de CORS.
 - **DNS** apuntando al server.
-- **`APP_VERSION` bumpeada** en cada release. Si no se bumpea, el modal de "hay actualización" no se dispara en clientes con la PWA cacheada.
+- **`package.json.version` bumpeada** en cada release (con `npm version patch|minor|major`). Si no se bumpea, el modal de "hay actualización" no se dispara en clientes con la PWA cacheada.
 
 ### CI/CD — pendiente de definir
 
@@ -143,10 +145,10 @@ Pase lo que pase con la pipeline, el server productivo necesita:
   - ¿O hay un agente tipo Watchtower/ArgoCD/Portainer que detecta el push al registry y reinicia solo?
 - **Trigger del deploy a prod**:
   - ¿Push a `main`?
-  - ¿Tag SemVer (`v*.*.*`) — casa naturalmente con `APP_VERSION` y el modal de update PWA?
+  - ¿Tag SemVer (`v*.*.*`) — casa naturalmente con `package.json.version` (que `npm version` etiqueta automáticamente) y el modal de update PWA?
   - ¿`workflow_dispatch` manual?
   - ¿Hay ambiente staging intermedio?
-- **Manejo de secrets** (`API_BASE_URL`, `TENANT_SLUG`, `DRAFT_ENABLED`, `APP_VERSION`):
+- **Manejo de secrets** (`API_BASE_URL`, `DRAFT_ENABLED`, `DEV_TOOLS`, `PUBLIC_CAPTCHA_SITE_KEY`):
   - ¿GitHub Secrets inyectados como build args o escritos al `.env` antes de `docker build`?
   - ¿`.env` gestionado en el server por DevOps, fuera del repo, montado al compose?
 - **Registry de imágenes** (si se elige el camino registry): nombre del repo, política de tags (`:latest`, `:<sha>`, `:<semver>`), retención.

@@ -1,5 +1,5 @@
 // Post-build hook: inyecta `appData.version` en cada `ngsw.json` generado por
-// `ng build`. La versión SemVer se lee de `.env` (APP_VERSION).
+// `ng build`. La versión SemVer se lee de `package.json.version`.
 //
 // ¿Por qué postbuild y no parte de scripts/build-env.mjs?
 // `ng build` regenera `ngsw.json` desde cero y descarta cualquier mutación
@@ -11,7 +11,7 @@
 // (1.0.0) en el modal de actualización, en lugar del hash del SW (a3f2b9c...).
 //
 // Silencioso si no encuentra `ngsw.json` (caso development/test). Falla con
-// exit 1 si `APP_VERSION` está ausente en `.env` o si la mutación rompe.
+// exit 1 si `package.json.version` está ausente o si la mutación rompe.
 
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { dirname, resolve, join } from 'node:path';
@@ -19,44 +19,13 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..');
-const envPath = resolve(repoRoot, '.env');
 
-function parseEnv(raw) {
-  const out = {};
-  for (const line of raw.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const eq = trimmed.indexOf('=');
-    if (eq === -1) continue;
-    const key = trimmed.slice(0, eq).trim();
-    let value = trimmed.slice(eq + 1).trim();
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-    out[key] = value;
-  }
-  return out;
-}
-
-let env;
-try {
-  env = parseEnv(readFileSync(envPath, 'utf8'));
-} catch (err) {
-  if (err.code === 'ENOENT') {
-    // Sin .env no hay build; algún hook upstream ya falló.
-    console.warn('postbuild: no .env found, skipping ngsw appData injection');
-    process.exit(0);
-  }
-  throw err;
-}
-
-if (!env.APP_VERSION || env.APP_VERSION.startsWith('<')) {
-  console.error('✘ postbuild: APP_VERSION ausente o con placeholder en .env');
+const pkg = JSON.parse(readFileSync(resolve(repoRoot, 'package.json'), 'utf8'));
+if (!pkg.version) {
+  console.error('✘ postbuild: package.json no tiene campo "version".');
   process.exit(1);
 }
+const appVersion = pkg.version;
 
 const distRoot = resolve(repoRoot, 'dist');
 if (!existsSync(distRoot)) {
@@ -70,9 +39,9 @@ for (const projectDir of readdirSync(distRoot)) {
   if (!existsSync(ngswCandidate) || !statSync(ngswCandidate).isFile()) continue;
   try {
     const ngsw = JSON.parse(readFileSync(ngswCandidate, 'utf8'));
-    ngsw.appData = { ...(ngsw.appData ?? {}), version: env.APP_VERSION };
+    ngsw.appData = { ...(ngsw.appData ?? {}), version: appVersion };
     writeFileSync(ngswCandidate, `${JSON.stringify(ngsw, null, 2)}\n`);
-    console.log(`✓ ngsw.json appData.version = ${env.APP_VERSION} (${ngswCandidate})`);
+    console.log(`✓ ngsw.json appData.version = ${appVersion} (${ngswCandidate})`);
     mutated += 1;
   } catch (err) {
     console.error(`✘ Error inyectando appData en ${ngswCandidate}: ${err.message}`);
