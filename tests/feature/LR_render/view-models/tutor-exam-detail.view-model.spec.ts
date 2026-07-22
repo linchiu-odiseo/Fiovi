@@ -8,6 +8,7 @@ import { GetTutorExamDetailUseCase } from '../../../../src/L2_application/use-ca
 import { ListClassroomStudentsUseCase } from '../../../../src/L2_application/use-cases/list-classroom-students.use-case';
 import { IniciarExamenUseCase } from '../../../../src/L2_application/use-cases/iniciar-examen.use-case';
 import { FinalizarExamenUseCase } from '../../../../src/L2_application/use-cases/finalizar-examen.use-case';
+import { ArchivarExamenUseCase } from '../../../../src/L2_application/use-cases/archivar-examen.use-case';
 import { ActualizarAlumnosHabilitadosUseCase } from '../../../../src/L2_application/use-cases/actualizar-alumnos-habilitados.use-case';
 import { TutorExam } from '../../../../src/L1_domain/entities/tutor-exam';
 import { TutorExamDetail } from '../../../../src/L1_domain/value-objects/tutor-exam-detail';
@@ -190,6 +191,24 @@ class FakeFinalizarExamenUseCase {
   }
 }
 
+class FakeArchivarExamenUseCase {
+  callCount = 0;
+  lastRecordId: string | null = null;
+  private _next: { kind: 'resolve' } | { kind: 'reject'; error: Error } = { kind: 'resolve' };
+
+  willResolve() {
+    this._next = { kind: 'resolve' };
+  }
+  willReject(error: Error) {
+    this._next = { kind: 'reject', error };
+  }
+  async execute(req: { recordId: string }): Promise<void> {
+    this.callCount++;
+    this.lastRecordId = req.recordId;
+    if (this._next.kind === 'reject') throw this._next.error;
+  }
+}
+
 class FakeActualizarAlumnosHabilitadosUseCase {
   callCount = 0;
   lastCall: { recordId: string; enabledStudentIds: readonly string[] } | null = null;
@@ -218,6 +237,7 @@ function setup(recordId = 'rec-1') {
   const fakeListStudents = new FakeListClassroomStudentsUseCase();
   const fakeIniciar = new FakeIniciarExamenUseCase();
   const fakeFinalizar = new FakeFinalizarExamenUseCase();
+  const fakeArchivar = new FakeArchivarExamenUseCase();
   const fakeActualizar = new FakeActualizarAlumnosHabilitadosUseCase();
 
   TestBed.resetTestingModule();
@@ -229,6 +249,7 @@ function setup(recordId = 'rec-1') {
       { provide: ListClassroomStudentsUseCase, useValue: fakeListStudents },
       { provide: IniciarExamenUseCase, useValue: fakeIniciar },
       { provide: FinalizarExamenUseCase, useValue: fakeFinalizar },
+      { provide: ArchivarExamenUseCase, useValue: fakeArchivar },
       { provide: ActualizarAlumnosHabilitadosUseCase, useValue: fakeActualizar },
       { provide: CLOCK, useValue: new FakeClock() },
       {
@@ -249,6 +270,7 @@ function setup(recordId = 'rec-1') {
     fakeListStudents,
     fakeIniciar,
     fakeFinalizar,
+    fakeArchivar,
     fakeActualizar,
   };
 }

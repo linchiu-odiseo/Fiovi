@@ -115,6 +115,32 @@ describe('TutorExamsStore', () => {
     });
   });
 
+  describe('remove()', () => {
+    it('remove() saca el exam por recordId y deja el resto', () => {
+      const a = buildExam({ recordId: 'rec-a' });
+      const b = buildExam({ recordId: 'rec-b' });
+      store.setExams([a, b]);
+
+      store.remove('rec-a');
+
+      expect(store.exams()).toHaveLength(1);
+      expect(store.findByRecordId('rec-a')).toBeNull();
+      expect(store.findByRecordId('rec-b')).not.toBeNull();
+    });
+
+    it('remove() sobre un recordId inexistente es no-op (no re-emite la signal)', () => {
+      const a = buildExam({ recordId: 'rec-a' });
+      store.setExams([a]);
+      const before = store.exams();
+
+      store.remove('rec-inexistente');
+
+      // Misma referencia = la signal no re-emitió. Preserva identidad para que
+      // los computed downstream no recomputen sin necesidad.
+      expect(store.exams()).toBe(before);
+    });
+  });
+
   describe('upsert()', () => {
     it('upsert actualiza un exam existente por recordId', () => {
       const exam1 = buildExam({ recordId: 'rec-1', name: 'Original' });

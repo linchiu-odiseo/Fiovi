@@ -63,12 +63,15 @@ class FakeTutorExamDetailViewModel {
   };
   // Modal "confirmar finalización antes de tiempo".
   readonly finalizarModalOpen: WritableSignal<boolean> = signal(false);
+  // Modal "confirmar archivar" (post-finalize).
+  readonly archivarModalOpen: WritableSignal<boolean> = signal(false);
   // Contadores del panel de alumnos.
   readonly enabledCount = () => this.enabledStudentIds().length;
   readonly totalStudents = () => this.students().length;
 
   canIniciar = vi.fn().mockReturnValue(false);
   canFinalizar = vi.fn().mockReturnValue(false);
+  canArchivar = vi.fn().mockReturnValue(false);
   isCheckboxDisabled = vi.fn().mockReturnValue(false);
 
   openIniciarModal = vi.fn(() => {
@@ -89,6 +92,15 @@ class FakeTutorExamDetailViewModel {
   confirmFinalizarModal = vi.fn(async () => {
     this.finalizarModalOpen.set(false);
   });
+  openArchivarModal = vi.fn(() => {
+    this.archivarModalOpen.set(true);
+  });
+  cancelArchivarModal = vi.fn(() => {
+    this.archivarModalOpen.set(false);
+  });
+  confirmArchivarModal = vi.fn(async () => {
+    this.archivarModalOpen.set(false);
+  });
 
   // Countdown en vivo (mismo shape que el simulacro del alumno). En el fake
   // exponemos strings vacíos porque el fake no arranca el ticker — la lógica
@@ -96,6 +108,7 @@ class FakeTutorExamDetailViewModel {
   readonly effectiveCloseAt = () => null;
   readonly countdownRestante = () => '';
   readonly closeTimeText = () => '';
+  readonly closeLabelPrefix = () => 'Cierra a las';
 
   async load(): Promise<void> {
     /* no-op */
@@ -107,6 +120,9 @@ class FakeTutorExamDetailViewModel {
     /* no-op */
   }
   async finalizar(): Promise<void> {
+    /* no-op */
+  }
+  async archivar(): Promise<void> {
     /* no-op */
   }
   async toggleStudent(_studentId: string): Promise<void> {

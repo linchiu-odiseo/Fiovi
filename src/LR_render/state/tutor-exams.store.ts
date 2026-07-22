@@ -41,6 +41,18 @@ export class TutorExamsStore {
     }
   }
 
+  // Saca un exam del store por recordId. Usado tras archivar — el back
+  // deja de devolver el exam en la lista, así que lo sacamos localmente
+  // para que /tutor/home no muestre el card obsoleto hasta el próximo poll.
+  // No-op si el recordId no está.
+  remove(recordId: string): void {
+    const current = this._exams();
+    const next = current.filter((e) => e.recordId !== recordId);
+    if (next.length !== current.length) {
+      this._exams.set(next);
+    }
+  }
+
   // Limpia el store. Útil en logout o reset de sesión.
   clear(): void {
     this._exams.set([]);

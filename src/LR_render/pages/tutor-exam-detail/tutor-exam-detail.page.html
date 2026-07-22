@@ -105,13 +105,17 @@
       }
 
       <!-- Celda countdown: destaca dentro del cajetín. Aparece solo cuando
-           hay cierre determinable (started !== null). -->
+           hay cierre determinable (started !== null). El label pasa de
+           "Cierra a las" (in_progress) a "Cerrado a las" (finalized) — el
+           countdown queda en "00:00" congelado. -->
       @if (vm.closeTimeText()) {
         <div
           class="tutor-exam-detail__bp-cell tutor-exam-detail__bp-cell--countdown"
           data-testid="tutor-countdown"
         >
-          <p class="tutor-exam-detail__bp-label">Cierra a las {{ vm.closeTimeText() }}</p>
+          <p class="tutor-exam-detail__bp-label">
+            {{ vm.closeLabelPrefix() }} {{ vm.closeTimeText() }}
+          </p>
           <p class="tutor-exam-detail__bp-countdown">{{ vm.countdownRestante() }}</p>
           <p class="tutor-exam-detail__bp-label tutor-exam-detail__bp-label--sub">
             Tiempo restante
@@ -336,6 +340,68 @@
           Finalizar ahora
         </button>
       </section>
+    }
+
+    <!-- Archivar: aparece cuando el examen ya está finalizado (status=finalized).
+         Reutiliza el mismo cajón escape-hatch — la UX es "acción secundaria
+         que saca este examen de la vista principal". Al confirmar, el detalle
+         redirige a /tutor/home porque el examen deja de aparecer en la lista. -->
+    @if (canArchivar()) {
+      <section class="tutor-exam-detail__finalizar-early">
+        <p class="tutor-exam-detail__finalizar-early-hint">
+          Podés archivar el examen para sacarlo de la lista.
+        </p>
+        <button
+          type="button"
+          class="tutor-exam-detail__finalizar-early-btn"
+          data-testid="btn-archivar"
+          [disabled]="vm.isSaving()"
+          (click)="onArchivar()"
+        >
+          Archivar
+        </button>
+      </section>
+    }
+
+    <!-- Modal: confirmar archivar (irreversible desde la vista del tutor). -->
+    @if (vm.archivarModalOpen()) {
+      <div
+        class="tutor-exam-detail__modal-backdrop"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="archivar-modal-title"
+        data-testid="archivar-modal"
+      >
+        <div class="tutor-exam-detail__modal">
+          <h2 id="archivar-modal-title" class="tutor-exam-detail__modal-title">
+            Archivar examen
+          </h2>
+          <p class="tutor-exam-detail__modal-hint">
+            El examen se sacará de la lista. Las notas de los alumnos siguen
+            disponibles desde el histórico.
+          </p>
+          <div class="tutor-exam-detail__modal-actions tutor-exam-detail__modal-actions--stacked">
+            <button
+              type="button"
+              class="tutor-exam-detail__modal-confirm tutor-exam-detail__modal-confirm--large"
+              data-testid="btn-confirm-archivar"
+              [disabled]="vm.isSaving()"
+              (click)="onConfirmArchivarModal()"
+            >
+              Sí, archivar
+            </button>
+            <button
+              type="button"
+              class="tutor-exam-detail__modal-cancel tutor-exam-detail__modal-cancel--large"
+              data-testid="btn-cancel-archivar"
+              [disabled]="vm.isSaving()"
+              (click)="onCancelArchivarModal()"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
     }
   }
 </main>

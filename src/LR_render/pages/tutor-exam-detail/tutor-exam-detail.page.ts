@@ -59,6 +59,10 @@ export class TutorExamDetailPage {
     return this.vm.canFinalizar();
   }
 
+  protected canArchivar(): boolean {
+    return this.vm.canArchivar();
+  }
+
   protected isCheckboxDisabled(student: ClassroomStudent): boolean {
     return this.vm.isCheckboxDisabled(student);
   }
@@ -120,6 +124,18 @@ export class TutorExamDetailPage {
 
   protected onConfirmFinalizarModal(): void {
     void this.vm.confirmFinalizarModal();
+  }
+
+  protected onArchivar(): void {
+    this.vm.openArchivarModal();
+  }
+
+  protected onCancelArchivarModal(): void {
+    this.vm.cancelArchivarModal();
+  }
+
+  protected onConfirmArchivarModal(): void {
+    void this.vm.confirmArchivarModal();
   }
 
   protected onToggleStudent(studentId: string): void {

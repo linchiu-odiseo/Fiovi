@@ -1,10 +1,11 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { GetTutorExamsUseCase } from '../../L2_application/use-cases/get-tutor-exams.use-case';
 import { GetTutorExamDetailUseCase } from '../../L2_application/use-cases/get-tutor-exam-detail.use-case';
 import { ListClassroomStudentsUseCase } from '../../L2_application/use-cases/list-classroom-students.use-case';
 import { IniciarExamenUseCase } from '../../L2_application/use-cases/iniciar-examen.use-case';
 import { FinalizarExamenUseCase } from '../../L2_application/use-cases/finalizar-examen.use-case';
+import { ArchivarExamenUseCase } from '../../L2_application/use-cases/archivar-examen.use-case';
 import { ActualizarAlumnosHabilitadosUseCase } from '../../L2_application/use-cases/actualizar-alumnos-habilitados.use-case';
 import { TutorExamsStore } from '../state/tutor-exams.store';
 import { TutorExamDetail } from '../../L1_domain/value-objects/tutor-exam-detail';
@@ -28,6 +29,19 @@ const COUNTDOWN_TICK_MS = 1_000;
 // MM:SS digital que da sensación de urgencia y actualiza cada segundo.
 const SHOW_SECONDS_BELOW_MS = 5 * 60_000;
 
+// Un único refresh diferido tras cruzar el cierre local del countdown:
+// da al back el tiempo del grace del auto-finalize (5s post-cierre) + un
+// margen para que la cola de finalización procese. Se dispara UNA sola vez
+// por recordId. Si el back tardó más, el próximo refresh manual / navegación
+// del tutor lo recupera — no armamos ráfagas para no cargar el back cuando
+// hay 500 alumnos convergiendo al mismo segundo.
+const POST_CIERRE_REFRESH_MS = 10_000;
+
+// Jitter simétrico (±3s) para dispersar el refresh entre los tutores/alumnos
+// que terminen sus exámenes al mismo instante. Sin jitter, 500 clientes que
+// arrancaron a la misma hora golpean al back en el mismo ms (thundering herd).
+const POST_CIERRE_JITTER_MS = 3_000;
+
 // View-model de la pantalla de gestión de un virtual exam (/tutor/exams/:recordId).
 // Provider-local al TutorExamDetailPage (NO providedIn root) — cada montaje
 // arranca limpio (D6 + D4). Ver diseño D1 (classroomId resolution), D2 (copy-by-action),
@@ -35,11 +49,13 @@ const SHOW_SECONDS_BELOW_MS = 5 * 60_000;
 @Injectable()
 export class TutorExamDetailViewModel {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly getTutorExams = inject(GetTutorExamsUseCase);
   private readonly getTutorExamDetail = inject(GetTutorExamDetailUseCase);
   private readonly listClassroomStudents = inject(ListClassroomStudentsUseCase);
   private readonly iniciarExamen = inject(IniciarExamenUseCase);
   private readonly finalizarExamen = inject(FinalizarExamenUseCase);
+  private readonly archivarExamen = inject(ArchivarExamenUseCase);
   private readonly actualizarAlumnos = inject(ActualizarAlumnosHabilitadosUseCase);
   private readonly store = inject(TutorExamsStore);
   private readonly clock = inject(CLOCK);
@@ -49,6 +65,32 @@ export class TutorExamDetailViewModel {
   // destruir el componente. Idéntico al patrón del alumno (simulacro).
   private countdownTimer: ReturnType<typeof setInterval> | null = null;
   private stopped = false;
+
+  // Refresh diferido tras cruzar el cierre local. Se agenda una única vez por
+  // recordId mediante el effect del constructor y se cancela en stop().
+  private postCierreTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly postCierreRefreshDone = new Set<string>();
+
+  constructor() {
+    // Detecta el instante en que el countdown local cruza el cierre efectivo
+    // con status=in_progress y programa un único refresh diferido para captar
+    // el `status=finalized` que dispara el auto-finalize del back (~5s + grace).
+    // Guardia por recordId: si el detail se recarga y sigue in_progress por
+    // lag del back, no re-agenda; si el refresh trae finalized, tampoco lo
+    // vuelve a intentar. Ver POST_CIERRE_REFRESH_MS + POST_CIERRE_JITTER_MS.
+    effect(() => {
+      const d = this.detail();
+      if (!d) return;
+      if (!d.status.is('in_progress')) return;
+      const closeAt = this.effectiveCloseAt();
+      if (closeAt === null) return;
+      if (this.nowTick().getTime() < closeAt.getTime()) return;
+      if (this.postCierreRefreshDone.has(d.recordId)) return;
+
+      this.postCierreRefreshDone.add(d.recordId);
+      this.schedulePostCierreRefresh(d.recordId);
+    });
+  }
 
   // Reloj para el countdown — server-anchored via el puerto Clock. NUNCA
   // Date.now() directo: el tutor puede tener el reloj del OS desfasado.
@@ -109,6 +151,11 @@ export class TutorExamDetailViewModel {
   // grader; el tutor confirma explícitamente.
   readonly finalizarModalOpen = signal(false);
 
+  // Modal de confirmación para archivar. El examen archivado sale de la lista
+  // del tutor — el back retorna sólo no-archived — por eso pedimos confirmación
+  // explícita antes de sacarlo de la vista.
+  readonly archivarModalOpen = signal(false);
+
   // Cuenta de alumnos habilitados en tiempo real (lo que el tutor ve en la
   // lista con checkboxes). Total = alumnos del aula.
   readonly enabledCount = computed(() => this.enabledStudentIds().length);
@@ -165,6 +212,18 @@ export class TutorExamDetailViewModel {
     return formatHHMM(closeAt);
   });
 
+  /**
+   * Prefijo del label de cierre: "Cierra a las" mientras el examen está
+   * activo, "Cerrado a las" una vez finalizado. Deriva del status del
+   * detail — así el header refleja instantáneamente el post-finalize sin
+   * cambios extra en la page.
+   */
+  readonly closeLabelPrefix = computed<string>(() => {
+    const d = this.detail();
+    if (!d) return 'Cierra a las';
+    return d.status.is('in_progress') ? 'Cierra a las' : 'Cerrado a las';
+  });
+
   // ── Derived state helpers (para los guards de D5) ───────────────────────────
 
   // El botón "Iniciar" debe estar habilitado SOLO si status=scheduled Y hay ≥1 alumno
@@ -180,6 +239,15 @@ export class TutorExamDetailViewModel {
     const d = this.detail();
     if (!d) return false;
     return d.status.is('in_progress');
+  }
+
+  // El botón "Archivar" reemplaza a "Finalizar" cuando el examen ya terminó
+  // (status=finalized). Guard D5 análogo — la page solo lo muestra si esto
+  // es true; el back también valida la transición (409 si no aplica).
+  canArchivar(): boolean {
+    const d = this.detail();
+    if (!d) return false;
+    return d.status.is('finalized');
   }
 
   // Un checkbox de alumno está deshabilitado si el examen está finalizado (read-only)
@@ -355,6 +423,44 @@ export class TutorExamDetailViewModel {
     }
   }
 
+  // Abre el modal de confirmación de archivar. Guard D5: solo si el examen
+  // está finalized.
+  openArchivarModal(): void {
+    if (!this.canArchivar()) return;
+    this.archivarModalOpen.set(true);
+  }
+
+  cancelArchivarModal(): void {
+    this.archivarModalOpen.set(false);
+  }
+
+  async confirmArchivarModal(): Promise<void> {
+    this.archivarModalOpen.set(false);
+    await this.archivar();
+  }
+
+  // Archiva el examen (finalized → archived). Tras éxito, quita el exam del
+  // store local (deja de aparecer en la lista) y redirige a /tutor/home.
+  async archivar(): Promise<void> {
+    if (!this.canArchivar()) return;
+
+    const recordId = this.route.snapshot.paramMap.get('recordId') ?? '';
+    this.actionError.set(null);
+    this.isSaving.set(true);
+
+    try {
+      await this.archivarExamen.execute({ recordId });
+      // El back ya no lo va a devolver en la lista — sacamos del store local
+      // para que /tutor/home no muestre el card obsoleto.
+      this.store.remove(recordId);
+      void this.router.navigate(['/tutor/home']);
+    } catch (err) {
+      this.actionError.set(this.copyForAction('archivar', err));
+    } finally {
+      this.isSaving.set(false);
+    }
+  }
+
   // Alterna el estado habilitado de un alumno.
   // Actualiza enabledStudentIds localmente (optimistic) y dispara el PATCH.
   // En error → revierte enabledStudentIds y setea actionError (D5 rollback).
@@ -453,7 +559,7 @@ export class TutorExamDetailViewModel {
   // Tabla completa en design.md §D2. Los valores exactos respetan el tone rioplatense
   // del copy de diseño.
   private copyForAction(
-    action: 'iniciar' | 'finalizar' | 'actualizarAlumnos',
+    action: 'iniciar' | 'finalizar' | 'archivar' | 'actualizarAlumnos',
     err: unknown,
   ): string {
     switch (action) {
@@ -478,6 +584,15 @@ export class TutorExamDetailViewModel {
           return 'No tenés permiso para operar este examen.';
         if (err instanceof NetworkError) return 'Sin conexión. Revisá tu red y reintentá.';
         return 'Ocurrió un error al finalizar el examen. Reintentá.';
+
+      case 'archivar':
+        if (err instanceof ExamConflictError)
+          return 'El examen ya fue archivado o todavía no está finalizado.';
+        if (err instanceof VirtualExamNotFoundError) return 'Este examen ya no está disponible.';
+        if (err instanceof TutorExamForbiddenError)
+          return 'No tenés permiso para archivar este examen.';
+        if (err instanceof NetworkError) return 'Sin conexión. Revisá tu red y reintentá.';
+        return 'Ocurrió un error al archivar el examen. Reintentá.';
 
       case 'actualizarAlumnos':
         if (err instanceof ExamConflictError)
@@ -528,6 +643,30 @@ export class TutorExamDetailViewModel {
   }
 
   /**
+   * Programa un único refresh diferido tras cruzar el cierre local del
+   * countdown, con jitter simétrico para dispersar el pico cuando 500
+   * clientes cruzan el cierre a la misma hora. `Math.random()` alcanza:
+   * no necesitamos jitter criptográfico, sólo dispersión estadística.
+   */
+  private schedulePostCierreRefresh(recordId: string): void {
+    if (this.stopped) return;
+    const jitter = Math.random() * 2 * POST_CIERRE_JITTER_MS - POST_CIERRE_JITTER_MS;
+    const delay = POST_CIERRE_REFRESH_MS + jitter;
+    this.postCierreTimer = setTimeout(() => {
+      this.postCierreTimer = null;
+      if (this.stopped) return;
+      void this.reloadDetail(recordId);
+    }, delay);
+  }
+
+  private cancelPostCierreRefresh(): void {
+    if (this.postCierreTimer !== null) {
+      clearTimeout(this.postCierreTimer);
+      this.postCierreTimer = null;
+    }
+  }
+
+  /**
    * Teardown del VM. La page lo invoca en `destroyRef.onDestroy` — sin esto,
    * el `setInterval` seguiría corriendo tras la navegación aunque el VM ya
    * no exista, generando un leak (y llamados a `clock.now()` sobre un
@@ -536,6 +675,7 @@ export class TutorExamDetailViewModel {
   stop(): void {
     this.stopped = true;
     this.stopCountdownTicker();
+    this.cancelPostCierreRefresh();
   }
 }
 

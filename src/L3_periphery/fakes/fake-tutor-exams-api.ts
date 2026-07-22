@@ -41,4 +41,8 @@ export class FakeTutorExamsApi implements TutorExamsApi {
   async finalizar(_recordId: string): Promise<FinalizeResult> {
     return { transitioned: true };
   }
+
+  async archivar(_recordId: string): Promise<void> {
+    return;
+  }
 }
