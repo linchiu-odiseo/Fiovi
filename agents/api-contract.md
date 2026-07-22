@@ -67,6 +67,8 @@ Response 200 (alumno):
 }
 ```
 
+> El campo `permissions[]` viaja en el body pero Fiovi lo ignora en el mapper (F5-03 — no se hornea en `Identity` ni en `localStorage`). La autorización efectiva es server-side (RLS + guards). No agregar consumo de `permissions` en cliente sin discutir alternativas primero.
+
 Response 200 (tutor): mismo shape, `roles: ["tutor"]`, `codigo: null` (caso observado).
 
 Invariante: `roles.length === 1` en este producto.

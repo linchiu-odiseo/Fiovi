@@ -24,6 +24,7 @@ import { SimulacroNoAsignadoError } from '../../L1_domain/errors/simulacro-no-as
 import { StudentNotEnrolledError } from '../../L1_domain/errors/student-not-enrolled.error';
 import { StudentNotLinkedError } from '../../L1_domain/errors/student-not-linked.error';
 import { apiPath } from './api-paths';
+import { SlugStore } from './slug-store';
 
 interface ExamDto {
   id: string;
@@ -101,11 +102,22 @@ const DRAFT_ERROR_MESSAGES: ReadonlySet<DraftErrorMessage> = new Set([
 @Injectable({ providedIn: 'root' })
 export class HttpExamsApi implements ExamsApi {
   private readonly http = inject(HttpClient);
+  private readonly slugStore = inject(SlugStore);
+
+  // Los endpoints tenant-scoped (`/t/{slug}/...`) leen el slug del SlugStore
+  // hidratado en APP_INITIALIZER. Si el slug es null, algún caller invocó
+  // el use case sin identity activa — señalizamos NetworkError para que la
+  // UI degrade sin loop de refresh (auth.guard debería haber redirigido antes).
+  private requireSlug(): string {
+    const slug = this.slugStore.current();
+    if (!slug) throw new NetworkError();
+    return slug;
+  }
 
   async getTodaysExams(): Promise<ExamsListResult> {
     try {
       const dto = await firstValueFrom(
-        this.http.get<ExamsListResponseDto>(apiPath.studentExamSessions()),
+        this.http.get<ExamsListResponseDto>(apiPath.studentExamSessions(this.requireSlug())),
       );
       // Pasa el DTO al dominio sin filtrar: los casos `in_progress` con
       // `started === null` (data rara que el back en teoría nunca emite)
@@ -132,12 +144,15 @@ export class HttpExamsApi implements ExamsApi {
   async enviar(req: EnvioRequest): Promise<EnvioResult> {
     try {
       const dto = await firstValueFrom(
-        this.http.post<SubmitResponseDto>(apiPath.studentExamSubmit(req.examId), {
-          code: req.code,
-          admission_area: req.admissionArea,
-          responses: req.responses,
-          client_finished_at: req.clientFinishedAt,
-        }),
+        this.http.post<SubmitResponseDto>(
+          apiPath.studentExamSubmit(this.requireSlug(), req.examId),
+          {
+            code: req.code,
+            admission_area: req.admissionArea,
+            responses: req.responses,
+            client_finished_at: req.clientFinishedAt,
+          },
+        ),
       );
       // El VO valida shape: hash 64 hex, submittedAt Date válido.
       const ack = new SubmissionAck(dto.id, dto.submission_hash, new Date(dto.submitted_at));
@@ -158,7 +173,7 @@ export class HttpExamsApi implements ExamsApi {
     try {
       await firstValueFrom(
         this.http
-          .post<void>(apiPath.studentExamDraft(req.examId), {
+          .post<void>(apiPath.studentExamDraft(this.requireSlug(), req.examId), {
             code: req.code,
             admission_area: req.admissionArea,
             responses: req.responses,

@@ -36,7 +36,7 @@ class LoginStub {}
 function buildIdentity(role: 'student' | 'tutor' = 'student'): Identity {
   const email = role === 'student' ? '79507732@vonex.edu.pe' : 'tutor1@vonex.pe';
   const codigo = role === 'student' ? '79507732' : null;
-  return new Identity('user-id', 'tenant-id', email, codigo, [role], [], Date.now() + 900_000);
+  return new Identity('user-id', 'tenant-id', 'vonex', email, codigo, [role], Date.now() + 900_000);
 }
 
 const buildStudentProfile = (overrides: Partial<StudentProfile> = {}): StudentProfile => ({
@@ -218,10 +218,8 @@ class FakeMarkingsStorage implements MarkingsStorage {
 // Hash sha256 hex válido (64 chars) para construir SubmissionAck en tests.
 const VALID_HASH = 'a3f5c8d1b2e4f6a8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2';
 
-const buildAck = (
-  id = 'ack-1',
-  submittedIso = '2026-06-11T11:30:00.000Z',
-): SubmissionAck => new SubmissionAck(id, VALID_HASH, new Date(submittedIso));
+const buildAck = (id = 'ack-1', submittedIso = '2026-06-11T11:30:00.000Z'): SubmissionAck =>
+  new SubmissionAck(id, VALID_HASH, new Date(submittedIso));
 
 const buildExam = (
   id: string,
@@ -239,8 +237,8 @@ const buildExam = (
   const finalized = serverStatusValue === 'finalized';
   return new Exam({
     id,
-    area: 'area' in overrides ? overrides.area ?? null : 'Matemática',
-    course: 'course' in overrides ? overrides.course ?? null : 'Aritmética',
+    area: 'area' in overrides ? (overrides.area ?? null) : 'Matemática',
+    course: 'course' in overrides ? (overrides.course ?? null) : 'Aritmética',
     type: 'simulacro',
     name: `Examen ${id}`,
     count: 20,
@@ -248,13 +246,13 @@ const buildExam = (
     scheduled: overrides.scheduled ?? new Date('2026-06-11T10:00:00Z'),
     started:
       'started' in overrides
-        ? overrides.started ?? null
+        ? (overrides.started ?? null)
         : inProgress || finalized
           ? new Date('2026-06-11T10:00:05Z')
           : null,
     finished:
       'finished' in overrides
-        ? overrides.finished ?? null
+        ? (overrides.finished ?? null)
         : finalized
           ? new Date('2026-06-11T12:00:00Z')
           : null,
@@ -389,10 +387,7 @@ describe('HomePageViewModel', () => {
 
   describe('start() + primer fetch', () => {
     it('después del primer fetch exitoso, exams() tiene la lista y isLoading() es false', async () => {
-      const list = [
-        buildExam('exam-1', 'in_progress'),
-        buildExam('exam-2', 'scheduled'),
-      ];
+      const list = [buildExam('exam-1', 'in_progress'), buildExam('exam-2', 'scheduled')];
       fakeGetTodaysExams.willResolve(list);
 
       const vm = createVm();

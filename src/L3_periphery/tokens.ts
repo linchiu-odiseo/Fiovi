@@ -1,9 +1,11 @@
 import { InjectionToken } from '@angular/core';
+import { CaptchaProvider } from '../L1_domain/ports/captcha-provider';
 import { IdentityStorage } from '../L1_domain/ports/identity-storage';
 import { ProfileStorage } from '../L1_domain/ports/profile-storage';
 import { OutboxStoragePort } from '../L1_domain/ports/outbox-storage.port';
 import { SwMessengerPort } from '../L1_domain/ports/sw-messenger.port';
 import { TutorExamsApi } from '../L1_domain/ports/tutor-exams-api';
+import { TutorNavigationApi } from '../L1_domain/ports/tutor-navigation-api';
 
 // Tokens DI para los ports L1 que se inyectan via interface (Angular no
 // puede inyectar interfaces por tipo en TypeScript runtime). Los bindings
@@ -24,3 +26,14 @@ export const SW_MESSENGER = new InjectionToken<SwMessengerPort>('SwMessengerPort
 // vive en `app.config.ts` con `useExisting: HttpTutorExamsApi`.
 // Las VM del tutor lo inyectan para usarlo sin acoplarse a la clase L3.
 export const TUTOR_EXAMS_API = new InjectionToken<TutorExamsApi>('TUTOR_EXAMS_API');
+
+// Token DI para el puerto de navegación del tutor (AULA → SEMANA → CURSO →
+// EXÁMENES + shortcut en-curso). Separado de TUTOR_EXAMS_API porque cubre
+// otro bounded context: navegación / listados agregados, no operaciones
+// sobre un virtual exam individual.
+export const TUTOR_NAVIGATION_API = new InjectionToken<TutorNavigationApi>('TUTOR_NAVIGATION_API');
+
+// Token DI para el puerto del captcha anti-bot que protege el login. El binding
+// concreto vive en `app.config.ts` con `useExisting: CloudflareTurnstileProvider`.
+// El `CaptchaWidgetComponent` (LR) lo consume vía este token.
+export const CAPTCHA_PROVIDER = new InjectionToken<CaptchaProvider>('CaptchaProvider');

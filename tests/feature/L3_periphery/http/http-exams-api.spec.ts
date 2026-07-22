@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { HttpExamsApi } from '../../../../src/L3_periphery/http/http-exams-api';
+import { SlugStore } from '../../../../src/L3_periphery/http/slug-store';
 import { Exam } from '../../../../src/L1_domain/entities/exam';
 import { ServerTime } from '../../../../src/L1_domain/value-objects/server-time';
 import { InvalidExamError } from '../../../../src/L1_domain/errors/invalid-exam.error';
@@ -10,6 +11,8 @@ import { NetworkError } from '../../../../src/L1_domain/errors/network.error';
 import { ExamsPermissionRevokedError } from '../../../../src/L1_domain/errors/exams-permission-revoked.error';
 import { StudentNotLinkedError } from '../../../../src/L1_domain/errors/student-not-linked.error';
 import { environment } from '../../../../src/environments/environment';
+
+const TEST_SLUG = 'vonex';
 
 // Cubre `HttpExamsApi.getTodaysExams()` (L3): hit a
 // `/t/{slug}/student/exam-sessions`, mapeo de DTO → Exam y clasificación
@@ -23,7 +26,7 @@ describe('HttpExamsApi', () => {
 
   // El path se arma desde environment para que cambios en tenantSlug se
   // propaguen sin tocar tests.
-  const EXAMS_URL = `${environment.apiBaseUrl}/t/${environment.tenantSlug}/student/exam-sessions`;
+  const EXAMS_URL = `${environment.apiBaseUrl}/t/${TEST_SLUG}/student/exam-sessions`;
 
   // DTO base válido para componer respuestas (ExamDto del adapter).
   const dtoFor = (
@@ -57,10 +60,11 @@ describe('HttpExamsApi', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), HttpExamsApi],
+      providers: [provideHttpClient(), provideHttpClientTesting(), HttpExamsApi, SlugStore],
     });
     httpMock = TestBed.inject(HttpTestingController);
     adapter = TestBed.inject(HttpExamsApi);
+    TestBed.inject(SlugStore).set(TEST_SLUG);
   });
 
   afterEach(() => httpMock.verify());
@@ -70,9 +74,7 @@ describe('HttpExamsApi', () => {
       const pending = adapter.getTodaysExams();
 
       const req = httpMock.expectOne(
-        (r) =>
-          r.method === 'GET' &&
-          r.url.endsWith(`/t/${environment.tenantSlug}/student/exam-sessions`),
+        (r) => r.method === 'GET' && r.url.endsWith(`/t/${TEST_SLUG}/student/exam-sessions`),
       );
       expect(req.request.method).toBe('GET');
 
@@ -272,10 +274,7 @@ describe('HttpExamsApi', () => {
     it('404 con code distinto a STUDENT_NOT_LINKED → NetworkError', async () => {
       const pending = adapter.getTodaysExams();
       const req = httpMock.expectOne(EXAMS_URL);
-      req.flush(
-        { code: 'OTRO_CODE', message: 'algo' },
-        { status: 404, statusText: 'Not Found' },
-      );
+      req.flush({ code: 'OTRO_CODE', message: 'algo' }, { status: 404, statusText: 'Not Found' });
       await expect(pending).rejects.toBeInstanceOf(NetworkError);
     });
 

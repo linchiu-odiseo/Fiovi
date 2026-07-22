@@ -213,29 +213,29 @@ El sistema SHALL exponer un componente standalone Angular `<app-version-footer>`
 - **WHEN** se renderiza `HomePage` en cualquier estado (con o sin `pendingUpdate().available`)
 - **THEN** el DOM de `HomePage` SHALL contener `<app-version-footer>` con texto `"Fiovi · versión 1.1.0"`
 
-### Requirement: `APP_VERSION` en `.env` propagada por `build-env.mjs`
+### Requirement: `version` en `package.json` propagada por `build-env.mjs` y `inject-ngsw-appdata.mjs`
 
-`scripts/build-env.mjs` SHALL leer la variable `APP_VERSION` desde `.env`. Si está ausente o vacía, el script SHALL fallar con un mensaje de error que mencione el nombre exacto de la variable faltante (mismo patrón que `API_BASE_URL` y `TENANT_SLUG`). Cuando está presente, el script SHALL escribir el campo `appVersion: '<valor>'` en `src/environments/environment.ts` y `src/environments/environment.development.ts`. El script SHALL adicionalmente abrir el `ngsw.json` generado por `ng build` y mutar el JSON para incluir el campo `appData: { version: '<valor>' }` a nivel raíz, persistiendo el cambio. La mutación SHALL NO ejecutarse si `ngsw.json` no existe (ej. en build de development o tests).
+`scripts/build-env.mjs` SHALL leer el campo `version` desde `package.json` (raíz del repo). Si está ausente o vacío, el script SHALL fallar con un mensaje de error que mencione `package.json` y `version`. Cuando está presente, el script SHALL escribir el campo `appVersion: '<valor>'` en `src/environments/environment.ts` y `src/environments/environment.production.ts`. Post-build, `scripts/inject-ngsw-appdata.mjs` (hook `postbuild`) SHALL abrir el `ngsw.json` generado por `ng build` y mutar el JSON para incluir el campo `appData: { version: '<valor>' }` a nivel raíz, persistiendo el cambio. La mutación SHALL NO ejecutarse si `ngsw.json` no existe (ej. en build de development o tests). La versión NO SHALL leerse de `.env`: `package.json` es la única fuente de verdad para que el bump se haga con `npm version` y no requiera tocar `.env` en producción.
 
-#### Scenario: Variable presente — environments y ngsw.json actualizados
+#### Scenario: `package.json.version` presente — environments y ngsw.json actualizados
 
-- **GIVEN** `.env` contiene `APP_VERSION=1.1.0`
+- **GIVEN** `package.json` contiene `"version": "1.1.0"`
 - **WHEN** se ejecuta `npm run build`
 - **THEN** `src/environments/environment.ts` SHALL exportar un objeto con `appVersion: '1.1.0'`
 - **AND** `dist/.../ngsw.json` SHALL contener `appData: { version: '1.1.0' }` a nivel raíz
 
-#### Scenario: Variable ausente — preflight falla
+#### Scenario: `package.json.version` ausente — preflight falla
 
-- **GIVEN** `.env` no contiene `APP_VERSION`
+- **GIVEN** `package.json` no contiene el campo `version` (o está vacío)
 - **WHEN** se ejecuta `npm run build` o `npm run dev`
 - **THEN** el proceso SHALL salir con código no-cero
-- **AND** stderr SHALL incluir el texto literal `APP_VERSION`
+- **AND** stderr SHALL mencionar `package.json` y `version`
 
 #### Scenario: Build sin ngsw.json (development)
 
-- **GIVEN** `.env` contiene `APP_VERSION=1.1.0`
+- **GIVEN** `package.json` contiene `"version": "1.1.0"`
 - **AND** se corre un comando que no genera `ngsw.json` (ej. `npm test`)
-- **WHEN** `scripts/build-env.mjs` ejecuta
+- **WHEN** el hook `postbuild` no dispara (o `dist/` no existe)
 - **THEN** el step de mutación de `ngsw.json` SHALL ser skipped silenciosamente
 - **AND** `environment.ts` SHALL escribirse correctamente igual
 

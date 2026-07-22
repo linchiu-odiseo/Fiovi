@@ -4,17 +4,11 @@ import { DraftRequest, ExamsApi, ExamsListResult } from '../../../src/L1_domain/
 import { Identity } from '../../../src/L1_domain/entities/identity';
 import { SessionExpiredError } from '../../../src/L1_domain/errors/session-expired.error';
 import { SimulacroCerradoError } from '../../../src/L1_domain/errors/simulacro-cerrado.error';
-import {
-  FakeIdentityStorage,
-  InMemoryMarkingsStorage,
-} from './fakes';
+import { FakeIdentityStorage, InMemoryMarkingsStorage } from './fakes';
 
 // Fake ExamsApi mínimo para GuardarDraftUseCase — solo implementa guardarDraft.
 class FakeDraftExamsApi implements ExamsApi {
-  private draftPlan:
-    | { kind: 'resolve' }
-    | { kind: 'reject'; error: Error }
-    | null = null;
+  private draftPlan: { kind: 'resolve' } | { kind: 'reject'; error: Error } | null = null;
 
   public draftCalls: DraftRequest[] = [];
 
@@ -50,10 +44,10 @@ function studentIdentity(codigo: string | null = VALID_CODIGO): Identity {
   return new Identity(
     'user-id',
     'tenant-id',
+    'vonex',
     VALID_EMAIL,
     codigo,
     ['student'],
-    [],
     Date.now() + 900_000,
   );
 }

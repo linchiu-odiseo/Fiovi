@@ -3,7 +3,10 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { HttpExamsApi } from '../../../../src/L3_periphery/http/http-exams-api';
+import { SlugStore } from '../../../../src/L3_periphery/http/slug-store';
 import { DraftRequest } from '../../../../src/L1_domain/ports/exams-api';
+
+const TEST_SLUG = 'vonex';
 import { InvalidPayloadError } from '../../../../src/L1_domain/errors/invalid-payload.error';
 import { NetworkError } from '../../../../src/L1_domain/errors/network.error';
 import { SimulacroCerradoError } from '../../../../src/L1_domain/errors/simulacro-cerrado.error';
@@ -24,7 +27,7 @@ describe('HttpExamsApi.guardarDraft (POST /draft)', () => {
   let adapter: HttpExamsApi;
 
   const SESSION_ID = '7620c18d-5b4d-4ef0-bf41-98352d21c2cf';
-  const DRAFT_URL = `${environment.apiBaseUrl}/t/${environment.tenantSlug}/student/exam-sessions/${SESSION_ID}/draft`;
+  const DRAFT_URL = `${environment.apiBaseUrl}/t/${TEST_SLUG}/student/exam-sessions/${SESSION_ID}/draft`;
 
   const validRequest = (): DraftRequest => ({
     examId: SESSION_ID,
@@ -35,10 +38,11 @@ describe('HttpExamsApi.guardarDraft (POST /draft)', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), HttpExamsApi],
+      providers: [provideHttpClient(), provideHttpClientTesting(), HttpExamsApi, SlugStore],
     });
     httpMock = TestBed.inject(HttpTestingController);
     adapter = TestBed.inject(HttpExamsApi);
+    TestBed.inject(SlugStore).set(TEST_SLUG);
   });
 
   afterEach(() => httpMock.verify());
@@ -87,9 +91,7 @@ describe('HttpExamsApi.guardarDraft (POST /draft)', () => {
 
       const req = httpMock.expectOne(DRAFT_URL);
       const bodyJson = JSON.stringify(req.request.body);
-      expect(bodyJson).toBe(
-        '{"code":"30303011","admission_area":"A","responses":"A-C-"}',
-      );
+      expect(bodyJson).toBe('{"code":"30303011","admission_area":"A","responses":"A-C-"}');
 
       req.flush(null, { status: 204, statusText: 'No Content' });
       await pending;
@@ -99,7 +101,7 @@ describe('HttpExamsApi.guardarDraft (POST /draft)', () => {
       const weirdId = 'foo/bar';
       const pending = adapter.guardarDraft({ ...validRequest(), examId: weirdId });
 
-      const expectedUrl = `${environment.apiBaseUrl}/t/${environment.tenantSlug}/student/exam-sessions/foo%2Fbar/draft`;
+      const expectedUrl = `${environment.apiBaseUrl}/t/${TEST_SLUG}/student/exam-sessions/foo%2Fbar/draft`;
       const req = httpMock.expectOne(expectedUrl);
       req.flush(null, { status: 204, statusText: 'No Content' });
       await pending;
@@ -142,10 +144,7 @@ describe('HttpExamsApi.guardarDraft (POST /draft)', () => {
     it('400 + INVALID_ADMISSION_AREA → InvalidAdmissionAreaError', async () => {
       const pending = adapter.guardarDraft(validRequest());
       const req = httpMock.expectOne(DRAFT_URL);
-      req.flush(
-        { message: 'INVALID_ADMISSION_AREA' },
-        { status: 400, statusText: 'Bad Request' },
-      );
+      req.flush({ message: 'INVALID_ADMISSION_AREA' }, { status: 400, statusText: 'Bad Request' });
       const err = await pending.catch((e) => e as Error);
       expect(err).toBeInstanceOf(InvalidAdmissionAreaError);
       expect(err).not.toBeInstanceOf(InvalidPayloadError);
@@ -182,10 +181,7 @@ describe('HttpExamsApi.guardarDraft (POST /draft)', () => {
     it('404 + STUDENT_BY_CODE_NOT_FOUND → StudentNotLinkedError', async () => {
       const pending = adapter.guardarDraft(validRequest());
       const req = httpMock.expectOne(DRAFT_URL);
-      req.flush(
-        { message: 'STUDENT_BY_CODE_NOT_FOUND' },
-        { status: 404, statusText: 'Not Found' },
-      );
+      req.flush({ message: 'STUDENT_BY_CODE_NOT_FOUND' }, { status: 404, statusText: 'Not Found' });
       await expect(pending).rejects.toBeInstanceOf(StudentNotLinkedError);
     });
 

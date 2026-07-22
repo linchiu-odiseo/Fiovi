@@ -6,7 +6,7 @@ import { FakeIdentityStorage } from '../../fixtures/identity-storage.fake';
 const NOW = 1_700_000_000_000;
 
 const makeIdentity = (expiresAt: number) =>
-  new Identity('uid', 'tid', 'alumno@vonex.edu.pe', '79507732', ['student'], [], expiresAt);
+  new Identity('uid', 'tid', 'vonex', 'alumno@vonex.edu.pe', '79507732', ['student'], expiresAt);
 
 describe('GetIdentityUseCase', () => {
   let storage: FakeIdentityStorage;

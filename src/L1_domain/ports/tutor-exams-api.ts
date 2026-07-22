@@ -69,4 +69,11 @@ export interface TutorExamsApi {
   // Errores posibles: ExamConflictError (409), ExamPreconditionError (422 — aún no iniciado),
   //                   NetworkError.
   finalizar(recordId: string): Promise<FinalizeResult>;
+
+  // POST /t/:slug/virtual-exams/:recordId/archive — sin body. Respuesta: 204 void.
+  // Transición finalized → archived (irreversible; el examen sale de la lista del tutor).
+  // Errores posibles: VirtualExamNotFoundError (404), TutorExamForbiddenError (403),
+  //                   ExamConflictError (409 — ya archivado / aún no finalizado),
+  //                   NetworkError.
+  archivar(recordId: string): Promise<void>;
 }

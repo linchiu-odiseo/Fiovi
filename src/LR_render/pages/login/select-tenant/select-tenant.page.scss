@@ -1,0 +1,188 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 100dvh;
+  background: var(--color-bg);
+  color: var(--color-on-surface);
+  padding: var(--space-xl) var(--space-lg);
+  box-sizing: border-box;
+  font-family: var(--font-body);
+}
+
+.select-tenant {
+  width: 100%;
+  max-width: 22rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+
+  &__header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: var(--space-xs);
+  }
+
+  // Mismo bloque de marca que /login para mantener continuidad visual —
+  // el user viene de /login sin refresh, no debería sentir el "salto".
+  &__brand {
+    width: 5rem;
+    height: 5rem;
+    border-radius: var(--radius-lg);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    margin-bottom: var(--space-xs);
+  }
+
+  &__title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    line-height: 2.25rem;
+    letter-spacing: -0.02em;
+    font-weight: 700;
+    color: var(--color-on-surface);
+  }
+
+  &__subtitle {
+    margin: 0;
+    color: var(--color-on-surface-variant);
+    font-size: 1rem;
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  // Botón por tenant — outlined light siguiendo el estilo del botón Google
+  // de /login para mantener la jerarquía visual: "opción" (outlined) vs
+  // "acción por default" (primary sólido, que acá no aplica porque no hay
+  // acción principal única). Nombre a la izquierda, icono chevron_right a
+  // la derecha para señalar "avanzás al elegir".
+  &__tenant-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
+    width: 100%;
+    min-height: 3.25rem;
+    padding: 0 var(--space-md);
+    border: 1.5px solid var(--color-outline-variant);
+    border-radius: var(--radius);
+    background: var(--color-surface-container-lowest);
+    color: var(--color-on-surface);
+    font-family: var(--font-body);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    text-align: left;
+    cursor: pointer;
+    transition:
+      background 120ms ease,
+      border-color 120ms ease,
+      transform 60ms ease;
+
+    &:hover:not(:disabled) {
+      background: var(--color-surface-container-low);
+      border-color: var(--color-primary);
+    }
+
+    &:active:not(:disabled) {
+      transform: scale(0.99);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+    }
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+  }
+
+  &__tenant-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__tenant-icon {
+    flex-shrink: 0;
+    color: var(--color-on-surface-variant);
+    font-size: 1.25rem;
+  }
+
+  // Botón "Volver a iniciar sesión" — text button, jerarquía terciaria.
+  // No es peligroso (no borra estado), solo cancela la selección — usamos
+  // color-on-surface-variant para bajarlo del principal sin ocultarlo.
+  &__cancel {
+    align-self: center;
+    background: transparent;
+    border: none;
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    font-weight: 600;
+    padding: 0.5rem var(--space-md);
+    cursor: pointer;
+    border-radius: var(--radius);
+    transition: color 120ms ease;
+
+    &:hover:not(:disabled) {
+      color: var(--color-primary);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+    }
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.error {
+  margin: 0;
+  padding: 0.75rem var(--space-md);
+  background: var(--color-error-container);
+  border-radius: var(--radius);
+  color: var(--color-on-error-container);
+  font-size: 0.9rem;
+  line-height: 1.35;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+
+  &__icon {
+    flex-shrink: 0;
+    font-size: 1.25rem;
+    line-height: 1.35;
+  }
+
+  &__copy {
+    flex: 1;
+    min-width: 0;
+  }
+}

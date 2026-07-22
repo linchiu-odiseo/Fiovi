@@ -24,6 +24,17 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/login/login.page').then((m) => m.LoginPage),
   },
   {
+    // Segunda mitad del flow cuando el email matchea >1 tenant (post-login
+    // password o post-callback SSO Google). El publicOnlyGuard lo protege:
+    // si el user ya tiene identity, se envía directo al home del rol.
+    // El page se auto-redirige a /login si no hay challenge pendiente en
+    // sessionStorage.
+    path: 'login/select-tenant',
+    canActivate: [publicOnlyGuard],
+    loadComponent: () =>
+      import('./pages/login/select-tenant/select-tenant.page').then((m) => m.SelectTenantPage),
+  },
+  {
     path: 'student/home',
     canActivate: [authGuard, roleGuard('student')],
     loadComponent: () => import('./pages/home/home.page').then((m) => m.HomePage),
@@ -39,37 +50,43 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./pages/tutor-exams-list/tutor-exams-list.page').then((m) => m.TutorExamsListPage),
   },
+  // Nav mobile AULA → SEMANA → CURSO → EXÁMENES (change tutor-aulas-semanas-view).
+  // La ruta legacy `/tutor/aulas/:classroomId` (que apuntaba a la lista plana de
+  // cursos) redirige a la nueva vista de semanas — deep-links viejos siguen
+  // funcionando sin 404.
   {
     path: 'tutor/aulas/:classroomId',
+    pathMatch: 'full',
+    redirectTo: 'tutor/aulas/:classroomId/semanas',
+  },
+  {
+    path: 'tutor/aulas/:classroomId/semanas',
     canActivate: [authGuard, roleGuard('tutor')],
     loadComponent: () =>
-      import('./pages/tutor-aula-courses/tutor-aula-courses.page').then(
-        (m) => m.TutorAulaCoursesPage,
+      import('./pages/tutor-aula-semanas/tutor-aula-semanas.page').then(
+        (m) => m.TutorAulaSemanasPage,
       ),
   },
   {
-    path: 'tutor/aulas/:classroomId/curso/:course',
+    path: 'tutor/aulas/:classroomId/semanas/:periodId',
     canActivate: [authGuard, roleGuard('tutor')],
     loadComponent: () =>
-      import('./pages/tutor-aula-course-exams/tutor-aula-course-exams.page').then(
-        (m) => m.TutorAulaCourseExamsPage,
+      import('./pages/tutor-aula-semana-examenes/tutor-aula-semana-examenes.page').then(
+        (m) => m.TutorAulaSemanaExamenesPage,
       ),
   },
   {
     path: 'tutor/exams/:recordId',
     canActivate: [authGuard, roleGuard('tutor')],
     loadComponent: () =>
-      import('./pages/tutor-exam-detail/tutor-exam-detail.page').then(
-        (m) => m.TutorExamDetailPage,
-      ),
+      import('./pages/tutor-exam-detail/tutor-exam-detail.page').then((m) => m.TutorExamDetailPage),
   },
   // Ruta dev-only: cartilla mock 100% en memoria, sin back ni auth. La visibilidad
   // del atajo desde /home está gated por `environment.devTools`; la ruta en sí no
   // tiene guard porque también sirve como demo pública si se comparte el link.
   {
     path: 'demo-sheet',
-    loadComponent: () =>
-      import('./pages/demo-sheet/demo-sheet.page').then((m) => m.DemoSheetPage),
+    loadComponent: () => import('./pages/demo-sheet/demo-sheet.page').then((m) => m.DemoSheetPage),
   },
   // Redirects legacy para bookmarks / instalaciones PWA existentes.
   { path: 'home', pathMatch: 'full', redirectTo: '/student/home' },

@@ -1,7 +1,4 @@
 // Estilos de la pantalla de gestión de examen virtual del tutor.
-// Reutiliza el sistema Native Excellence: tokens del design system, jerarquía
-// tipográfica alineada con home/login/tutor-list, y patrones BEM
-// encapsulados por Angular.
 
 :host {
   display: block;
@@ -28,8 +25,6 @@
     align-items: center;
   }
 
-  // Botón Volver estilo tinted iOS-lite: sin caja, chevron real, color
-  // primary, tap-target 44pt para uso cómodo con el pulgar.
   &__btn-volver {
     display: inline-flex;
     align-items: center;
@@ -69,9 +64,8 @@
     color: var(--color-on-surface);
   }
 
-  // Chip pill con label es-PE — el elemento con data-testid contiene SOLO
-  // el texto label. Los íconos, si se agregan a futuro, deben quedar por
-  // fuera del `<span data-testid>` para no romper asserts `.textContent`.
+  // El elemento con data-testid contiene SOLO el texto label — cualquier
+  // ícono va fuera para no romper asserts `.textContent`.
   &__status-chip {
     display: inline-flex;
     align-items: center;
@@ -84,12 +78,99 @@
     background: var(--color-surface-container-high);
     color: var(--color-on-surface-variant);
 
-    // "En curso" es el único estado accionable → tint success para
-    // diferenciarlo del gris neutro de scheduled/finalized.
     &--in-progress {
       background: var(--color-success-container);
       color: var(--color-on-success-container);
     }
+  }
+
+  // Cajetín de rotulación técnica: card con celdas separadas por bordes
+  // internos. Divider entre todo hijo directo distinto al primero para
+  // stackear bp-cell / bp-row / bp-cell--countdown uniformemente.
+  &__blueprint {
+    display: flex;
+    flex-direction: column;
+    background: var(--color-surface-container-lowest);
+    border: 1px solid var(--color-on-surface-variant);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+
+    > * + * {
+      border-top: 1px solid var(--color-on-surface-variant);
+    }
+  }
+
+  &__bp-cell {
+    padding: 0.6rem 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  &__bp-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+
+    > .tutor-exam-detail__bp-cell + .tutor-exam-detail__bp-cell {
+      border-left: 1px solid var(--color-on-surface-variant);
+    }
+  }
+
+  &__bp-row--2 {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  &__bp-label {
+    margin: 0;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-on-surface-variant);
+
+    &--sub {
+      margin-top: 0.15rem;
+    }
+  }
+
+  &__bp-value {
+    margin: 0;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--color-on-surface);
+    letter-spacing: -0.005em;
+  }
+
+  &__bp-cell--countdown {
+    align-items: center;
+    text-align: center;
+    padding: 0.85rem;
+    background: var(--color-surface-container);
+  }
+
+  &__bp-closed-line {
+    margin: 0;
+    font-family: var(--font-mono, monospace);
+    font-size: 1.15rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-on-surface);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+  }
+
+  &__bp-countdown {
+    margin: 0;
+    font-family: var(--font-mono, monospace);
+    font-size: 2rem;
+    line-height: 1;
+    font-weight: 700;
+    color: var(--color-primary);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
   }
 
   &__error,
@@ -157,11 +238,6 @@
     border-color: var(--color-primary);
   }
 
-  &__btn-finalizar {
-    background: var(--color-error);
-    color: var(--color-on-error);
-    border-color: var(--color-error);
-  }
 
   &__students {
     display: flex;
@@ -183,38 +259,172 @@
     list-style: none;
     padding: 0;
     margin: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-outline-variant);
+    background: var(--color-surface-container-lowest);
+    overflow: hidden;
   }
 
   &__student-item {
-    padding: var(--space-sm) 0.9rem;
-    border-radius: var(--radius);
-    border: 1px solid var(--color-outline-variant);
-    background: var(--color-surface-container-lowest);
+    display: flex;
+    align-items: stretch;
+    box-sizing: border-box;
+
+    & + & {
+      border-top: 1px solid var(--color-outline-variant);
+    }
   }
 
   &__student-label {
     display: flex;
     align-items: center;
-    gap: var(--space-xs);
+    gap: var(--space-sm);
+    padding: 0.5rem var(--space-md);
+    min-height: 2.5rem;
+    box-sizing: border-box;
+    width: 100%;
     cursor: pointer;
+    user-select: none;
+    transition: background-color 0.12s ease;
+
+    &:hover {
+      background: var(--color-surface-container);
+    }
+
+    &:has(input:disabled) {
+      cursor: not-allowed;
+      opacity: 0.55;
+      &:hover {
+        background: transparent;
+      }
+    }
+  }
+
+  // Input real visualmente oculto pero accesible por teclado (focus-visible
+  // se pinta sobre el círculo custom).
+  &__student-checkbox-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  &__student-checkbox {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    border: 1.5px solid var(--color-outline);
+    background: var(--color-surface-container-lowest);
+    transition:
+      background-color 0.18s ease,
+      border-color 0.18s ease,
+      transform 0.12s ease;
+
+    .material-symbols-outlined {
+      font-size: 1.05rem;
+      line-height: 1;
+      color: var(--color-on-primary);
+      transform: scale(0);
+      transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+      font-variation-settings:
+        'FILL' 1,
+        'wght' 700;
+    }
+  }
+
+  &__student-checkbox-input:checked + &__student-checkbox {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+
+    .material-symbols-outlined {
+      transform: scale(1);
+    }
+  }
+
+  &__student-checkbox-input:focus-visible + &__student-checkbox {
+    box-shadow: 0 0 0 3px var(--color-primary-container);
+  }
+
+  &__student-label:active &__student-checkbox {
+    transform: scale(0.92);
   }
 
   &__student-name {
     flex: 1;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     color: var(--color-on-surface);
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   &__submitted-badge {
-    font-size: 0.75rem;
-    padding: 0.125rem 0.5rem;
-    border-radius: var(--radius-sm);
-    background: var(--color-surface-container-high);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.15rem 0.55rem;
+    border-radius: var(--radius-pill);
+    background: var(--color-success-container);
+    color: var(--color-on-success-container);
+    flex: 0 0 auto;
+
+    .material-symbols-outlined {
+      font-size: 0.9rem;
+      line-height: 1;
+    }
+  }
+
+  // Escape hatch discreto — el flujo esperado es que expire el countdown.
+  &__finalizar-early {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+    padding-top: var(--space-md);
+    margin-top: var(--space-sm);
+    border-top: 1px dashed var(--color-outline-variant);
+  }
+
+  &__finalizar-early-hint {
+    margin: 0;
+    font-size: 0.8rem;
     color: var(--color-on-surface-variant);
-    margin-left: auto;
+    text-align: center;
+  }
+
+  &__finalizar-early-btn {
+    appearance: none;
+    background: transparent;
+    border: 1px solid var(--color-primary);
+    border-radius: var(--radius);
+    padding: 0.4rem 1rem;
+    color: var(--color-primary);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    min-height: 2rem;
+
+    &:hover:not(:disabled) {
+      background: var(--color-surface-container);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
   }
 
   &__title-row {
@@ -224,33 +434,6 @@
     flex-wrap: wrap;
   }
 
-  &__meta {
-    list-style: none;
-    padding: 0;
-    margin: var(--space-sm) 0 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    font-size: 0.9rem;
-    color: var(--color-on-surface-variant);
-
-    li {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
-
-    .material-symbols-outlined {
-      font-size: 1.05rem;
-      line-height: 1;
-      color: var(--color-on-surface-variant);
-    }
-
-    strong {
-      font-weight: 700;
-      color: var(--color-on-surface);
-    }
-  }
 
   &__no-students {
     padding: var(--space-md);
@@ -268,8 +451,6 @@
     padding: var(--space-md);
     z-index: 20;
 
-    // En pantallas ≥ 480px lo centramos (desktop / tablet); en móvil se ancla
-    // al inferior para quedar cerca del pulgar del usuario.
     @media (min-width: 30rem) {
       place-items: center;
     }
@@ -324,8 +505,6 @@
     }
   }
 
-  // Grupo de dos inputs para "minutos : segundos". Layout centrado; los inputs
-  // son grandes (targets táctiles) y el ":" central los agrupa visualmente.
   &__mmss {
     display: flex;
     align-items: flex-end;
@@ -411,8 +590,6 @@
     margin-top: var(--space-xs);
   }
 
-  // Stacked: botones apilados verticalmente. Primary primero, con acción
-  // esperada al pulgar. Cancelar debajo, secundario.
   &__modal-actions--stacked {
     flex-direction: column;
     justify-content: stretch;
@@ -445,8 +622,6 @@
     color: #fff;
   }
 
-  // Variantes "large" para móviles: tap targets ≥ 48px, tipografía grande,
-  // full-width para agarrar bien con el pulgar.
   &__modal-confirm--large,
   &__modal-cancel--large {
     width: 100%;
@@ -461,7 +636,7 @@
   }
 
   &__modal-confirm--danger {
-    background: var(--color-error, #b91c1c);
+    background: var(--color-primary);
   }
 
   &__students-header {

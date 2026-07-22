@@ -2,10 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { timeout } from 'rxjs/operators';
-import {
-  FinalizeResult,
-  TutorExamsApi,
-} from '../../L1_domain/ports/tutor-exams-api';
+import { FinalizeResult, TutorExamsApi } from '../../L1_domain/ports/tutor-exams-api';
 import { TutorExam } from '../../L1_domain/entities/tutor-exam';
 import { TutorExamDetail } from '../../L1_domain/value-objects/tutor-exam-detail';
 import { ClassroomStudent } from '../../L1_domain/value-objects/classroom-student';
@@ -17,6 +14,7 @@ import { ExamConflictError } from '../../L1_domain/errors/exam-conflict.error';
 import { ExamPreconditionError } from '../../L1_domain/errors/exam-precondition.error';
 import { TutorExamForbiddenError } from '../../L1_domain/errors/tutor-exam-forbidden.error';
 import { apiPath } from './api-paths';
+import { SlugStore } from './slug-store';
 
 // DTO shapes — camelCase desde learnex (a diferencia del flujo del alumno que usa snake_case).
 
@@ -75,6 +73,15 @@ interface FinalizeResponseDto {
 @Injectable({ providedIn: 'root' })
 export class HttpTutorExamsApi implements TutorExamsApi {
   private readonly http = inject(HttpClient);
+  private readonly slugStore = inject(SlugStore);
+
+  // Ver `HttpExamsApi.requireSlug` — mismo contrato: si el slug no está
+  // hidratado, NetworkError sin loop de refresh.
+  private requireSlug(): string {
+    const slug = this.slugStore.current();
+    if (!slug) throw new NetworkError();
+    return slug;
+  }
 
   // GET /t/:slug/tutor/virtual-exams — lista de virtual exams del tutor.
   // `withCredentials` lo agrega el credentials.interceptor global — NO se setea acá.
@@ -83,7 +90,7 @@ export class HttpTutorExamsApi implements TutorExamsApi {
     try {
       const dto = await firstValueFrom(
         this.http
-          .get<TutorVirtualExamListResponseDto>(apiPath.tutorVirtualExams())
+          .get<TutorVirtualExamListResponseDto>(apiPath.tutorVirtualExams(this.requireSlug()))
           .pipe(timeout(10_000)),
       );
       return dto.items.map((item) => this.toTutorExam(item));
@@ -97,7 +104,7 @@ export class HttpTutorExamsApi implements TutorExamsApi {
     try {
       const dto = await firstValueFrom(
         this.http
-          .get<VirtualExamDetailDto>(apiPath.virtualExam(recordId))
+          .get<VirtualExamDetailDto>(apiPath.virtualExam(this.requireSlug(), recordId))
           .pipe(timeout(10_000)),
       );
       return this.toTutorExamDetail(dto);
@@ -115,7 +122,7 @@ export class HttpTutorExamsApi implements TutorExamsApi {
       const dto = await firstValueFrom(
         this.http
           .get<ClassroomStudentsResponseDto>(
-            apiPath.classroomStudents(req.classroomId, req.virtualExamDetailId),
+            apiPath.classroomStudents(this.requireSlug(), req.classroomId, req.virtualExamDetailId),
           )
           .pipe(timeout(10_000)),
       );
@@ -133,7 +140,7 @@ export class HttpTutorExamsApi implements TutorExamsApi {
     try {
       await firstValueFrom(
         this.http
-          .patch<void>(apiPath.virtualExamEnabledStudents(req.recordId), {
+          .patch<void>(apiPath.virtualExamEnabledStudents(this.requireSlug(), req.recordId), {
             enabledStudentIds: req.enabledStudentIds,
           })
           .pipe(timeout(10_000)),
@@ -151,7 +158,7 @@ export class HttpTutorExamsApi implements TutorExamsApi {
     try {
       await firstValueFrom(
         this.http
-          .post<void>(apiPath.virtualExamStart(recordId), body)
+          .post<void>(apiPath.virtualExamStart(this.requireSlug(), recordId), body)
           .pipe(timeout(10_000)),
       );
     } catch (err) {
@@ -167,13 +174,29 @@ export class HttpTutorExamsApi implements TutorExamsApi {
     try {
       const dto = await firstValueFrom(
         this.http
-          .post<FinalizeResponseDto>(apiPath.virtualExamFinalize(recordId), null)
+          .post<FinalizeResponseDto>(
+            apiPath.virtualExamFinalize(this.requireSlug(), recordId),
+            null,
+          )
           .pipe(timeout(10_000)),
       );
       return {
         transitioned: dto.transitioned,
         jobId: dto.jobId,
       };
+    } catch (err) {
+      throw this.classifyTutorError(err);
+    }
+  }
+
+  // POST /t/:slug/virtual-exams/:recordId/archive — sin body. Respuesta: 204 void.
+  async archivar(recordId: string): Promise<void> {
+    try {
+      await firstValueFrom(
+        this.http
+          .post<void>(apiPath.virtualExamArchive(this.requireSlug(), recordId), null)
+          .pipe(timeout(10_000)),
+      );
     } catch (err) {
       throw this.classifyTutorError(err);
     }

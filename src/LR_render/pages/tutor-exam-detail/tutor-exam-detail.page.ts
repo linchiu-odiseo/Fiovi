@@ -21,11 +21,10 @@ export class TutorExamDetailPage {
 
   constructor() {
     void this.vm.load();
-    // La carga no tiene cleanup (online-only, D3) pero si el componente se
-    // destruye antes de resolverse, la Promise simplemente queda sin efecto.
-    this.destroyRef.onDestroy(() => {
-      // No hay timers ni listeners en el detail VM (a diferencia del list VM).
-    });
+    // El VM arranca un ticker de countdown de 1s cuando el examen está
+    // in_progress (para refrescar `nowTick`). `stop()` cancela el interval
+    // al destruir la page — sin esto quedaría un leak tras navegar.
+    this.destroyRef.onDestroy(() => this.vm.stop());
   }
 
   // Volver a /tutor/home usando Router.navigate — robusto para deep-links e
@@ -58,6 +57,10 @@ export class TutorExamDetailPage {
 
   protected canFinalizar(): boolean {
     return this.vm.canFinalizar();
+  }
+
+  protected canArchivar(): boolean {
+    return this.vm.canArchivar();
   }
 
   protected isCheckboxDisabled(student: ClassroomStudent): boolean {
@@ -123,8 +126,37 @@ export class TutorExamDetailPage {
     void this.vm.confirmFinalizarModal();
   }
 
+  protected onArchivar(): void {
+    this.vm.openArchivarModal();
+  }
+
+  protected onCancelArchivarModal(): void {
+    this.vm.cancelArchivarModal();
+  }
+
+  protected onConfirmArchivarModal(): void {
+    void this.vm.confirmArchivarModal();
+  }
+
   protected onToggleStudent(studentId: string): void {
-    void this.vm.toggleStudent(studentId);
+    this.vm.requestToggleStudent(studentId);
+  }
+
+  protected onConfirmDesactivar(): void {
+    void this.vm.confirmDesactivarStudent();
+  }
+
+  protected onCancelDesactivar(): void {
+    this.vm.cancelDesactivarStudent();
+  }
+
+  /** Nombre del alumno cuyo desactivar está pendiente — para el copy del modal. */
+  protected pendingDesactivarStudentName(): string {
+    const id = this.vm.desactivarPendingStudentId();
+    if (id === null) return '';
+    const s = this.vm.students().find((x) => x.studentId === id);
+    if (!s) return '';
+    return `${s.firstName} ${s.lastName}`;
   }
 
   protected onRetry(): void {
@@ -144,11 +176,21 @@ export class TutorExamDetailPage {
 
   // Fecha compacta es-PE: 10/07/2026 14:32 — sin dependencias externas.
   protected formatDateTime(date: Date): string {
+    return `${this.formatDate(date)} ${this.formatTime(date)}`;
+  }
+
+  // Solo fecha (dd/mm/yyyy) — el cajetín las separa en celdas propias.
+  protected formatDate(date: Date): string {
     const dd = String(date.getDate()).padStart(2, '0');
     const mm = String(date.getMonth() + 1).padStart(2, '0');
     const yyyy = date.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  }
+
+  // Solo hora (HH:mm).
+  protected formatTime(date: Date): string {
     const hh = String(date.getHours()).padStart(2, '0');
     const mi = String(date.getMinutes()).padStart(2, '0');
-    return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
+    return `${hh}:${mi}`;
   }
 }

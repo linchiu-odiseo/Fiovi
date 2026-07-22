@@ -9,14 +9,14 @@ import { ExamServerStatus } from './exam-server-status';
 // `course` / `area` son snapshots plain-text; pueden ser null cuando el examen
 // se creó desde un entry sin curso.
 export interface TutorExamDetail {
-  readonly id: string;            // detailId interno
-  readonly recordId: string;      // id usado por endpoints de gestión
+  readonly id: string; // detailId interno
+  readonly recordId: string; // id usado por endpoints de gestión
   readonly status: ExamServerStatus;
   readonly name: string;
   readonly course: string | null;
   readonly area: string | null;
   readonly count: number | null;
-  readonly duration: number;      // segundos
+  readonly duration: number; // segundos
   readonly enabledStudentIds: readonly string[];
   readonly startedAt: Date | null;
   readonly finishedAt: Date | null;

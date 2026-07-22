@@ -1,0 +1,37 @@
+import { AuthRepository } from '../../L1_domain/ports/auth-repository';
+import { IdentityStorage } from '../../L1_domain/ports/identity-storage';
+import { TenantSlugCache } from '../../L1_domain/ports/tenant-slug-cache';
+import { Identity } from '../../L1_domain/entities/identity';
+import { GetProfileUseCase } from './get-profile.use-case';
+
+// Segunda mitad del flow multi-tenant. La view-model de `/login/select-tenant`
+// invoca esto pasando el slug que el user eligió + el `selectionToken` del
+// challenge (pre-autenticado por password o por SSO Google).
+//
+// Post-selección exitosa el backend:
+//   - setea cookies HttpOnly con path `/t/{slug}` (scope al tenant elegido);
+//   - responde `{user:{...,slug}, expiresAt}`.
+//   - Si el token traía context SSO (google), linkea `providerSub` al tenant
+//     elegido — transparente al frontend.
+//
+// La view-model luego navega a `/{role}/home`. Si el repo tira
+// `SelectionInvalidError` (token expiró, slug fuera de la lista, backend
+// rechazó), la view-model muestra un toast y redirige a `/login`.
+export class SelectTenantUseCase {
+  constructor(
+    private readonly authRepo: AuthRepository,
+    private readonly identityStorage: IdentityStorage,
+    private readonly slugCache: TenantSlugCache,
+    private readonly getProfile: GetProfileUseCase,
+  ) {}
+
+  async execute(input: { selectionToken: string; slug: string }): Promise<Identity> {
+    const identity = await this.authRepo.selectTenant(input);
+    await this.identityStorage.write(identity);
+    this.slugCache.set(identity.tenantSlug);
+    void this.getProfile.execute(identity.role()).catch((err) => {
+      console.warn('profile fetch post-select-tenant failed', err);
+    });
+    return identity;
+  }
+}

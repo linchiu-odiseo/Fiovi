@@ -56,7 +56,17 @@
             >
               <span class="aula-card__strip" aria-hidden="true"></span>
               <div class="aula-card__body">
-                <h3 class="aula-card__name">{{ aula.name }}</h3>
+                <div class="aula-card__title-row">
+                  <h3 class="aula-card__name">{{ aula.name }}</h3>
+                  @if (vm.inProgressCountFor(aula.id) > 0) {
+                    <span
+                      class="aula-card__badge aula-card__badge--in-progress"
+                      data-testid="aula-in-progress-badge"
+                    >
+                      {{ vm.inProgressCountFor(aula.id) }} en curso
+                    </span>
+                  }
+                </div>
                 <p class="aula-card__cycle">{{ aula.cycleName }}</p>
                 <p class="aula-card__meta">{{ aula.modality }} · {{ aula.shift }}</p>
                 <p class="aula-card__students">
@@ -91,11 +101,11 @@
         <p>Sin conexión. Revisá tu red y reintentá.</p>
         <button type="button" (click)="vm.refresh()">Reintentar</button>
       </div>
-    } @else if (!vm.hasExamsInProgress()) {
+    } @else if (!vm.hasExamsEnCurso()) {
       <p class="exams-in-progress-section__empty">No hay exámenes en curso ahora.</p>
     } @else {
       <ul class="tutor-exams-list__list" data-testid="exams-list">
-        @for (exam of vm.examsInProgress(); track exam.recordId) {
+        @for (exam of vm.examsEnCurso(); track exam.recordId) {
           <li
             class="exam-card exam-card--in-progress"
             data-testid="exam-card"
@@ -107,16 +117,15 @@
             <span class="exam-card__strip" aria-hidden="true"></span>
             <div class="exam-card__header">
               <h3 class="exam-card__name">{{ exam.name }}</h3>
-              <span class="exam-card__status-badge" data-testid="status-badge">
-                {{ statusLabel(exam) }}
-              </span>
+              <span class="exam-card__status-badge" data-testid="status-badge"> En curso </span>
             </div>
             <div class="exam-card__meta">
+              <span class="exam-card__classroom">{{ exam.classroomName }}</span>
               @if (exam.course) {
                 <span class="exam-card__course">{{ exam.course }}</span>
               }
               <span class="exam-card__count">{{ countDisplay(exam) }} preguntas</span>
-              <span class="exam-card__duration">{{ exam.durationInMinutes }} min</span>
+              <span class="exam-card__duration">{{ durationInMinutes(exam) }} min</span>
             </div>
           </li>
         }

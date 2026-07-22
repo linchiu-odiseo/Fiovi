@@ -15,7 +15,10 @@ import {
 } from '../../../../../src/L2_application/use-cases/programar-auto-envio.use-case';
 import { SeleccionarAdmissionAreaUseCase } from '../../../../../src/L2_application/use-cases/seleccionar-admission-area.use-case';
 import { CLOCK, MARKINGS_STORAGE } from '../../../../../src/app.config';
-import { NoopDraftAutoSaveDispatcher, DraftAutoSaveDispatcher } from '../../../../../src/L3_periphery/envio/draft-auto-save-dispatcher.service';
+import {
+  NoopDraftAutoSaveDispatcher,
+  DraftAutoSaveDispatcher,
+} from '../../../../../src/L3_periphery/envio/draft-auto-save-dispatcher.service';
 import { Exam } from '../../../../../src/L1_domain/entities/exam';
 import { ExamServerStatus } from '../../../../../src/L1_domain/value-objects/exam-server-status';
 import { ServerTime } from '../../../../../src/L1_domain/value-objects/server-time';
@@ -183,7 +186,7 @@ const buildExam = (
     scheduled: overrides.scheduled ?? new Date('2026-06-11T10:00:00Z'),
     started:
       'started' in overrides
-        ? overrides.started ?? null
+        ? (overrides.started ?? null)
         : inProgress || finalized
           ? new Date('2026-06-11T10:00:05Z')
           : null,

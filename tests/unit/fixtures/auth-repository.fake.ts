@@ -4,14 +4,21 @@
 
 import { AuthRepository } from '../../../src/L1_domain/ports/auth-repository';
 import { Identity, Role } from '../../../src/L1_domain/entities/identity';
+import { SelectionChallenge } from '../../../src/L1_domain/value-objects/selection-challenge';
+import { SsoProvider } from '../../../src/L1_domain/value-objects/sso-provider';
 import { StudentProfile } from '../../../src/L1_domain/value-objects/student-profile';
 import { TutorProfile } from '../../../src/L1_domain/value-objects/tutor-profile';
 
 export class FakeAuthRepository implements AuthRepository {
   private nextLogin:
+    | { kind: 'resolve'; outcome: Identity | SelectionChallenge }
+    | { kind: 'reject'; error: Error }
+    | null = null;
+  private nextSelectTenant:
     | { kind: 'resolve'; identity: Identity }
     | { kind: 'reject'; error: Error }
     | null = null;
+  private nextSsoProviders: SsoProvider[] = [];
   private nextMe:
     | { kind: 'resolve'; identity: Identity }
     | { kind: 'reject'; error: Error }
@@ -26,7 +33,9 @@ export class FakeAuthRepository implements AuthRepository {
     | { kind: 'reject'; error: Error }
     | null = null;
 
-  private loginCalls: { email: string; password: string }[] = [];
+  private loginCalls: { email: string; password: string; captchaToken?: string }[] = [];
+  private selectTenantCalls: { selectionToken: string; slug: string }[] = [];
+  private ssoProvidersCalls = 0;
   private meCalls = 0;
   private refreshCalls = 0;
   private logoutCalls = 0;
@@ -34,12 +43,24 @@ export class FakeAuthRepository implements AuthRepository {
 
   // Configuración
 
-  willResolveLogin(identity: Identity): void {
-    this.nextLogin = { kind: 'resolve', identity };
+  willResolveLogin(outcome: Identity | SelectionChallenge): void {
+    this.nextLogin = { kind: 'resolve', outcome };
   }
 
   willRejectLogin(error: Error): void {
     this.nextLogin = { kind: 'reject', error };
+  }
+
+  willResolveSelectTenant(identity: Identity): void {
+    this.nextSelectTenant = { kind: 'resolve', identity };
+  }
+
+  willRejectSelectTenant(error: Error): void {
+    this.nextSelectTenant = { kind: 'reject', error };
+  }
+
+  willResolveSsoProviders(providers: SsoProvider[]): void {
+    this.nextSsoProviders = providers;
   }
 
   willResolveMe(identity: Identity): void {
@@ -72,8 +93,16 @@ export class FakeAuthRepository implements AuthRepository {
 
   // Inspectores
 
-  getLoginCalls(): readonly { email: string; password: string }[] {
+  getLoginCalls(): readonly { email: string; password: string; captchaToken?: string }[] {
     return this.loginCalls;
+  }
+
+  getSelectTenantCalls(): readonly { selectionToken: string; slug: string }[] {
+    return this.selectTenantCalls;
+  }
+
+  getSsoProvidersCalls(): number {
+    return this.ssoProvidersCalls;
   }
 
   getMeCalls(): number {
@@ -94,14 +123,33 @@ export class FakeAuthRepository implements AuthRepository {
 
   // Implementación del puerto
 
-  async login(credentials: { email: string; password: string }): Promise<Identity> {
+  async login(credentials: {
+    email: string;
+    password: string;
+    captchaToken?: string;
+  }): Promise<Identity | SelectionChallenge> {
     this.loginCalls.push(credentials);
     if (!this.nextLogin)
       throw new Error(
         'FakeAuthRepository: configurar willResolveLogin/willRejectLogin antes de login()',
       );
     if (this.nextLogin.kind === 'reject') throw this.nextLogin.error;
-    return this.nextLogin.identity;
+    return this.nextLogin.outcome;
+  }
+
+  async selectTenant(input: { selectionToken: string; slug: string }): Promise<Identity> {
+    this.selectTenantCalls.push(input);
+    if (!this.nextSelectTenant)
+      throw new Error(
+        'FakeAuthRepository: configurar willResolveSelectTenant/willRejectSelectTenant antes de selectTenant()',
+      );
+    if (this.nextSelectTenant.kind === 'reject') throw this.nextSelectTenant.error;
+    return this.nextSelectTenant.identity;
+  }
+
+  async listSsoProviders(): Promise<SsoProvider[]> {
+    this.ssoProvidersCalls++;
+    return this.nextSsoProviders;
   }
 
   async me(): Promise<Identity> {

@@ -4,7 +4,10 @@ import { provideRouter, Router } from '@angular/router';
 import { Component } from '@angular/core';
 import { LoginViewModel } from '../../../../src/LR_render/view-models/login.view-model';
 import { LoginUseCase } from '../../../../src/L2_application/use-cases/login.use-case';
+import { ListSsoProvidersUseCase } from '../../../../src/L2_application/use-cases/list-sso-providers.use-case';
 import { Identity } from '../../../../src/L1_domain/entities/identity';
+import { SelectionChallenge } from '../../../../src/L1_domain/value-objects/selection-challenge';
+import { SsoProvider } from '../../../../src/L1_domain/value-objects/sso-provider';
 import { InvalidCredentialsError } from '../../../../src/L1_domain/errors/invalid-credentials.error';
 import { NetworkError } from '../../../../src/L1_domain/errors/network.error';
 import { RateLimitError } from '../../../../src/L1_domain/errors/rate-limit.error';
@@ -17,22 +20,37 @@ class StudentHomeStub {}
 @Component({ template: '' })
 class TutorHomeStub {}
 
+@Component({ template: '' })
+class SelectTenantStub {}
+
+class FakeListSsoProvidersUseCase {
+  async execute(): Promise<SsoProvider[]> {
+    return [];
+  }
+}
+
 // Fake del LoginUseCase. Lo controlamos por `willResolveAs` / `willRejectWith`.
 // Devuelve una Identity instanciada de verdad (no un stub) para que `identity.role()`
 // funcione sin mocks adicionales.
 class FakeLoginUseCase {
-  private next: { kind: 'resolve'; identity: Identity } | { kind: 'reject'; error: Error } = {
+  private next:
+    | { kind: 'resolve'; outcome: Identity | SelectionChallenge }
+    | { kind: 'reject'; error: Error } = {
     kind: 'resolve',
-    identity: buildIdentity('student'),
+    outcome: buildIdentity('student'),
   };
   public calls: { email: string; password: string }[] = [];
   // Permite suspender la promesa para verificar isSubmitting=true durante el await.
   private pending: Promise<unknown> | null = null;
-  private resolvePending: ((v: Identity) => void) | null = null;
+  private resolvePending: ((v: Identity | SelectionChallenge) => void) | null = null;
   private rejectPending: ((err: Error) => void) | null = null;
 
   willResolveAs(role: 'student' | 'tutor') {
-    this.next = { kind: 'resolve', identity: buildIdentity(role) };
+    this.next = { kind: 'resolve', outcome: buildIdentity(role) };
+  }
+
+  willResolveSelection(challenge: SelectionChallenge) {
+    this.next = { kind: 'resolve', outcome: challenge };
   }
 
   willRejectWith(error: Error) {
@@ -41,8 +59,8 @@ class FakeLoginUseCase {
 
   /** Modo manual: el caller controla la resolución/rechazo vía resolveNow/rejectNow. */
   willSuspend() {
-    this.next = { kind: 'resolve', identity: buildIdentity('student') };
-    this.pending = new Promise<Identity>((resolve, reject) => {
+    this.next = { kind: 'resolve', outcome: buildIdentity('student') };
+    this.pending = new Promise<Identity | SelectionChallenge>((resolve, reject) => {
       this.resolvePending = resolve;
       this.rejectPending = reject;
     });
@@ -60,15 +78,17 @@ class FakeLoginUseCase {
     this.rejectPending = null;
   }
 
-  async execute(credentials: { email: string; password: string }): Promise<Identity> {
+  async execute(credentials: {
+    email: string;
+    password: string;
+  }): Promise<Identity | SelectionChallenge> {
     this.calls.push(credentials);
     if (this.pending) {
-      // Esperamos a que el test llame resolveNow/rejectNow.
-      const id = (await this.pending) as Identity;
-      return id;
+      const outcome = (await this.pending) as Identity | SelectionChallenge;
+      return outcome;
     }
     if (this.next.kind === 'reject') throw this.next.error;
-    return this.next.identity;
+    return this.next.outcome;
   }
 }
 
@@ -76,7 +96,7 @@ function buildIdentity(role: 'student' | 'tutor'): Identity {
   // Email coherente con el rol — no es load-bearing, pero mantiene el realismo.
   const email = role === 'student' ? '79507732@vonex.edu.pe' : 'tutor1@vonex.pe';
   const codigo = role === 'student' ? '79507732' : null;
-  return new Identity('user-id', 'tenant-id', email, codigo, [role], [], Date.now() + 900_000);
+  return new Identity('user-id', 'tenant-id', 'vonex', email, codigo, [role], Date.now() + 900_000);
 }
 
 const validCredentials = { email: 'fulano@panda.test', password: '12345678' };
@@ -96,8 +116,10 @@ describe('LoginViewModel', () => {
         provideRouter([
           { path: 'student/home', component: StudentHomeStub },
           { path: 'tutor/home', component: TutorHomeStub },
+          { path: 'login/select-tenant', component: SelectTenantStub },
         ]),
         { provide: LoginUseCase, useValue: fakeUseCase },
+        { provide: ListSsoProvidersUseCase, useValue: new FakeListSsoProvidersUseCase() },
       ],
     }).compileComponents();
   });

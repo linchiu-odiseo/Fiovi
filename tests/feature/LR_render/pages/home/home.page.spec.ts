@@ -35,10 +35,10 @@ function buildIdentity(): Identity {
   return new Identity(
     'user-id',
     'tenant-id',
+    'vonex',
     'fulano@panda.test',
     '79507732',
     ['student'],
-    [],
     Date.now() + 900_000,
   );
 }
@@ -434,9 +434,8 @@ describe('HomePage', () => {
       fixture.detectChanges();
       const blockquote = (fixture.nativeElement as HTMLElement).querySelector('blockquote.quote');
       expect(blockquote).not.toBeNull();
-      const { INSPIRATIONAL_QUOTES } = await import(
-        '../../../../../src/LR_render/pages/home/inspirational-quotes'
-      );
+      const { INSPIRATIONAL_QUOTES } =
+        await import('../../../../../src/LR_render/pages/home/inspirational-quotes');
       const text = blockquote?.textContent?.trim();
       expect(INSPIRATIONAL_QUOTES).toContain(text);
     });
@@ -570,7 +569,8 @@ describe('HomePage', () => {
       expect(dialog).not.toBeNull();
       const text = dialog?.textContent ?? '';
       // Regex case-insensitive cubriendo singular/plural y variantes con/sin tilde.
-      const forbidden = /se borrar[áa]n|vas a perder|se eliminar[áa]n|se borran|se pierden|se eliminan/i;
+      const forbidden =
+        /se borrar[áa]n|vas a perder|se eliminar[áa]n|se borran|se pierden|se eliminan/i;
       expect(forbidden.test(text)).toBe(false);
     });
 

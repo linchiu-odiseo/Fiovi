@@ -19,16 +19,16 @@
 └─────────────┘   └────────┘   └──────┘   └────────┘   └───────┘   └───────┘   └────────┘   └─────────┘
 ```
 
-| # | Fase | Skill / comando | Artefacto que produce | Cuándo es obligatoria |
-| - | ---- | --------------- | --------------------- | --------------------- |
-| 1 | **Explore** | `sdd-explore` | notas / memory | Opcional. Solo cuando la idea no está clara y hay que investigar el código antes de proponer. |
-| 2 | **Propose** | `sdd-propose` | `proposal.md` | **Siempre.** Sin proposal aprobada no hay change. |
-| 3 | **Spec** | `sdd-spec` | `specs/<cap>/spec.md` (delta) | **Siempre.** Define requisitos formales (capabilities + scenarios). |
-| 4 | **Design** | `sdd-design` | `design.md` | **Siempre que haya decisiones técnicas no obvias.** En cambios triviales puede ser una nota corta, pero el archivo existe. |
-| 5 | **Tasks** | `sdd-tasks` | `tasks.md` | **Siempre.** Checklist accionable y ordenada. Sin tasks no se puede aplicar. |
-| 6 | **Apply** | `sdd-apply` | código + tasks marcadas ✓ | **Siempre.** Esta es la única fase donde se modifica `src/` y `tests/`. |
-| 7 | **Verify** | `sdd-verify` | `verify-report.md` | **Siempre.** Valida implementación contra spec/design/tasks. **Aquí corre el gate de `hexagonal-guard` (ver Regla #3).** |
-| 8 | **Archive** | `sdd-archive` | `archive-report.md` + merge a `openspec/specs/` | **Siempre.** Cierra el ciclo: mueve el change a `openspec/changes/archive/<YYYY-MM-DD>-<name>/` y mergea los delta specs en las main specs. |
+| #   | Fase        | Skill / comando | Artefacto que produce                           | Cuándo es obligatoria                                                                                                                       |
+| --- | ----------- | --------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Explore** | `sdd-explore`   | notas / memory                                  | Opcional. Solo cuando la idea no está clara y hay que investigar el código antes de proponer.                                               |
+| 2   | **Propose** | `sdd-propose`   | `proposal.md`                                   | **Siempre.** Sin proposal aprobada no hay change.                                                                                           |
+| 3   | **Spec**    | `sdd-spec`      | `specs/<cap>/spec.md` (delta)                   | **Siempre.** Define requisitos formales (capabilities + scenarios).                                                                         |
+| 4   | **Design**  | `sdd-design`    | `design.md`                                     | **Siempre que haya decisiones técnicas no obvias.** En cambios triviales puede ser una nota corta, pero el archivo existe.                  |
+| 5   | **Tasks**   | `sdd-tasks`     | `tasks.md`                                      | **Siempre.** Checklist accionable y ordenada. Sin tasks no se puede aplicar.                                                                |
+| 6   | **Apply**   | `sdd-apply`     | código + tasks marcadas ✓                       | **Siempre.** Esta es la única fase donde se modifica `src/` y `tests/`.                                                                     |
+| 7   | **Verify**  | `sdd-verify`    | `verify-report.md`                              | **Siempre.** Valida implementación contra spec/design/tasks. **Aquí corre el gate de `hexagonal-guard` (ver Regla #3).**                    |
+| 8   | **Archive** | `sdd-archive`   | `archive-report.md` + merge a `openspec/specs/` | **Siempre.** Cierra el ciclo: mueve el change a `openspec/changes/archive/<YYYY-MM-DD>-<name>/` y mergea los delta specs en las main specs. |
 
 ### Reglas duras del workflow
 
@@ -91,11 +91,11 @@ El repo tiene 3 subagentes especializados, definidos en [`.claude/agents/`](./.c
 
 ### Los 3 subagentes
 
-| Subagente | Cuándo usarlo | Obligatoriedad |
-| --------- | ------------- | -------------- |
-| **`hexagonal-guard`** | Auditor read-only de boundaries hexagonales. Detecta imports cruzados que ESLint no atrapa, entidades anémicas, mappers ceremoniales, use cases passthrough. | **OBLIGATORIO antes de `sdd-archive`. Bloqueante.** |
-| **`frontend-builder`** | Implementa LR_render: pages, components, view-models con Signals, Reactive Forms, routing. | Recomendado cuando el change toca `src/LR_render/`. No bloqueante. |
-| **`test-engineer`** | Escribe tests Vitest (L1+L2 puros, L3+LR con TestBed/HttpTestingController). | Recomendado cuando el change agrega/modifica entidad, value-object, use case, adapter o componente. No bloqueante. |
+| Subagente              | Cuándo usarlo                                                                                                                                                | Obligatoriedad                                                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| **`hexagonal-guard`**  | Auditor read-only de boundaries hexagonales. Detecta imports cruzados que ESLint no atrapa, entidades anémicas, mappers ceremoniales, use cases passthrough. | **OBLIGATORIO antes de `sdd-archive`. Bloqueante.**                                                                |
+| **`frontend-builder`** | Implementa LR_render: pages, components, view-models con Signals, Reactive Forms, routing.                                                                   | Recomendado cuando el change toca `src/LR_render/`. No bloqueante.                                                 |
+| **`test-engineer`**    | Escribe tests Vitest (L1+L2 puros, L3+LR con TestBed/HttpTestingController).                                                                                 | Recomendado cuando el change agrega/modifica entidad, value-object, use case, adapter o componente. No bloqueante. |
 
 ### El gate de `hexagonal-guard` (bloqueante)
 

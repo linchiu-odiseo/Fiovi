@@ -20,15 +20,17 @@ export class FakeTutorExamsApi implements TutorExamsApi {
     throw new Error('FakeTutorExamsApi.getExamDetail: not implemented in this stub');
   }
 
-  async listClassroomStudents(
-    _req: { classroomId: string; virtualExamDetailId: string },
-  ): Promise<readonly ClassroomStudent[]> {
+  async listClassroomStudents(_req: {
+    classroomId: string;
+    virtualExamDetailId: string;
+  }): Promise<readonly ClassroomStudent[]> {
     return [];
   }
 
-  async updateEnabledStudents(
-    _req: { recordId: string; enabledStudentIds: readonly string[] },
-  ): Promise<void> {
+  async updateEnabledStudents(_req: {
+    recordId: string;
+    enabledStudentIds: readonly string[];
+  }): Promise<void> {
     return;
   }
 
@@ -38,5 +40,9 @@ export class FakeTutorExamsApi implements TutorExamsApi {
 
   async finalizar(_recordId: string): Promise<FinalizeResult> {
     return { transitioned: true };
+  }
+
+  async archivar(_recordId: string): Promise<void> {
+    return;
   }
 }

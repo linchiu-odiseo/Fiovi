@@ -46,42 +46,85 @@
           >{{ sc.label }}</span
         >
       </div>
-
-      <ul class="tutor-exam-detail__meta" data-testid="exam-meta">
-        @if (detail.area) {
-          <li>
-            <span class="material-symbols-outlined" aria-hidden="true">category</span>
-            <span>Área: <strong>{{ detail.area }}</strong></span>
-          </li>
-        }
-        @if (detail.course) {
-          <li>
-            <span class="material-symbols-outlined" aria-hidden="true">menu_book</span>
-            <span>Curso: <strong>{{ detail.course }}</strong></span>
-          </li>
-        }
-        <li>
-          <span class="material-symbols-outlined" aria-hidden="true">quiz</span>
-          <span>{{ countLabel(detail) }}</span>
-        </li>
-        <li>
-          <span class="material-symbols-outlined" aria-hidden="true">timer</span>
-          <span>Duración: <strong>{{ durationMinutes(detail) }} min</strong></span>
-        </li>
-        @if (detail.startedAt) {
-          <li>
-            <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>
-            <span>Iniciado: <strong>{{ formatDateTime(detail.startedAt) }}</strong></span>
-          </li>
-        }
-        @if (detail.finishedAt) {
-          <li>
-            <span class="material-symbols-outlined" aria-hidden="true">flag</span>
-            <span>Finalizado: <strong>{{ formatDateTime(detail.finishedAt) }}</strong></span>
-          </li>
-        }
-      </ul>
     </header>
+
+    <!-- Cajetín de rotulación estilo dibujo técnico: card con divisores
+         internos (celdas), tipografía monoespaciada, bordes contrastados.
+         Mismo layout en mobile y desktop — sin media queries. Reúne toda
+         la info del examen + countdown en una sola pieza. -->
+    <section class="tutor-exam-detail__blueprint" data-testid="exam-meta">
+      @if (detail.course) {
+        <div class="tutor-exam-detail__bp-cell">
+          <p class="tutor-exam-detail__bp-label">Curso</p>
+          <p class="tutor-exam-detail__bp-value">{{ detail.course }}</p>
+        </div>
+      }
+
+      <div class="tutor-exam-detail__bp-row">
+        @if (detail.area) {
+          <div class="tutor-exam-detail__bp-cell">
+            <p class="tutor-exam-detail__bp-label">Área</p>
+            <p class="tutor-exam-detail__bp-value">{{ detail.area }}</p>
+          </div>
+        }
+        <div class="tutor-exam-detail__bp-cell">
+          <p class="tutor-exam-detail__bp-label">Preguntas</p>
+          <p class="tutor-exam-detail__bp-value">
+            {{ detail.count === null ? '—' : detail.count }}
+          </p>
+        </div>
+        <div class="tutor-exam-detail__bp-cell">
+          <p class="tutor-exam-detail__bp-label">Duración</p>
+          <p class="tutor-exam-detail__bp-value">{{ durationMinutes(detail) }} min</p>
+        </div>
+      </div>
+
+      @if (detail.startedAt) {
+        <div class="tutor-exam-detail__bp-row tutor-exam-detail__bp-row--2">
+          <div class="tutor-exam-detail__bp-cell">
+            <p class="tutor-exam-detail__bp-label">Fecha inicio</p>
+            <p class="tutor-exam-detail__bp-value">{{ formatDate(detail.startedAt) }}</p>
+          </div>
+          <div class="tutor-exam-detail__bp-cell">
+            <p class="tutor-exam-detail__bp-label">Hora inicio</p>
+            <p class="tutor-exam-detail__bp-value">{{ formatTime(detail.startedAt) }}</p>
+          </div>
+        </div>
+      }
+      <!-- Nota: no repetimos "Fecha fin / Hora fin" — la celda countdown
+           de abajo ya muestra "Cerrado a las HH:MM" cuando finaliza. -->
+
+      <!-- Celda countdown: destaca dentro del cajetín. Aparece solo cuando
+           hay cierre determinable (started !== null). Mientras el examen
+           está en curso muestra "Cierra a las HH:MM" + MM:SS + "Tiempo
+           restante". Una vez finalizado, colapsa a solo "Cerrado a las
+           HH:MM" — el 00:00 congelado no aporta información y el label
+           basta como cierre visual. -->
+      @if (vm.closeTimeText()) {
+        <div
+          class="tutor-exam-detail__bp-cell tutor-exam-detail__bp-cell--countdown"
+          [class.tutor-exam-detail__bp-cell--countdown-finalized]="!canFinalizar()"
+          data-testid="tutor-countdown"
+        >
+          @if (canFinalizar()) {
+            <p class="tutor-exam-detail__bp-label">
+              {{ vm.closeLabelPrefix() }} {{ vm.closeTimeText() }}
+            </p>
+            <p class="tutor-exam-detail__bp-countdown">{{ vm.countdownRestante() }}</p>
+            <p class="tutor-exam-detail__bp-label tutor-exam-detail__bp-label--sub">
+              Tiempo restante
+            </p>
+          } @else {
+            <!-- Post-finalize: una sola línea grande con "CERRADO A LAS HH:MM"
+                 — sin partir el label del valor. Tipografía uppercase mono
+                 más grande que el label chico, para que sea el foco visual. -->
+            <p class="tutor-exam-detail__bp-closed-line">
+              {{ vm.closeLabelPrefix() }} {{ vm.closeTimeText() }}
+            </p>
+          }
+        </div>
+      }
+    </section>
 
     <!-- Error de acción (iniciar / finalizar / habilitar) -->
     @if (vm.actionError()) {
@@ -94,9 +137,12 @@
       </section>
     }
 
-    <!-- Botones de acción: Iniciar y Finalizar (D5 guards — solo el válido aparece) -->
-    <section class="tutor-exam-detail__actions">
-      @if (canIniciar()) {
+    <!-- Botón principal: solo "Iniciar" acá (D5 guard). "Finalizar" es un
+         escape hatch discreto al final de la pantalla — el flujo esperado
+         es que el examen termine solo cuando venza el countdown, no que el
+         tutor lo corte manualmente. -->
+    @if (canIniciar()) {
+      <section class="tutor-exam-detail__actions">
         <button
           type="button"
           class="tutor-exam-detail__btn-iniciar"
@@ -106,20 +152,8 @@
         >
           Iniciar examen
         </button>
-      }
-
-      @if (canFinalizar()) {
-        <button
-          type="button"
-          class="tutor-exam-detail__btn-finalizar"
-          data-testid="btn-finalizar"
-          [disabled]="vm.isSaving()"
-          (click)="onFinalizar()"
-        >
-          Finalizar examen
-        </button>
-      }
-    </section>
+      </section>
+    }
 
     <!-- Modal: confirmar finalización antes de tiempo -->
     @if (vm.finalizarModalOpen()) {
@@ -135,8 +169,8 @@
             Finalizar examen
           </h2>
           <p class="tutor-exam-detail__modal-hint">
-            ¿Seguro que querés cerrar el examen antes de tiempo? Los alumnos
-            no podrán seguir marcando y se enviará a procesar.
+            ¿Seguro que querés cerrar el examen antes de tiempo? Los alumnos no podrán seguir
+            marcando y se enviará a procesar.
           </p>
           <div class="tutor-exam-detail__modal-actions tutor-exam-detail__modal-actions--stacked">
             <button
@@ -172,9 +206,7 @@
         data-testid="iniciar-modal"
       >
         <div class="tutor-exam-detail__modal tutor-exam-detail__modal--iniciar">
-          <h2 id="iniciar-modal-title" class="tutor-exam-detail__modal-title">
-            Iniciar examen
-          </h2>
+          <h2 id="iniciar-modal-title" class="tutor-exam-detail__modal-title">Iniciar examen</h2>
           <p class="tutor-exam-detail__modal-hint">
             Confirmá o ajustá el tiempo antes de iniciar. Los alumnos verán esta duración.
           </p>
@@ -254,22 +286,38 @@
           {{ vm.enabledCount() }} habilitados de {{ vm.totalStudents() }}
         </span>
       </div>
+      <!-- Lista compacta estilo iOS Settings: una sola card contenedora con
+           dividers internos, filas densas para escanear cómodamente 60+
+           alumnos sin scroll infinito. Cada fila es un label que envuelve
+           el checkbox custom + nombre — click en cualquier parte del label
+           toggle el checkbox (área táctil grande). El input real está
+           visualmente oculto pero accesible por teclado y screen readers. -->
       <ul class="tutor-exam-detail__student-list">
         @for (student of vm.students(); track student.studentId) {
           <li class="tutor-exam-detail__student-item" data-testid="student-item">
             <label class="tutor-exam-detail__student-label">
               <input
                 type="checkbox"
+                class="tutor-exam-detail__student-checkbox-input"
                 data-testid="student-checkbox"
                 [checked]="isStudentEnabled(student.studentId)"
                 [disabled]="isCheckboxDisabled(student)"
                 (change)="onToggleStudent(student.studentId)"
               />
+              <span
+                class="tutor-exam-detail__student-checkbox"
+                aria-hidden="true"
+              >
+                <span class="material-symbols-outlined">check</span>
+              </span>
               <span class="tutor-exam-detail__student-name">
                 {{ student.firstName }} {{ student.lastName }}
               </span>
               @if (student.hasSubmitted) {
-                <span class="tutor-exam-detail__submitted-badge">Entregado</span>
+                <span class="tutor-exam-detail__submitted-badge">
+                  <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+                  Entregado
+                </span>
               }
             </label>
           </li>
@@ -280,5 +328,132 @@
         }
       </ul>
     </section>
+
+    <!-- Escape hatch: finalizar antes de tiempo. Aparece solo cuando canFinalizar
+         es true (status=in_progress). Diseño intencionalmente discreto — la UX
+         esperada es dejar que el countdown expire, no cortar el examen manualmente. -->
+    @if (canFinalizar()) {
+      <section class="tutor-exam-detail__finalizar-early">
+        <p class="tutor-exam-detail__finalizar-early-hint">
+          ¿Necesitás cerrar antes del tiempo previsto?
+        </p>
+        <button
+          type="button"
+          class="tutor-exam-detail__finalizar-early-btn"
+          data-testid="btn-finalizar"
+          [disabled]="vm.isSaving()"
+          (click)="onFinalizar()"
+        >
+          Finalizar ahora
+        </button>
+      </section>
+    }
+
+    <!-- Archivar: aparece cuando el examen ya está finalizado (status=finalized).
+         Reutiliza el mismo cajón escape-hatch — la UX es "acción secundaria
+         que saca este examen de la vista principal". Al confirmar, el detalle
+         redirige a /tutor/home porque el examen deja de aparecer en la lista. -->
+    @if (canArchivar()) {
+      <section class="tutor-exam-detail__finalizar-early">
+        <p class="tutor-exam-detail__finalizar-early-hint">
+          Podés archivar el examen para sacarlo de la lista.
+        </p>
+        <button
+          type="button"
+          class="tutor-exam-detail__finalizar-early-btn"
+          data-testid="btn-archivar"
+          [disabled]="vm.isSaving()"
+          (click)="onArchivar()"
+        >
+          Archivar
+        </button>
+      </section>
+    }
+
+    <!-- Modal: confirmar deshabilitar alumno mientras el examen está en curso.
+         El alumno queda fuera del set de habilitados; al finalizar el grader
+         lo ignora (sin nota). Pedimos confirmación explícita para evitar
+         cambios accidentales con exam en vivo. -->
+    @if (vm.desactivarModalOpen()) {
+      <div
+        class="tutor-exam-detail__modal-backdrop"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="desactivar-modal-title"
+        data-testid="desactivar-modal"
+      >
+        <div class="tutor-exam-detail__modal">
+          <h2 id="desactivar-modal-title" class="tutor-exam-detail__modal-title">
+            Deshabilitar alumno
+          </h2>
+          <p class="tutor-exam-detail__modal-hint">
+            ¿Seguro que querés deshabilitar a
+            <strong>{{ pendingDesactivarStudentName() }}</strong>? El examen ya
+            está en curso — el alumno no aparecerá en las notas al finalizar.
+          </p>
+          <div class="tutor-exam-detail__modal-actions tutor-exam-detail__modal-actions--stacked">
+            <button
+              type="button"
+              class="tutor-exam-detail__modal-confirm tutor-exam-detail__modal-confirm--danger tutor-exam-detail__modal-confirm--large"
+              data-testid="btn-confirm-desactivar"
+              [disabled]="vm.isSaving()"
+              (click)="onConfirmDesactivar()"
+            >
+              Sí, deshabilitar
+            </button>
+            <button
+              type="button"
+              class="tutor-exam-detail__modal-cancel tutor-exam-detail__modal-cancel--large"
+              data-testid="btn-cancel-desactivar"
+              [disabled]="vm.isSaving()"
+              (click)="onCancelDesactivar()"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Modal: confirmar archivar (irreversible desde la vista del tutor). -->
+    @if (vm.archivarModalOpen()) {
+      <div
+        class="tutor-exam-detail__modal-backdrop"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="archivar-modal-title"
+        data-testid="archivar-modal"
+      >
+        <div class="tutor-exam-detail__modal">
+          <h2 id="archivar-modal-title" class="tutor-exam-detail__modal-title">
+            Archivar examen
+          </h2>
+          <p class="tutor-exam-detail__modal-hint">
+            El examen se sacará de la lista. Las notas de los alumnos siguen
+            disponibles desde el histórico.
+          </p>
+          <div class="tutor-exam-detail__modal-actions tutor-exam-detail__modal-actions--stacked">
+            <button
+              type="button"
+              class="tutor-exam-detail__modal-confirm tutor-exam-detail__modal-confirm--large"
+              data-testid="btn-confirm-archivar"
+              [disabled]="vm.isSaving()"
+              (click)="onConfirmArchivarModal()"
+            >
+              Sí, archivar
+            </button>
+            <button
+              type="button"
+              class="tutor-exam-detail__modal-cancel tutor-exam-detail__modal-cancel--large"
+              data-testid="btn-cancel-archivar"
+              [disabled]="vm.isSaving()"
+              (click)="onCancelArchivarModal()"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
+    }
   }
 </main>

@@ -6,10 +6,7 @@ import { TutorExamsApi } from '../../L1_domain/ports/tutor-exams-api';
 export class ActualizarAlumnosHabilitadosUseCase {
   constructor(private readonly api: TutorExamsApi) {}
 
-  async execute(req: {
-    recordId: string;
-    enabledStudentIds: readonly string[];
-  }): Promise<void> {
+  async execute(req: { recordId: string; enabledStudentIds: readonly string[] }): Promise<void> {
     return this.api.updateEnabledStudents(req);
   }
 }

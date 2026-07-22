@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { HttpExamsApi } from '../../../../src/L3_periphery/http/http-exams-api';
+import { SlugStore } from '../../../../src/L3_periphery/http/slug-store';
 import { EnvioRequest } from '../../../../src/L1_domain/ports/exams-api';
 import { SubmissionAck } from '../../../../src/L1_domain/value-objects/submission-ack';
 import { InvalidPayloadError } from '../../../../src/L1_domain/errors/invalid-payload.error';
@@ -13,6 +14,8 @@ import { SimulacroNoAsignadoError } from '../../../../src/L1_domain/errors/simul
 import { StudentNotEnrolledError } from '../../../../src/L1_domain/errors/student-not-enrolled.error';
 import { InvalidAdmissionAreaError } from '../../../../src/L1_domain/errors/invalid-admission-area.error';
 import { environment } from '../../../../src/environments/environment';
+
+const TEST_SLUG = 'vonex';
 
 // Cubre `HttpExamsApi.enviar()` (L3) según el spec
 // `fase-3-exam-submit-learnex` `http-client` Requirements:
@@ -39,7 +42,7 @@ describe('HttpExamsApi.enviar (POST real)', () => {
   // El path se arma desde environment para que cambios en tenantSlug se
   // propaguen sin tocar tests.
   const SESSION_ID = '7620c18d-5b4d-4ef0-bf41-98352d21c2cf';
-  const SUBMIT_URL = `${environment.apiBaseUrl}/t/${environment.tenantSlug}/student/exam-sessions/${SESSION_ID}/submit`;
+  const SUBMIT_URL = `${environment.apiBaseUrl}/t/${TEST_SLUG}/student/exam-sessions/${SESSION_ID}/submit`;
 
   // Hash sha256 hex válido (64 chars) — coincide con el seed del test del VO.
   const VALID_HASH = 'a3f5c8d1b2e4f6a8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2';
@@ -55,10 +58,11 @@ describe('HttpExamsApi.enviar (POST real)', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), HttpExamsApi],
+      providers: [provideHttpClient(), provideHttpClientTesting(), HttpExamsApi, SlugStore],
     });
     httpMock = TestBed.inject(HttpTestingController);
     adapter = TestBed.inject(HttpExamsApi);
+    TestBed.inject(SlugStore).set(TEST_SLUG);
   });
 
   afterEach(() => httpMock.verify());
@@ -126,7 +130,7 @@ describe('HttpExamsApi.enviar (POST real)', () => {
         examId: weirdId,
       });
 
-      const expectedUrl = `${environment.apiBaseUrl}/t/${environment.tenantSlug}/student/exam-sessions/foo%2Fbar/submit`;
+      const expectedUrl = `${environment.apiBaseUrl}/t/${TEST_SLUG}/student/exam-sessions/foo%2Fbar/submit`;
       const req = httpMock.expectOne(expectedUrl);
 
       req.flush({
@@ -186,10 +190,7 @@ describe('HttpExamsApi.enviar (POST real)', () => {
     it('400 + body.message === "INVALID_ADMISSION_AREA" → InvalidAdmissionAreaError', async () => {
       const pending = adapter.enviar(validRequest());
       const req = httpMock.expectOne(SUBMIT_URL);
-      req.flush(
-        { message: 'INVALID_ADMISSION_AREA' },
-        { status: 400, statusText: 'Bad Request' },
-      );
+      req.flush({ message: 'INVALID_ADMISSION_AREA' }, { status: 400, statusText: 'Bad Request' });
       const err = await pending.catch((e) => e as Error);
       // Assert dura: es InvalidAdmissionAreaError, NO InvalidPayloadError.
       // Si el clasificador cayera al default, el catch abajo probaría el bug.
@@ -277,10 +278,7 @@ describe('HttpExamsApi.enviar (POST real)', () => {
     it('422 con message fuera del enum (`UNKNOWN_REASON`) → NetworkError (fallback)', async () => {
       const pending = adapter.enviar(validRequest());
       const req = httpMock.expectOne(SUBMIT_URL);
-      req.flush(
-        { message: 'UNKNOWN_REASON' },
-        { status: 422, statusText: 'Unprocessable Entity' },
-      );
+      req.flush({ message: 'UNKNOWN_REASON' }, { status: 422, statusText: 'Unprocessable Entity' });
       const err = await pending.catch((e) => e as Error);
       // Asserts duros sobre la misma instancia: es NetworkError y NO es
       // InvalidSubmissionTimeError (probaría que el clasificador leyó message

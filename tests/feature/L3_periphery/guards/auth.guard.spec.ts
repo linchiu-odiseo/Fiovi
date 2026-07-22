@@ -27,10 +27,10 @@ function makeIdentity(role: 'student' | 'tutor' = 'student'): Identity {
   return new Identity(
     'user-id',
     'tenant-id',
+    'vonex',
     'alumno@vonex.edu.pe',
     '79507732',
     [role],
-    [],
     Date.now() + 900_000,
   );
 }

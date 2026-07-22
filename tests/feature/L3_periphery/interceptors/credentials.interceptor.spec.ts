@@ -76,14 +76,16 @@ class FakeLogoutUseCase {
   }
 }
 
+const TEST_SLUG = 'vonex';
+
 function makeIdentity(): Identity {
   return new Identity(
     'user-id',
     'tenant-id',
+    TEST_SLUG,
     'alumno@vonex.edu.pe',
     '79507732',
     ['student'],
-    [],
     Date.now() + 900_000,
   );
 }
@@ -136,7 +138,7 @@ describe('credentialsInterceptor', () => {
 
   describe('skip refresh para URLs /auth/*', () => {
     it('401 en /auth/login propaga el error sin llamar refresh', async () => {
-      const url = `${environment.apiBaseUrl}/t/${environment.tenantSlug}/auth/login`;
+      const url = `${environment.apiBaseUrl}/t/${TEST_SLUG}/auth/login`;
       const pending = firstValueFrom(http.post(url, { email: 'x', password: 'y' }));
       const req = httpMock.expectOne(url);
       req.flush(
@@ -149,7 +151,7 @@ describe('credentialsInterceptor', () => {
     });
 
     it('401 en /auth/refresh propaga el error sin re-llamar refresh (loop guard)', async () => {
-      const url = `${environment.apiBaseUrl}/t/${environment.tenantSlug}/auth/refresh`;
+      const url = `${environment.apiBaseUrl}/t/${TEST_SLUG}/auth/refresh`;
       const pending = firstValueFrom(http.post(url, {}));
       const req = httpMock.expectOne(url);
       req.flush(
@@ -161,7 +163,7 @@ describe('credentialsInterceptor', () => {
     });
 
     it('401 en /auth/logout propaga el error sin refresh', async () => {
-      const url = `${environment.apiBaseUrl}/t/${environment.tenantSlug}/auth/logout`;
+      const url = `${environment.apiBaseUrl}/t/${TEST_SLUG}/auth/logout`;
       const pending = firstValueFrom(http.post(url, {}));
       const req = httpMock.expectOne(url);
       req.flush(null, { status: 401, statusText: 'Unauthorized' });
@@ -170,7 +172,7 @@ describe('credentialsInterceptor', () => {
     });
 
     it('401 en /auth/me propaga el error sin refresh', async () => {
-      const url = `${environment.apiBaseUrl}/t/${environment.tenantSlug}/auth/me`;
+      const url = `${environment.apiBaseUrl}/t/${TEST_SLUG}/auth/me`;
       const pending = firstValueFrom(http.get(url));
       const req = httpMock.expectOne(url);
       req.flush(null, { status: 401, statusText: 'Unauthorized' });
@@ -182,7 +184,7 @@ describe('credentialsInterceptor', () => {
   describe('refresh + retry en endpoints protegidos', () => {
     it('401 en /student/me dispara refresh → retry exitoso devuelve el body del retry', async () => {
       refreshUseCase.willResolve(makeIdentity());
-      const url = `${environment.apiBaseUrl}/t/${environment.tenantSlug}/student/me`;
+      const url = `${environment.apiBaseUrl}/t/${TEST_SLUG}/student/me`;
       const pending = firstValueFrom(http.get<{ code: string }>(url));
 
       // Primera request: 401.
@@ -206,7 +208,7 @@ describe('credentialsInterceptor', () => {
     });
 
     it('500 en /student/me propaga sin tocar refresh', async () => {
-      const url = `${environment.apiBaseUrl}/t/${environment.tenantSlug}/student/me`;
+      const url = `${environment.apiBaseUrl}/t/${TEST_SLUG}/student/me`;
       const pending = firstValueFrom(http.get(url));
       const req = httpMock.expectOne(url);
       req.flush('boom', { status: 500, statusText: 'Server Error' });
@@ -216,7 +218,7 @@ describe('credentialsInterceptor', () => {
 
     it('401 en /student/me + refresh falla con RefreshFailedError → logout fire-and-forget + propaga', async () => {
       refreshUseCase.willReject(new RefreshFailedError());
-      const url = `${environment.apiBaseUrl}/t/${environment.tenantSlug}/student/me`;
+      const url = `${environment.apiBaseUrl}/t/${TEST_SLUG}/student/me`;
       const pending = firstValueFrom(http.get(url));
 
       const first = httpMock.expectOne(url);
@@ -235,9 +237,9 @@ describe('credentialsInterceptor', () => {
   describe('race condition — lock shareReplay(1)', () => {
     it('3 requests paralelos con 401 sólo disparan 1 refresh; los 3 reintentan con sus responses', async () => {
       refreshUseCase.willStayPending();
-      const urlA = `${environment.apiBaseUrl}/t/${environment.tenantSlug}/student/me`;
-      const urlB = `${environment.apiBaseUrl}/t/${environment.tenantSlug}/student/dashboard`;
-      const urlC = `${environment.apiBaseUrl}/t/${environment.tenantSlug}/student/exams`;
+      const urlA = `${environment.apiBaseUrl}/t/${TEST_SLUG}/student/me`;
+      const urlB = `${environment.apiBaseUrl}/t/${TEST_SLUG}/student/dashboard`;
+      const urlC = `${environment.apiBaseUrl}/t/${TEST_SLUG}/student/exams`;
 
       // Disparamos las 3 requests en paralelo.
       const pendingA = firstValueFrom(http.get<{ name: string }>(urlA));
@@ -280,7 +282,7 @@ describe('credentialsInterceptor', () => {
     it('lock se libera tras finalize → un 401 posterior dispara OTRO refresh', async () => {
       // Primer ciclo: refresh exitoso.
       refreshUseCase.willResolve(makeIdentity());
-      const url1 = `${environment.apiBaseUrl}/t/${environment.tenantSlug}/student/me`;
+      const url1 = `${environment.apiBaseUrl}/t/${TEST_SLUG}/student/me`;
       const p1 = firstValueFrom(http.get(url1));
       httpMock.expectOne(url1).flush(null, { status: 401, statusText: 'Unauthorized' });
       await Promise.resolve();
@@ -297,7 +299,7 @@ describe('credentialsInterceptor', () => {
 
       // Segundo ciclo: otra 401 dispara OTRO refresh (lock liberado).
       refreshUseCase.willResolve(makeIdentity());
-      const url2 = `${environment.apiBaseUrl}/t/${environment.tenantSlug}/student/dashboard`;
+      const url2 = `${environment.apiBaseUrl}/t/${TEST_SLUG}/student/dashboard`;
       const p2 = firstValueFrom(http.get(url2));
       httpMock.expectOne(url2).flush(null, { status: 401, statusText: 'Unauthorized' });
       await Promise.resolve();

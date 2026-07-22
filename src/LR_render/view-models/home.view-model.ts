@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { GetIdentityUseCase } from '../../L2_application/use-cases/get-identity.use-case';
 import { GetProfileUseCase } from '../../L2_application/use-cases/get-profile.use-case';
@@ -31,6 +31,18 @@ const POLL_INTERVAL_MS = 120_000;
 // dos relojes con razones distintas: este es solo cosmético (texto del countdown),
 // el otro recoge cambios de estado del backend.
 const COUNTDOWN_TICK_MS = 1_000;
+
+// Un único refresh diferido tras cruzar el cierre local de una card
+// `in_progress`. El back tiene grace de 5s post-cierre + margen de cola de
+// auto-finalize; a los ~10s el estado real ya suele ser `finalized`. Si no,
+// el poll normal de 120s lo recupera. Evitamos ráfagas para no cargar el back
+// cuando 500 alumnos convergen al mismo instante.
+const POST_CIERRE_REFRESH_MS = 10_000;
+
+// Jitter simétrico (±3s) para dispersar el refresh entre alumnos que terminen
+// el mismo examen al mismo segundo. Sin jitter, 500 clientes pegan al back en
+// el mismo ms (thundering herd).
+const POST_CIERRE_JITTER_MS = 3_000;
 
 // View-model de /home. Provider-local al HomePage (no providedIn root) para que
 // cada montaje arranque limpio sus timers y listeners.
@@ -93,6 +105,34 @@ export class HomePageViewModel {
   private started = false;
   private stopped = false;
 
+  // Guard 1-vez por examId: cada card dispara su refresh diferido a lo sumo
+  // una vez por montaje del home. Si el alumno navega a /simulacro y vuelve,
+  // el VM se re-instancia y el Set arranca limpio.
+  private readonly postCierreRefreshDone = new Set<string>();
+  // Timers activos por examId, para poder cancelarlos en `stop()`.
+  private readonly postCierreTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  constructor() {
+    // Detector post-cierre: cuando el countdown local cruza `effectiveCloseAt`
+    // en una card `in_progress`, agenda un refresh puntual para captar el
+    // `finalized` que el back dispara ~5s post-cierre via auto-finalize.
+    // Guard por examId: dispara a lo sumo una vez por card.
+    effect(() => {
+      const now = this.nowTick();
+      if (this.stopped) return;
+      for (const exam of this.exams()) {
+        if (!exam.serverStatus.is('in_progress')) continue;
+        const closeAt = exam.effectiveCloseAt();
+        if (closeAt === null) continue;
+        if (now.getTime() < closeAt.getTime()) continue;
+        if (this.postCierreRefreshDone.has(exam.id)) continue;
+
+        this.postCierreRefreshDone.add(exam.id);
+        this.schedulePostCierreRefresh(exam.id);
+      }
+    });
+  }
+
   async start(): Promise<void> {
     if (this.started) return;
     this.started = true;
@@ -117,6 +157,7 @@ export class HomePageViewModel {
     this.stopPolling();
     this.stopCountdownTicker();
     this.detachVisibilityListener();
+    this.cancelPostCierreRefreshes();
   }
 
   async refresh(): Promise<void> {
@@ -296,6 +337,31 @@ export class HomePageViewModel {
       document.removeEventListener('visibilitychange', this.visibilityListener);
     }
     this.visibilityListener = null;
+  }
+
+  /**
+   * Programa un refresh diferido de la lista tras cruzar el cierre local de
+   * una card. Jitter simétrico dispersa el pico cuando 500 alumnos cruzan
+   * el cierre a la misma hora. `Math.random()` alcanza — no es criptografía,
+   * solo dispersión estadística.
+   */
+  private schedulePostCierreRefresh(examId: string): void {
+    if (this.stopped) return;
+    const jitter = Math.random() * 2 * POST_CIERRE_JITTER_MS - POST_CIERRE_JITTER_MS;
+    const delay = POST_CIERRE_REFRESH_MS + jitter;
+    const handle = setTimeout(() => {
+      this.postCierreTimers.delete(examId);
+      if (this.stopped) return;
+      void this.refresh();
+    }, delay);
+    this.postCierreTimers.set(examId, handle);
+  }
+
+  private cancelPostCierreRefreshes(): void {
+    for (const handle of this.postCierreTimers.values()) {
+      clearTimeout(handle);
+    }
+    this.postCierreTimers.clear();
   }
 
   private buildCard(exam: Exam, ack: SubmissionAck | null, now: Date): SimulacroCard {

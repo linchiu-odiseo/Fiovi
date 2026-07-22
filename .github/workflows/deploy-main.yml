@@ -1,0 +1,24 @@
+# CD de PRODUCCIÓN de Fiovi — copiar a odiseo-peru/Fiovi:.github/workflows/deploy-main.yml
+# Merge a `main` (push) → runner de prod reconstruye learnex-fiovi:prod y redespliega.
+# ⚠️ Fiovi NO tiene ci.yml todavía (deuda) — crear el gate (format/lint/vitest/ng build)
+#    y el ruleset production-protect ANTES de confiar el auto-deploy a un merge sin review.
+# ⚠️ El .env local del repo (env horneadas, no versionado) DEBE existir en la VM de prod
+#    (/srv/learnex-prod/src/Fiovi/.env) — el build falla sin él. deploy-fiovi.sh lo verifica.
+name: deploy-main
+on:
+  push:
+    branches: [main]
+concurrency:
+  group: cd-fiovi-main
+  cancel-in-progress: false
+jobs:
+  cd:
+    if: github.event_name == 'push'
+    runs-on: [self-hosted, learnex-prod]
+    steps:
+      - name: Actualizar learnex-docs y desplegar (main → :prod)
+        run: |
+          DOCS=/srv/learnex-prod/src/learnex-docs
+          git -C "$DOCS" fetch --prune origin main
+          git -C "$DOCS" reset --hard origin/main
+          BRANCH=main TAG=prod bash "$DOCS/scripts/deploy/deploy-fiovi.sh"

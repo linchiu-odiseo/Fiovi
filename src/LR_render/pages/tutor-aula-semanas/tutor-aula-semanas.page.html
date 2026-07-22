@@ -1,0 +1,136 @@
+<main class="tutor-aula-semanas">
+  <nav class="tutor-aula-semanas__nav">
+    <button
+      type="button"
+      class="tutor-aula-semanas__btn-volver"
+      data-testid="btn-volver"
+      (click)="onVolver()"
+    >
+      <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+      Aulas
+    </button>
+  </nav>
+
+  <header class="tutor-aula-semanas__header">
+    <p class="tutor-aula-semanas__kicker">Aula</p>
+    <h1 class="tutor-aula-semanas__title">
+      {{ vm.classroomName() ?? 'Aula sin nombre' }}
+    </h1>
+    @if (vm.cycleName()) {
+      <p class="tutor-aula-semanas__subtitle">{{ vm.cycleName() }}</p>
+    }
+  </header>
+
+  @if (vm.loading()) {
+    <section class="tutor-aula-semanas__loading" aria-busy="true">
+      <p>Cargando semanas…</p>
+    </section>
+  } @else if (vm.error() === 'network') {
+    <section class="tutor-aula-semanas__error" role="alert">
+      <p>Sin conexión. Revisá tu red y reintentá.</p>
+      <button type="button" data-testid="btn-retry" (click)="onRetry()">Reintentar</button>
+    </section>
+  } @else if (vm.error() === 'forbidden') {
+    <section class="tutor-aula-semanas__error" role="alert">
+      <p>No estás asignado a esta aula.</p>
+    </section>
+  } @else if (vm.error() === 'notFound') {
+    <section class="tutor-aula-semanas__error" role="alert">
+      <p>No encontramos esta aula.</p>
+    </section>
+  } @else if (!vm.hasSemanas()) {
+    <section class="tutor-aula-semanas__section">
+      <p class="tutor-aula-semanas__empty" data-testid="semanas-empty">
+        El ciclo de esta aula todavía no tiene semanas cargadas.
+      </p>
+    </section>
+  } @else {
+    <section class="tutor-aula-semanas__section">
+      <h2 class="section-title">Semanas</h2>
+
+      <div
+        class="wheel"
+        role="listbox"
+        aria-label="Semanas del ciclo"
+        data-testid="semanas-wheel"
+        [attr.data-debug-items]="virtualSemanas().length"
+        [attr.data-debug-selected]="observedVirtualIndex()"
+        [attr.data-debug-semanas-count]="vm.semanas().length"
+      >
+        <!-- Lens: dos líneas horizontales que demarcan el slot del item
+             centrado. Sin fill de fondo — el highlight visual del centro
+             viene solo de la nitidez del item (los demás están blurreados). -->
+        <div class="wheel__lens" aria-hidden="true"></div>
+
+        <div class="wheel__viewport" #viewport>
+          <div class="wheel__spacer" aria-hidden="true"></div>
+          <ul class="wheel__list">
+            @for (semana of virtualSemanas(); track $index; let i = $index) {
+              <li
+                class="wheel-item"
+                [class.wheel-item--selected]="i === observedVirtualIndex()"
+                [class.wheel-item--near]="distanceFromCenter(i) === 1"
+                [class.wheel-item--far]="distanceFromCenter(i) === 2"
+                [attr.data-virtual-index]="i"
+                [attr.aria-selected]="i === observedVirtualIndex()"
+                role="option"
+                tabindex="-1"
+                data-testid="semana-item"
+                (click)="onItemClick(i, semana)"
+                (keydown.enter)="onItemClick(i, semana)"
+              >
+                <span class="wheel-item__icon material-symbols-outlined" aria-hidden="true">
+                  {{ isToday(i) ? 'radio_button_checked' : 'calendar_month' }}
+                </span>
+                <div class="wheel-item__body">
+                  <div class="wheel-item__title-row">
+                    <h3 class="wheel-item__name">{{ semana.name }}</h3>
+                    @if (isToday(i)) {
+                      <span class="wheel-item__today-badge">HOY</span>
+                    }
+                  </div>
+                  @if (i === observedVirtualIndex()) {
+                    <p class="wheel-item__dates">{{ semana.startDate }} — {{ semana.endDate }}</p>
+                    @if (semana.estaVacia()) {
+                      <p class="wheel-item__meta wheel-item__meta--empty">Sin exámenes</p>
+                    } @else {
+                      <p class="wheel-item__meta">
+                        <span>{{ semana.examCount }} exámenes</span>
+                        @if (semana.byStatus.in_progress > 0) {
+                          <span aria-hidden="true">·</span>
+                          <span class="wheel-item__meta-strong">
+                            {{ semana.byStatus.in_progress }} en curso
+                          </span>
+                        }
+                        @if (semana.byStatus.finalized > 0) {
+                          <span aria-hidden="true">·</span>
+                          <span>{{ semana.byStatus.finalized }} finalizados</span>
+                        }
+                      </p>
+                    }
+                  }
+                </div>
+              </li>
+            }
+          </ul>
+          <div class="wheel__spacer" aria-hidden="true"></div>
+        </div>
+
+        <!-- Chevron fijo en el slot central de la rueda. NO viaja con los
+             items — su tap siempre entra a la semana actualmente centrada. -->
+        <button
+          type="button"
+          class="wheel__enter-btn"
+          aria-label="Entrar a la semana"
+          data-testid="btn-enter"
+          [disabled]="!vm.selectedSemana()"
+          (click)="onEnterCentered()"
+        >
+          <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
+        </button>
+      </div>
+
+      <p class="wheel__hint" aria-hidden="true">↕ desplazá para elegir</p>
+    </section>
+  }
+</main>

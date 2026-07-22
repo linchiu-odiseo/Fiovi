@@ -6,6 +6,7 @@ import { NetworkError } from '../../../../src/L1_domain/errors/network.error';
 import { FakeAuthRepository } from '../../fixtures/auth-repository.fake';
 import { FakeIdentityStorage } from '../../fixtures/identity-storage.fake';
 import { FakeProfileStorage } from '../../fixtures/profile-storage.fake';
+import { FakeTenantSlugCache } from '../../fixtures/tenant-slug-cache.fake';
 import { LogoutUseCase } from '../../../../src/L2_application/use-cases/logout.use-case';
 import { RouterPort } from '../../../../src/L1_domain/ports/router-port';
 import { OutboxStoragePort } from '../../../../src/L1_domain/ports/outbox-storage.port';
@@ -15,7 +16,15 @@ import { GetProfileUseCase } from '../../../../src/L2_application/use-cases/get-
 const NOW = 1_700_000_000_000;
 
 const makeIdentity = () =>
-  new Identity('uid', 'tid', 'alumno@vonex.edu.pe', '79507732', ['student'], [], NOW + 900_000);
+  new Identity(
+    'uid',
+    'tid',
+    'vonex',
+    'alumno@vonex.edu.pe',
+    '79507732',
+    ['student'],
+    NOW + 900_000,
+  );
 
 class FakeRouter implements RouterPort {
   navigate(_commands: unknown[]): void {
@@ -69,6 +78,7 @@ describe('RefreshIdentityUseCase', () => {
   let repo: FakeAuthRepository;
   let identityStorage: FakeIdentityStorage;
   let profileStorage: FakeProfileStorage;
+  let slugCache: FakeTenantSlugCache;
   let logout: LogoutUseCase;
   let logoutExecuteCalls: number;
   let useCase: RefreshIdentityUseCase;
@@ -77,23 +87,24 @@ describe('RefreshIdentityUseCase', () => {
     repo = new FakeAuthRepository();
     identityStorage = new FakeIdentityStorage();
     profileStorage = new FakeProfileStorage();
+    slugCache = new FakeTenantSlugCache();
     const _getProfile = new GetProfileUseCase(profileStorage, repo);
     logout = new LogoutUseCase(
       repo,
       identityStorage,
+      slugCache,
       profileStorage,
       new FakeMarkings(),
       new FakeOutbox(),
       new FakeRouter(),
     );
     logoutExecuteCalls = 0;
-    // Espiar logout.execute
     const originalLogoutExecute = logout.execute.bind(logout);
     logout.execute = async () => {
       logoutExecuteCalls++;
       return originalLogoutExecute();
     };
-    useCase = new RefreshIdentityUseCase(repo, identityStorage, logout);
+    useCase = new RefreshIdentityUseCase(repo, identityStorage, slugCache, logout);
   });
 
   it('refresh exitoso actualiza el storage con la nueva identity', async () => {

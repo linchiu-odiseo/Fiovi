@@ -50,9 +50,7 @@ export class Exam {
       throw new InvalidExamError('Exam requiere un name no vacío.');
     }
     if (!Number.isInteger(params.count) || params.count <= 0) {
-      throw new InvalidExamError(
-        `Exam count debe ser entero positivo. Recibido: ${params.count}.`,
-      );
+      throw new InvalidExamError(`Exam count debe ser entero positivo. Recibido: ${params.count}.`);
     }
     if (!Number.isInteger(params.duration) || params.duration < 1) {
       throw new InvalidExamError(
