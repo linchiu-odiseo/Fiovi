@@ -90,6 +90,13 @@ class FakeTutorExamDetailViewModel {
     this.finalizarModalOpen.set(false);
   });
 
+  // Countdown en vivo (mismo shape que el simulacro del alumno). En el fake
+  // exponemos strings vacíos porque el fake no arranca el ticker — la lógica
+  // real vive en el VM y está cubierta por su propio spec.
+  readonly effectiveCloseAt = () => null;
+  readonly countdownRestante = () => '';
+  readonly closeTimeText = () => '';
+
   async load(): Promise<void> {
     /* no-op */
   }
@@ -104,6 +111,9 @@ class FakeTutorExamDetailViewModel {
   }
   async toggleStudent(_studentId: string): Promise<void> {
     /* no-op */
+  }
+  stop(): void {
+    /* no-op — el fake no arranca timers */
   }
 }
 
@@ -295,7 +305,11 @@ describe('TutorExamDetailPage', () => {
   // ── Checkbox disabled states ───────────────────────────────────────────────
 
   describe('Scenario: Checkbox de alumno con hasSubmitted deshabilitado (D5)', () => {
-    it('checkbox de alumno con hasSubmitted=true está disabled', async () => {
+    // SKIP: el checkbox está comentado en el HTML mientras se define la UX
+    // de "desactivar alumno en curso". El guard sigue en `isCheckboxDisabled`
+    // (view-model) y en su spec. Al descomentar el input en la page,
+    // reactivar este test también.
+    it.skip('checkbox de alumno con hasSubmitted=true está disabled', async () => {
       const submitted = buildStudent({ studentId: 's-sub', hasSubmitted: true });
       fakeVm.students.set([submitted]);
       fakeVm.detail.set(buildDetail({ status: new ExamServerStatus('scheduled') }));
@@ -316,7 +330,9 @@ describe('TutorExamDetailPage', () => {
   });
 
   describe('Scenario: Checkboxes deshabilitados en modo finalized (D5)', () => {
-    it('todos los checkboxes disabled cuando status=finalized', async () => {
+    // SKIP: mismo motivo — checkbox pausado en el HTML hasta definir UX.
+    // Reactivar al descomentar el input.
+    it.skip('todos los checkboxes disabled cuando status=finalized', async () => {
       fakeVm.students.set([
         buildStudent({ studentId: 's-1', hasSubmitted: false }),
         buildStudent({ studentId: 's-2', hasSubmitted: false }),

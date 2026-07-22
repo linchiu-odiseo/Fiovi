@@ -21,11 +21,10 @@ export class TutorExamDetailPage {
 
   constructor() {
     void this.vm.load();
-    // La carga no tiene cleanup (online-only, D3) pero si el componente se
-    // destruye antes de resolverse, la Promise simplemente queda sin efecto.
-    this.destroyRef.onDestroy(() => {
-      // No hay timers ni listeners en el detail VM (a diferencia del list VM).
-    });
+    // El VM arranca un ticker de countdown de 1s cuando el examen está
+    // in_progress (para refrescar `nowTick`). `stop()` cancela el interval
+    // al destruir la page — sin esto quedaría un leak tras navegar.
+    this.destroyRef.onDestroy(() => this.vm.stop());
   }
 
   // Volver a /tutor/home usando Router.navigate — robusto para deep-links e
@@ -144,11 +143,21 @@ export class TutorExamDetailPage {
 
   // Fecha compacta es-PE: 10/07/2026 14:32 — sin dependencias externas.
   protected formatDateTime(date: Date): string {
+    return `${this.formatDate(date)} ${this.formatTime(date)}`;
+  }
+
+  // Solo fecha (dd/mm/yyyy) — el cajetín las separa en celdas propias.
+  protected formatDate(date: Date): string {
     const dd = String(date.getDate()).padStart(2, '0');
     const mm = String(date.getMonth() + 1).padStart(2, '0');
     const yyyy = date.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  }
+
+  // Solo hora (HH:mm).
+  protected formatTime(date: Date): string {
     const hh = String(date.getHours()).padStart(2, '0');
     const mi = String(date.getMinutes()).padStart(2, '0');
-    return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
+    return `${hh}:${mi}`;
   }
 }

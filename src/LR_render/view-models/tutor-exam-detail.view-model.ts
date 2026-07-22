@@ -11,11 +11,22 @@ import { TutorExamDetail } from '../../L1_domain/value-objects/tutor-exam-detail
 import { ClassroomStudent } from '../../L1_domain/value-objects/classroom-student';
 import { TutorExam } from '../../L1_domain/entities/tutor-exam';
 import { ExamServerStatus } from '../../L1_domain/value-objects/exam-server-status';
+import { CLOCK } from '../../app.config';
 import { NetworkError } from '../../L1_domain/errors/network.error';
 import { ExamConflictError } from '../../L1_domain/errors/exam-conflict.error';
 import { ExamPreconditionError } from '../../L1_domain/errors/exam-precondition.error';
 import { VirtualExamNotFoundError } from '../../L1_domain/errors/virtual-exam-not-found.error';
 import { TutorExamForbiddenError } from '../../L1_domain/errors/tutor-exam-forbidden.error';
+
+// Ticker del countdown: refresca `nowTick` cada 1s para que los signals
+// derivados (countdownRestante) recomputen. Idéntico al del simulacro del
+// alumno — la referencia es el `Clock` server-anchored, nunca Date.now().
+const COUNTDOWN_TICK_MS = 1_000;
+
+// Umbral de formato del countdown. Mismo que en simulacro.view-model.ts —
+// arriba de 5 min mostramos texto verbal ("X min restantes"), abajo el
+// MM:SS digital que da sensación de urgencia y actualiza cada segundo.
+const SHOW_SECONDS_BELOW_MS = 5 * 60_000;
 
 // View-model de la pantalla de gestión de un virtual exam (/tutor/exams/:recordId).
 // Provider-local al TutorExamDetailPage (NO providedIn root) — cada montaje
@@ -31,6 +42,17 @@ export class TutorExamDetailViewModel {
   private readonly finalizarExamen = inject(FinalizarExamenUseCase);
   private readonly actualizarAlumnos = inject(ActualizarAlumnosHabilitadosUseCase);
   private readonly store = inject(TutorExamsStore);
+  private readonly clock = inject(CLOCK);
+
+  // Ticker del countdown en vivo. Se activa cuando el detalle está cargado
+  // y su status es `in_progress`. Se detiene al pasar a `finalized` o al
+  // destruir el componente. Idéntico al patrón del alumno (simulacro).
+  private countdownTimer: ReturnType<typeof setInterval> | null = null;
+  private stopped = false;
+
+  // Reloj para el countdown — server-anchored via el puerto Clock. NUNCA
+  // Date.now() directo: el tutor puede tener el reloj del OS desfasado.
+  readonly nowTick = signal<Date>(this.clock.now());
 
   // ── Signals expuestos (spec Requirement "TutorExamDetailViewModel — Signals expuestos") ──
 
@@ -91,6 +113,57 @@ export class TutorExamDetailViewModel {
   // lista con checkboxes). Total = alumnos del aula.
   readonly enabledCount = computed(() => this.enabledStudentIds().length);
   readonly totalStudents = computed(() => this.students().length);
+
+  // ── Countdown (mismo cómputo que el simulacro del alumno) ───────────────────
+
+  /**
+   * Instante de cierre efectivo del examen:
+   *   - `finishedAt` si el tutor ya cerró (real).
+   *   - `startedAt + duration` cuando arrancó pero no terminó (cierre esperado).
+   *   - `null` si aún no arrancó → sin countdown.
+   * Mismo criterio que `Exam.effectiveCloseAt()` en el dominio del alumno —
+   * NO usamos `scheduled + duration` como fallback para no engañar con
+   * countdowns falsos antes de que el tutor active el examen.
+   */
+  readonly effectiveCloseAt = computed<Date | null>(() => {
+    const d = this.detail();
+    if (!d) return null;
+    if (d.finishedAt !== null) return d.finishedAt;
+    if (d.startedAt !== null) {
+      return new Date(d.startedAt.getTime() + d.duration * 1000);
+    }
+    return null;
+  });
+
+  /**
+   * Countdown formateado. Recomputa cada tick del reloj server-anchored.
+   *   ≥ 5 min → "X min restantes"
+   *   < 5 min → "MM:SS"
+   *   ≤ 0     → "00:00"
+   * Vacío cuando aún no hay cierre determinable (examen no arrancado).
+   */
+  readonly countdownRestante = computed<string>(() => {
+    const closeAt = this.effectiveCloseAt();
+    if (closeAt === null) return '';
+    // Ancla: `startedAt` (garantizado no-null si `effectiveCloseAt` no lo es).
+    // Si el reloj cliente está por debajo del `startedAt`, tomamos el
+    // `startedAt` como piso — evita mostrar "más tiempo del debido" cuando
+    // el reloj cliente está atrasado respecto del server.
+    const anchor = this.detail()?.startedAt ?? new Date(0);
+    const referenceNow = Math.max(this.nowTick().getTime(), anchor.getTime());
+    const remainingMs = Math.max(0, closeAt.getTime() - referenceNow);
+    return formatRestante(remainingMs);
+  });
+
+  /**
+   * Hora de cierre formateada "HH:MM" para el header ("CIERRA A LAS 18:09").
+   * Vacío cuando el examen aún no arrancó.
+   */
+  readonly closeTimeText = computed<string>(() => {
+    const closeAt = this.effectiveCloseAt();
+    if (closeAt === null) return '';
+    return formatHHMM(closeAt);
+  });
 
   // ── Derived state helpers (para los guards de D5) ───────────────────────────
 
@@ -327,6 +400,7 @@ export class TutorExamDetailViewModel {
       this.students.set(students);
       this.enabledStudentIds.set(detail.enabledStudentIds);
       this.error.set(null);
+      this.syncCountdownTicker();
     } catch (err) {
       this.error.set(this.classifyLoadError(err));
     }
@@ -338,6 +412,7 @@ export class TutorExamDetailViewModel {
     const detail = await this.getTutorExamDetail.execute({ recordId });
     this.detail.set(detail);
     this.enabledStudentIds.set(detail.enabledStudentIds);
+    this.syncCountdownTicker();
 
     // Upsert en el store con el nuevo status (R4 mitigation).
     // Construimos un TutorExam mínimo desde el detail — el classroomId y el
@@ -416,7 +491,75 @@ export class TutorExamDetailViewModel {
         return 'Ocurrió un error al actualizar los alumnos. Reintentá.';
     }
   }
+
+  // ── Countdown ticker lifecycle ───────────────────────────────────────────
+
+  /**
+   * Arranca el ticker si el examen está en curso, lo detiene si ya terminó
+   * (o si aún no arrancó). Llamado tras cada carga/recarga del detail —
+   * cubre los 3 flujos: primer load, tras iniciar, tras finalizar.
+   */
+  private syncCountdownTicker(): void {
+    const d = this.detail();
+    if (d && d.status.is('in_progress')) {
+      this.startCountdownTicker();
+    } else {
+      this.stopCountdownTicker();
+    }
+  }
+
+  private startCountdownTicker(): void {
+    if (this.countdownTimer !== null) return;
+    if (this.stopped) return;
+    // Sync inmediato para que el primer render no espere 1s con el valor
+    // desactualizado que quedó desde la construcción del VM.
+    this.nowTick.set(this.clock.now());
+    this.countdownTimer = setInterval(() => {
+      if (this.stopped) return;
+      this.nowTick.set(this.clock.now());
+    }, COUNTDOWN_TICK_MS);
+  }
+
+  private stopCountdownTicker(): void {
+    if (this.countdownTimer !== null) {
+      clearInterval(this.countdownTimer);
+      this.countdownTimer = null;
+    }
+  }
+
+  /**
+   * Teardown del VM. La page lo invoca en `destroyRef.onDestroy` — sin esto,
+   * el `setInterval` seguiría corriendo tras la navegación aunque el VM ya
+   * no exista, generando un leak (y llamados a `clock.now()` sobre un
+   * observable descartado).
+   */
+  stop(): void {
+    this.stopped = true;
+    this.stopCountdownTicker();
+  }
 }
 
 // Re-export ExamServerStatus for template usage (avoids extra imports in page).
 export { ExamServerStatus };
+
+// ── Formatting helpers (mismo criterio que simulacro.view-model.ts) ─────────
+
+function formatHHMM(d: Date): string {
+  const hh = d.getHours().toString().padStart(2, '0');
+  const mm = d.getMinutes().toString().padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+function formatRestante(ms: number): string {
+  if (ms <= 0) return '00:00';
+  if (ms >= SHOW_SECONDS_BELOW_MS) {
+    const mins = Math.ceil(ms / 60_000);
+    return `${mins} min restantes`;
+  }
+  const totalSeconds = Math.ceil(ms / 1_000);
+  const mm = Math.floor(totalSeconds / 60)
+    .toString()
+    .padStart(2, '0');
+  const ss = (totalSeconds % 60).toString().padStart(2, '0');
+  return `${mm}:${ss}`;
+}

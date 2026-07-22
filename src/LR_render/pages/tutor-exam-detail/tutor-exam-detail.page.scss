@@ -92,6 +92,93 @@
     }
   }
 
+  // Cajetín de rotulación técnica: card contenedora con celdas separadas
+  // por bordes internos, tipografía mono y bordes contrastados. Un único
+  // layout para mobile y desktop — mismo diseño en cualquier ancho.
+  //
+  // Divider horizontal entre TODO hijo directo distinto al primero — sirve
+  // para stackear bp-cell, bp-row y bp-cell--countdown uniformemente sin
+  // depender del tipo de elemento.
+  &__blueprint {
+    display: flex;
+    flex-direction: column;
+    background: var(--color-surface-container-lowest);
+    border: 1px solid var(--color-on-surface-variant);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+
+    > * + * {
+      border-top: 1px solid var(--color-on-surface-variant);
+    }
+  }
+
+  // Celda base del cajetín: label chico arriba + valor abajo.
+  &__bp-cell {
+    padding: 0.6rem 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  // Fila de celdas (área · preguntas · duración) — dividers verticales
+  // entre columnas. El border-top horizontal lo pone el `__blueprint > * + *`.
+  &__bp-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+
+    > .tutor-exam-detail__bp-cell + .tutor-exam-detail__bp-cell {
+      border-left: 1px solid var(--color-on-surface-variant);
+    }
+  }
+
+  // Variante de 2 columnas para fecha + hora.
+  &__bp-row--2 {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  &__bp-label {
+    margin: 0;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-on-surface-variant);
+
+    &--sub {
+      margin-top: 0.15rem;
+    }
+  }
+
+  &__bp-value {
+    margin: 0;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--color-on-surface);
+    letter-spacing: -0.005em;
+  }
+
+  // Celda countdown: centrada, con fondo levemente distinto para destacar
+  // dentro del cajetín. El border-top viene del contenedor `__blueprint`.
+  &__bp-cell--countdown {
+    align-items: center;
+    text-align: center;
+    padding: 0.85rem;
+    background: var(--color-surface-container);
+  }
+
+  &__bp-countdown {
+    margin: 0;
+    font-family: var(--font-mono, monospace);
+    font-size: 2rem;
+    line-height: 1;
+    font-weight: 700;
+    color: var(--color-primary);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+  }
+
   &__error,
   &__action-error {
     padding: 0.85rem var(--space-md);
@@ -157,11 +244,6 @@
     border-color: var(--color-primary);
   }
 
-  &__btn-finalizar {
-    background: var(--color-error);
-    color: var(--color-on-error);
-    border-color: var(--color-error);
-  }
 
   &__students {
     display: flex;
@@ -179,42 +261,101 @@
     }
   }
 
+  // Lista iOS Settings: card única con dividers internos, filas ~44px
+  // (touch target). Sin avatares — nombres comparten inicial en cohortes.
   &__student-list {
     list-style: none;
     padding: 0;
     margin: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-outline-variant);
+    background: var(--color-surface-container-lowest);
+    overflow: hidden;
   }
 
   &__student-item {
-    padding: var(--space-sm) 0.9rem;
-    border-radius: var(--radius);
-    border: 1px solid var(--color-outline-variant);
-    background: var(--color-surface-container-lowest);
-  }
-
-  &__student-label {
     display: flex;
     align-items: center;
-    gap: var(--space-xs);
-    cursor: pointer;
+    gap: var(--space-sm);
+    padding: 0.35rem var(--space-md);
+    min-height: 2.25rem;
+    box-sizing: border-box;
+
+    & + & {
+      border-top: 1px solid var(--color-outline-variant);
+    }
   }
 
   &__student-name {
     flex: 1;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     color: var(--color-on-surface);
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   &__submitted-badge {
-    font-size: 0.75rem;
-    padding: 0.125rem 0.5rem;
-    border-radius: var(--radius-sm);
-    background: var(--color-surface-container-high);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.15rem 0.55rem;
+    border-radius: var(--radius-pill);
+    background: var(--color-success-container);
+    color: var(--color-on-success-container);
+    flex: 0 0 auto;
+
+    .material-symbols-outlined {
+      font-size: 0.9rem;
+      line-height: 1;
+    }
+  }
+
+  // Escape hatch "Finalizar ahora" — intencionalmente discreto: el flujo
+  // esperado es que expire el countdown, no que el tutor lo corte.
+  &__finalizar-early {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+    padding-top: var(--space-md);
+    margin-top: var(--space-sm);
+    border-top: 1px dashed var(--color-outline-variant);
+  }
+
+  &__finalizar-early-hint {
+    margin: 0;
+    font-size: 0.8rem;
     color: var(--color-on-surface-variant);
-    margin-left: auto;
+    text-align: center;
+  }
+
+  // Botón outlined azul chico: presente pero no reluciente. Border primary +
+  // texto primary, sin fondo. Menos vistoso que un CTA sólido → no tienta.
+  &__finalizar-early-btn {
+    appearance: none;
+    background: transparent;
+    border: 1px solid var(--color-primary);
+    border-radius: var(--radius);
+    padding: 0.4rem 1rem;
+    color: var(--color-primary);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    min-height: 2rem;
+
+    &:hover:not(:disabled) {
+      background: var(--color-surface-container);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
   }
 
   &__title-row {
@@ -224,33 +365,6 @@
     flex-wrap: wrap;
   }
 
-  &__meta {
-    list-style: none;
-    padding: 0;
-    margin: var(--space-sm) 0 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    font-size: 0.9rem;
-    color: var(--color-on-surface-variant);
-
-    li {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
-
-    .material-symbols-outlined {
-      font-size: 1.05rem;
-      line-height: 1;
-      color: var(--color-on-surface-variant);
-    }
-
-    strong {
-      font-weight: 700;
-      color: var(--color-on-surface);
-    }
-  }
 
   &__no-students {
     padding: var(--space-md);
@@ -460,8 +574,12 @@
     border: 1px solid var(--color-outline-variant);
   }
 
+  // Modifier legacy — mantiene la clase por compatibilidad con el HTML del
+  // modal de finalización, pero ahora usa primary como el resto de acciones
+  // confirm. El warning lo comunica el copy ("¿Seguro que querés cerrar…?"),
+  // no el color.
   &__modal-confirm--danger {
-    background: var(--color-error, #b91c1c);
+    background: var(--color-primary);
   }
 
   &__students-header {

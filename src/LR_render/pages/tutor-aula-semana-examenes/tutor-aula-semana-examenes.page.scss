@@ -182,9 +182,12 @@
     color: var(--color-on-surface-variant);
     white-space: nowrap;
 
+    // Tint success (verde suave) — mismo tratamiento que el chip "EN CURSO"
+    // del detalle del examen. `--color-primary-container` es azul oscuro
+    // sólido y quedaba ilegible con texto primary encima.
     &--in-progress {
-      background: var(--color-primary-container, rgba(26, 86, 219, 0.12));
-      color: var(--color-primary, #1a56db);
+      background: var(--color-success-container);
+      color: var(--color-on-success-container);
     }
 
     &--finalized {
@@ -253,8 +256,8 @@
     }
 
     &--in-progress {
-      background: var(--color-primary-container, rgba(26, 86, 219, 0.12));
-      color: var(--color-primary, #1a56db);
+      background: var(--color-success-container);
+      color: var(--color-on-success-container);
     }
 
     &--finalized {

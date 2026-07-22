@@ -17,6 +17,25 @@ import { NetworkError } from '../../../../src/L1_domain/errors/network.error';
 import { ExamConflictError } from '../../../../src/L1_domain/errors/exam-conflict.error';
 import { ExamPreconditionError } from '../../../../src/L1_domain/errors/exam-precondition.error';
 import { FinalizeResult } from '../../../../src/L1_domain/ports/tutor-exams-api';
+import { CLOCK } from '../../../../src/app.config';
+import { Clock } from '../../../../src/L1_domain/ports/clock';
+import { ServerTime } from '../../../../src/L1_domain/value-objects/server-time';
+
+// FakeClock — el VM inyecta CLOCK para el countdown de "cierra a las HH:MM".
+// setNow() alcanza; setServerTime es no-op porque los tests no ejercitan el
+// server-time-sync (eso lo cubre el spec de simulacro).
+class FakeClock implements Clock {
+  private current: Date = new Date('2026-06-11T10:00:00Z');
+  setNow(d: Date) {
+    this.current = d;
+  }
+  now(): Date {
+    return this.current;
+  }
+  setServerTime(_st: ServerTime): void {
+    /* no-op */
+  }
+}
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -211,6 +230,7 @@ function setup(recordId = 'rec-1') {
       { provide: IniciarExamenUseCase, useValue: fakeIniciar },
       { provide: FinalizarExamenUseCase, useValue: fakeFinalizar },
       { provide: ActualizarAlumnosHabilitadosUseCase, useValue: fakeActualizar },
+      { provide: CLOCK, useValue: new FakeClock() },
       {
         provide: ActivatedRoute,
         useValue: { snapshot: { paramMap: { get: () => recordId } } },
