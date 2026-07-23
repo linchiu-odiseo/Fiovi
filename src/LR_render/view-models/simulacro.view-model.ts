@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { GetTodaysExamsUseCase } from '../../L2_application/use-cases/get-todays-exams.use-case';
 import { MarcarRespuestaUseCase } from '../../L2_application/use-cases/marcar-respuesta.use-case';
 import { EnviarSimulacroUseCase } from '../../L2_application/use-cases/enviar-simulacro.use-case';
+import { EnviarTareaUseCase } from '../../L2_application/use-cases/enviar-tarea.use-case';
 import {
   AutoEnvioHandle,
   ProgramarAutoEnvioUseCase,
@@ -85,6 +86,7 @@ export class SimulacroPageViewModel {
   private readonly getTodaysExams = inject(GetTodaysExamsUseCase);
   private readonly marcarRespuesta = inject(MarcarRespuestaUseCase);
   private readonly enviarSimulacro = inject(EnviarSimulacroUseCase);
+  private readonly enviarTarea = inject(EnviarTareaUseCase);
   private readonly programarAutoEnvio = inject(ProgramarAutoEnvioUseCase);
   private readonly seleccionarAdmissionArea = inject(SeleccionarAdmissionAreaUseCase);
   private readonly markings = inject(MARKINGS_STORAGE);
@@ -134,30 +136,58 @@ export class SimulacroPageViewModel {
     return Array.from({ length: e.count }, (_, i) => i + 1);
   });
 
+  /**
+   * Cierre efectivo desde el punto de vista del ALUMNO — usado por countdown
+   * y auto-envio locales.
+   *
+   * Modo "tarea": min(myStartedAt + duration, openUntil). Antes de hidratar
+   * myStartedAt (o si el alumno nunca abrió la tarea) fallback a openUntil
+   * pelado — es el cutoff hard del server.
+   *
+   * Modo "examen" (heredado): delega en `Exam.effectiveCloseAt()`.
+   *
+   * Este cómputo NO cambia el dominio — el server sigue viendo openUntil
+   * como fuente de verdad. Es una vista "personal" para el UX local del alumno.
+   */
+  readonly personalCloseAt: Signal<Date | null> = computed(() => {
+    const e = this.exam();
+    if (e === null) return null;
+    if (e.finished !== null) return e.finished;
+    if (e.esTarea()) {
+      const openUntil = e.openUntil!;
+      const my = this.myStartedAt();
+      if (my === null) return openUntil;
+      const personalMs = my.getTime() + e.duration * 1000;
+      return personalMs < openUntil.getTime() ? new Date(personalMs) : openUntil;
+    }
+    return e.effectiveCloseAt();
+  });
+
   // Countdown formateado para el header. Recomputa cada segundo (al cambiar
   // nowTick) y cuando se setea/cambia el examen. Cuenta hasta el cierre
-  // efectivo (`effectiveCloseAt`) usando `started` como referencia mínima.
-  // Cuando `effectiveCloseAt` es null (examen aún no activado por el tutor),
-  // retorna vacío — el banner "tomando un café" comunica el estado.
+  // efectivo personal — `personalCloseAt` — usando `started` como referencia
+  // mínima. Cuando `personalCloseAt` es null (examen aún no activado por el
+  // tutor), retorna vacío — el banner "tomando un café" comunica el estado.
   readonly countdownRestante: Signal<string> = computed(() => {
     const e = this.exam();
     if (e === null) return '';
-    const closeAt = e.effectiveCloseAt();
+    const closeAt = this.personalCloseAt();
     if (closeAt === null) return '';
-    const anchor = e.started ?? e.scheduled;
+    // En tarea la ancla es el myStartedAt local (el alumno arranca su
+    // countdown al entrar); en examen sigue siendo el started global del tutor.
+    const anchor = e.esTarea()
+      ? (this.myStartedAt() ?? e.scheduled)
+      : (e.started ?? e.scheduled);
     const referenceNow = Math.max(this.nowTick().getTime(), anchor.getTime());
     const remainingMs = Math.max(0, closeAt.getTime() - referenceNow);
     return formatRestante(remainingMs);
   });
 
   // Hora de cierre efectivo como "HH:MM" para mostrar junto al countdown.
-  // Lo decide el dominio (`Exam.effectiveCloseAt()`): `finished` si learnex
-  // ya lo emitió, sino `started + duration`. Vacío cuando aún no es
-  // determinable (examen no activado).
+  // Usa `personalCloseAt` para reflejar el cutoff del alumno (en tarea puede
+  // ser antes del openUntil global si su duración local vence primero).
   readonly cierreHHMM: Signal<string> = computed(() => {
-    const e = this.exam();
-    if (e === null) return '';
-    const closeAt = e.effectiveCloseAt();
+    const closeAt = this.personalCloseAt();
     if (closeAt === null) return '';
     return formatHHMM(closeAt);
   });
@@ -192,15 +222,17 @@ export class SimulacroPageViewModel {
   // aún no activado), retorna false — no aplica el concepto de "tiempo
   // agotado" si nunca arrancó.
   readonly examenTiempoCumplido: Signal<boolean> = computed(() => {
-    const e = this.exam();
-    if (e === null) return false;
-    const closeAt = e.effectiveCloseAt();
+    const closeAt = this.personalCloseAt();
     if (closeAt === null) return false;
     return this.nowTick().getTime() >= closeAt.getTime();
   });
 
   private countdownTimer: ReturnType<typeof setInterval> | null = null;
   private autoEnvioHandle: AutoEnvioHandle | null = null;
+  // Auto-envio en modo tarea usa setTimeout local en vez de
+  // programarAutoEnvio.execute — el cierre efectivo es
+  // min(myStartedAt + duration, openUntil), no exam.effectiveCloseAt().
+  private tareaAutoEnvioTimer: ReturnType<typeof setTimeout> | null = null;
   private editingTimer: ReturnType<typeof setTimeout> | null = null;
   private started = false;
   private stopped = false;
@@ -208,6 +240,13 @@ export class SimulacroPageViewModel {
   // para que stop() y submit() puedan cancelar el dispatcher sin tener que
   // leer exam() (que puede ser null en edge cases de lifecycle).
   private sessionId = '';
+
+  // Modo "tarea": momento en que el alumno abrió la tarea localmente.
+  // Se persiste en localStorage con clave `homework:<sessionId>` para que si
+  // el alumno cierra y reabre Fiovi, el countdown de 10 min continúe donde
+  // estaba. Signal null hasta que start() lo hidrate o cree.
+  readonly myStartedAt = signal<Date | null>(null);
+  private static readonly HOMEWORK_START_KEY_PREFIX = 'homework:';
 
   constructor() {
     // Observa la signal closedSessions del dispatcher. Si el back devuelve
@@ -283,9 +322,45 @@ export class SimulacroPageViewModel {
 
     this.sessionId = encontrado.id;
     this.exam.set(encontrado);
+    // Modo "tarea": hidratar / crear el myStartedAt local antes de programar
+    // countdown y auto-envio — ambos dependen de él.
+    if (encontrado.esTarea()) {
+      this.hydrateHomeworkStartedAt(encontrado.id);
+    }
     await this.loadMarcaciones(encontrado);
     this.startCountdownTicker();
     this.scheduleAutoEnvio(encontrado);
+  }
+
+  /**
+   * Modo "tarea": lee `homework:<sessionId>` de localStorage; si no existe,
+   * escribe `now` y setea la signal — así el countdown arranca desde el
+   * primer momento en que el alumno entra a la tarea. Si el alumno cierra
+   * Fiovi y reabre, el valor persistido continúa el countdown donde estaba.
+   *
+   * Falla silenciosa contra localStorage indisponible (SSR, safari private,
+   * quota exceeded) — el signal queda null y `personalCloseAt` cae al
+   * openUntil global. El alumno no queda bloqueado.
+   */
+  private hydrateHomeworkStartedAt(sessionId: string): void {
+    const key = SimulacroPageViewModel.HOMEWORK_START_KEY_PREFIX + sessionId;
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw !== null && raw.trim().length > 0) {
+        const d = new Date(raw);
+        if (!Number.isNaN(d.getTime())) {
+          this.myStartedAt.set(d);
+          return;
+        }
+      }
+      // Primera vez: sellar `now` en localStorage + signal.
+      const now = this.clock.now();
+      localStorage.setItem(key, now.toISOString());
+      this.myStartedAt.set(now);
+    } catch {
+      // localStorage indisponible: queda null; personalCloseAt usará openUntil
+      // como fallback (cutoff hard del server). UX degradada pero no rota.
+    }
   }
 
   stop(): void {
@@ -296,8 +371,16 @@ export class SimulacroPageViewModel {
     this.draftDispatcher.cancelarDraftsPendientes(this.sessionId);
     this.stopCountdownTicker();
     this.cancelAutoEnvio();
+    this.cancelTareaAutoEnvio();
     this.cancelEditingTimer();
     this.editingRow.set(null);
+  }
+
+  private cancelTareaAutoEnvio(): void {
+    if (this.tareaAutoEnvioTimer !== null) {
+      clearTimeout(this.tareaAutoEnvioTimer);
+      this.tareaAutoEnvioTimer = null;
+    }
   }
 
   // Estado actual de la fila para una pregunta. Reactivo: depende de los
@@ -466,11 +549,16 @@ export class SimulacroPageViewModel {
     // `final` en Redis. Design.md D3 cancel-on-submit + spec Requirement.
     this.draftDispatcher.cancelarDraftsPendientes(this.sessionId);
     this.cancelAutoEnvio();
+    this.cancelTareaAutoEnvio();
     this.isSubmitting.set(true);
     this.submissionState.set('sending');
 
     try {
-      const result = await this.enviarSimulacro.execute({ examId: e.id });
+      // Router por modo: tarea usa el nuevo endpoint /submit-homework
+      // (INSERT sincrono directo, sin queue).
+      const result = e.esTarea()
+        ? await this.enviarTarea.execute({ examId: e.id })
+        : await this.enviarSimulacro.execute({ examId: e.id });
       if (result.status === 'enviado') {
         this.submissionState.set('sent');
         if (result.ack !== null) {
@@ -510,6 +598,30 @@ export class SimulacroPageViewModel {
   // estado de envío encima si ya hay uno en vuelo.
   private scheduleAutoEnvio(exam: Exam): void {
     this.cancelAutoEnvio();
+    this.cancelTareaAutoEnvio();
+
+    // Modo "tarea": el cierre efectivo es personal (min de myStartedAt + duration
+    // y openUntil). Programamos un setTimeout local que dispara `submit()` — que
+    // ya elige el use case correcto (enviarTarea) por el `esTarea()` guard.
+    // El anti-thundering-herd no aplica: en tarea los alumnos entran dispersos
+    // en el tiempo, no hay pico de submits simultáneos.
+    if (exam.esTarea()) {
+      const closeAt = this.personalCloseAt();
+      if (closeAt === null) return;
+      const delay = Math.max(0, closeAt.getTime() - this.clock.now().getTime());
+      this.tareaAutoEnvioTimer = setTimeout(() => {
+        this.tareaAutoEnvioTimer = null;
+        if (this.stopped) return;
+        if (this.isSubmitting()) return;
+        // submit() se encarga del router por modo, del stateo de submissionState,
+        // del cancel del draft dispatcher, etc.
+        void this.submit();
+      }, delay);
+      return;
+    }
+
+    // Modo "examen": comportamiento heredado — timer + jitter + call directo
+    // a EnviarSimulacroUseCase con clientFinishedAtOverride para lock exact.
     this.autoEnvioHandle = this.programarAutoEnvio.execute({
       exam,
       onResult: (result) => {

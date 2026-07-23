@@ -37,6 +37,7 @@ import { ListSsoProvidersUseCase } from './L2_application/use-cases/list-sso-pro
 import { GetTodaysExamsUseCase } from './L2_application/use-cases/get-todays-exams.use-case';
 import { MarcarRespuestaUseCase } from './L2_application/use-cases/marcar-respuesta.use-case';
 import { EnviarSimulacroUseCase } from './L2_application/use-cases/enviar-simulacro.use-case';
+import { EnviarTareaUseCase } from './L2_application/use-cases/enviar-tarea.use-case';
 import { RetomarEnviosPendientesUseCase } from './L2_application/use-cases/retomar-envios-pendientes.use-case';
 import { ProgramarAutoEnvioUseCase } from './L2_application/use-cases/programar-auto-envio.use-case';
 import { GuardarDraftUseCase } from './L2_application/use-cases/guardar-draft.use-case';
@@ -250,6 +251,16 @@ export const appConfig: ApplicationConfig = {
         clock: Clock,
         identity: IdentityStorage,
       ) => new EnviarSimulacroUseCase(api, markings, clock, identity),
+      deps: [EXAMS_API, MARKINGS_STORAGE, CLOCK, IDENTITY_STORAGE],
+    },
+    {
+      provide: EnviarTareaUseCase,
+      useFactory: (
+        api: ExamsApi,
+        markings: MarkingsStorage,
+        clock: Clock,
+        identity: IdentityStorage,
+      ) => new EnviarTareaUseCase(api, markings, clock, identity),
       deps: [EXAMS_API, MARKINGS_STORAGE, CLOCK, IDENTITY_STORAGE],
     },
     {
