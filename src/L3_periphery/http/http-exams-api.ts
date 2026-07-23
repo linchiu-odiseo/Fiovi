@@ -38,6 +38,9 @@ interface ExamDto {
   scheduled: string;
   started: string | null;
   finished: string | null;
+  // ISO datetime en modo "tarea"; null en modo "examen".
+  // Wire: `open_until` en snake_case (endpoints del alumno de learnex).
+  open_until: string | null;
 }
 
 interface ExamsListResponseDto {
@@ -65,7 +68,13 @@ type SubmitErrorMessage =
   | 'STUDENT_MISMATCH'
   | 'SESSION_NOT_ACTIVE'
   | 'CLOCK_SKEW_BEFORE_START'
-  | 'CLOCK_SKEW_TOO_FAR_FUTURE';
+  | 'CLOCK_SKEW_TOO_FAR_FUTURE'
+  // Códigos adicionales del endpoint /submit-homework — el enum es superset
+  // porque `classifySubmitError` sirve a ambos endpoints; el submit clásico
+  // nunca los emite. Ambos se mapean a SimulacroCerradoError (misma UX que
+  // "sesión cerrada" al recibir 409).
+  | 'NOT_HOMEWORK_MODE'
+  | 'HOMEWORK_WINDOW_CLOSED';
 
 const SUBMIT_ERROR_MESSAGES: ReadonlySet<SubmitErrorMessage> = new Set([
   'INVALID_ADMISSION_AREA',
@@ -74,6 +83,8 @@ const SUBMIT_ERROR_MESSAGES: ReadonlySet<SubmitErrorMessage> = new Set([
   'SESSION_NOT_ACTIVE',
   'CLOCK_SKEW_BEFORE_START',
   'CLOCK_SKEW_TOO_FAR_FUTURE',
+  'NOT_HOMEWORK_MODE',
+  'HOMEWORK_WINDOW_CLOSED',
 ]);
 
 // Segundo set enumerado cerrado para el POST /draft. EXCEPCIÓN documentada a
@@ -162,6 +173,30 @@ export class HttpExamsApi implements ExamsApi {
     }
   }
 
+  // POST /t/{slug}/student/exam-sessions/{sessionId}/submit-homework
+  // Mismo body/response shape que /submit — la única diferencia es la ruta y
+  // los guards del server (openUntil !== null AND now < openUntil).
+  // El backend NO enqueua a BullMQ acá: INSERT sincrono directo, receipt al vuelo.
+  async enviarHomework(req: EnvioRequest): Promise<EnvioResult> {
+    try {
+      const dto = await firstValueFrom(
+        this.http.post<SubmitResponseDto>(
+          apiPath.studentExamSubmitHomework(this.requireSlug(), req.examId),
+          {
+            code: req.code,
+            admission_area: req.admissionArea,
+            responses: req.responses,
+            client_finished_at: req.clientFinishedAt,
+          },
+        ),
+      );
+      const ack = new SubmissionAck(dto.id, dto.submission_hash, new Date(dto.submitted_at));
+      return { ack };
+    } catch (err) {
+      throw this.classifySubmitError(err);
+    }
+  }
+
   // POST /t/{slug}/student/exam-sessions/{sessionId}/draft
   // Envía un snapshot completo del set de respuestas al server (Redis buffer).
   // El draft NO reemplaza al submit: es piso de recuperación para force-close.
@@ -198,6 +233,10 @@ export class HttpExamsApi implements ExamsApi {
     if (finished !== null && Number.isNaN(finished.getTime())) {
       throw new InvalidExamError(`Exam finished no es ISO8601 válido: "${dto.finished}".`);
     }
+    const openUntil = dto.open_until !== null ? new Date(dto.open_until) : null;
+    if (openUntil !== null && Number.isNaN(openUntil.getTime())) {
+      throw new InvalidExamError(`Exam open_until no es ISO8601 válido: "${dto.open_until}".`);
+    }
     return new Exam({
       id: dto.id,
       area: dto.area,
@@ -210,6 +249,7 @@ export class HttpExamsApi implements ExamsApi {
       scheduled,
       started,
       finished,
+      openUntil,
     });
   }
 
@@ -314,6 +354,13 @@ export class HttpExamsApi implements ExamsApi {
       if (err.status === 404) return new SimulacroNoAsignadoError();
       if (err.status === 409) {
         if (knownMessage === 'SESSION_NOT_ACTIVE') return new SimulacroCerradoError();
+        // Homework: ambos códigos comparten UX "sesión cerrada" con el submit
+        // clásico. NOT_HOMEWORK_MODE indica misuse del endpoint (el alumno no
+        // debería llegar acá si el enrutamiento por modo funciona);
+        // HOMEWORK_WINDOW_CLOSED es lo esperable si el alumno perdió el
+        // deadline global.
+        if (knownMessage === 'NOT_HOMEWORK_MODE') return new SimulacroCerradoError();
+        if (knownMessage === 'HOMEWORK_WINDOW_CLOSED') return new SimulacroCerradoError();
         return new NetworkError();
       }
       if (err.status === 422) {
