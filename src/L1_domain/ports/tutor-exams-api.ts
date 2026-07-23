@@ -55,14 +55,18 @@ export interface TutorExamsApi {
   }): Promise<void>;
 
   // POST /t/:slug/virtual-exams/:recordId/start
-  // Body opcional: `{ duration?: number }` en segundos (60..7200). Cuando el
-  // tutor sobrescribe la duración al iniciar, viaja acá; ausencia mantiene la
-  // duración con la que se creó el examen. Respuesta: 204 void.
+  // Body opcional: `{ duration?, openUntil? }`.
+  //   - `duration`: segundos (60..7200) sobrescribe la duración creada.
+  //   - `openUntil`: Date opcional. Cuando se pasa, el examen arranca en modo
+  //     "tarea" (ventana global hasta esa fecha; countdown por alumno cliente).
+  //     Cuando se omite, arranca en modo "examen" (comportamiento heredado).
+  // Respuesta: 204 void.
   // Errores posibles: InvalidPayloadError (400 — duración fuera de rango),
   //                   ExamConflictError (409 — ya iniciado),
-  //                   ExamPreconditionError (422 — 0 alumnos habilitados o claves no configuradas),
+  //                   ExamPreconditionError (422 — 0 alumnos habilitados,
+  //                     claves no configuradas, o openUntil fuera de rango),
   //                   NetworkError.
-  iniciar(recordId: string, duration?: number): Promise<void>;
+  iniciar(recordId: string, opts?: { duration?: number; openUntil?: Date }): Promise<void>;
 
   // POST /t/:slug/virtual-exams/:recordId/finalize — sin body.
   // Respuesta: 200 (NO 202 ni 204) con body { transitioned, jobId? } — ver design.md R2.
