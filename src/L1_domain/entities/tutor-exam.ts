@@ -30,6 +30,12 @@ export class TutorExam {
   public readonly scheduled: Date;
   public readonly startedAt: Date | null;
   public readonly finishedAt: Date | null;
+  /**
+   * Fecha límite en modo "tarea". null = modo "examen" (contador server-side,
+   * heredado). Distingue los dos comportamientos sin campo `mode` explícito:
+   * es homework sii `openUntil !== null`.
+   */
+  public readonly openUntil: Date | null;
 
   constructor(params: {
     detailId: string;
@@ -44,6 +50,7 @@ export class TutorExam {
     scheduled: Date;
     startedAt: Date | null;
     finishedAt: Date | null;
+    openUntil: Date | null;
   }) {
     this.detailId = params.detailId;
     this.recordId = params.recordId;
@@ -57,6 +64,7 @@ export class TutorExam {
     this.scheduled = params.scheduled;
     this.startedAt = params.startedAt;
     this.finishedAt = params.finishedAt;
+    this.openUntil = params.openUntil;
   }
 
   /**
@@ -80,5 +88,13 @@ export class TutorExam {
   // El examen ya fue finalizado (read-only para el tutor — D5).
   estaFinalizado(): boolean {
     return this.serverStatus.is('finalized') || this.serverStatus.esTerminal();
+  }
+
+  /**
+   * true = modo "tarea" (ventana global con fecha límite),
+   * false = modo "examen" (contador de duración server-side desde el start).
+   */
+  esTarea(): boolean {
+    return this.openUntil !== null;
   }
 }

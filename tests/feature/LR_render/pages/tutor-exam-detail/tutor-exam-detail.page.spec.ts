@@ -23,6 +23,7 @@ function buildDetail(overrides: Partial<TutorExamDetail> = {}): TutorExamDetail 
     enabledStudentIds: ['s-1'],
     startedAt: null,
     finishedAt: null,
+    openUntil: null,
     createdAt: new Date('2026-06-01T10:00:00Z'),
     ...overrides,
   };

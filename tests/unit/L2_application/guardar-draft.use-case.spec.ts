@@ -35,6 +35,9 @@ class FakeDraftExamsApi implements ExamsApi {
   async enviar(): Promise<never> {
     throw new Error('Not used in draft tests');
   }
+  async enviarHomework(): Promise<never> {
+    throw new Error('Not used in draft tests');
+  }
 }
 
 const VALID_CODIGO = '30303011';

@@ -28,6 +28,7 @@ describe('GetTodaysExamsUseCase', () => {
       scheduled: new Date('2026-06-11T10:00:00Z'),
       started,
       finished,
+      openUntil: null,
       serverStatus: new ExamServerStatus(statusValue),
     });
   };

@@ -19,6 +19,7 @@ function buildTutorExam(id: string): TutorExam {
     scheduled: new Date('2026-06-01T10:00:00Z'),
     startedAt: null,
     finishedAt: null,
+    openUntil: null,
   });
 }
 

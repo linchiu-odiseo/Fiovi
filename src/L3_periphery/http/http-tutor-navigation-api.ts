@@ -59,6 +59,7 @@ interface TutorVirtualExamListItemDto {
   scheduled: string;
   startedAt: string | null;
   finishedAt: string | null;
+  openUntil: string | null;
 }
 
 interface AulaSemanaCourseGroupDto {
@@ -223,6 +224,7 @@ export class HttpTutorNavigationApi implements TutorNavigationApi {
       scheduled: new Date(dto.scheduled),
       startedAt: this.parseNullableDate(dto.startedAt),
       finishedAt: this.parseNullableDate(dto.finishedAt),
+      openUntil: this.parseNullableDate(dto.openUntil),
     });
   }
 

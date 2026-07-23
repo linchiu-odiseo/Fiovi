@@ -18,6 +18,7 @@ function buildDetail(): TutorExamDetail {
     enabledStudentIds: ['s-1', 's-2'],
     startedAt: null,
     finishedAt: null,
+    openUntil: null,
     createdAt: new Date('2026-06-01T10:00:00Z'),
   };
 }

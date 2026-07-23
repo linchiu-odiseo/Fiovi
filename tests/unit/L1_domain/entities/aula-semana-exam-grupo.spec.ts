@@ -17,6 +17,7 @@ function fakeExam(name: string): TutorExam {
     scheduled: new Date('2026-04-15T09:00:00Z'),
     startedAt: null,
     finishedAt: null,
+    openUntil: null,
   });
 }
 

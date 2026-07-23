@@ -27,6 +27,7 @@ describe('TutorExamDetail — tipo/estructura', () => {
       enabledStudentIds: ['s-1', 's-2'],
       startedAt: null,
       finishedAt: null,
+      openUntil: null,
       createdAt: new Date('2026-06-01T10:00:00Z'),
     };
     // Si el tipo tiene classroomId / entryId, TS lo inferiría como requerido y
@@ -48,6 +49,7 @@ describe('TutorExamDetail — tipo/estructura', () => {
       enabledStudentIds: [],
       startedAt: new Date('2026-06-10T08:00:00Z'),
       finishedAt: null,
+      openUntil: null,
       createdAt: new Date('2026-06-01T10:00:00Z'),
     };
     expect((detail as unknown as Record<string, unknown>)['entryId']).toBeUndefined();
@@ -66,6 +68,7 @@ describe('TutorExamDetail — tipo/estructura', () => {
       enabledStudentIds: ['s-1', 's-2', 's-3'],
       startedAt: null,
       finishedAt: null,
+      openUntil: null,
       createdAt: new Date('2026-06-01T10:00:00Z'),
     };
     expect(detail.enabledStudentIds).toEqual(['s-1', 's-2', 's-3']);

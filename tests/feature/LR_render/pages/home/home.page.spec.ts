@@ -203,6 +203,7 @@ const buildExam = (
     scheduled: new Date('2026-06-11T10:00:00Z'),
     started: inProgress || finalized ? new Date('2026-06-11T10:00:05Z') : null,
     finished: finalized ? new Date('2026-06-11T12:00:00Z') : null,
+    openUntil: null,
     serverStatus: new ExamServerStatus(serverStatusValue),
   });
 };

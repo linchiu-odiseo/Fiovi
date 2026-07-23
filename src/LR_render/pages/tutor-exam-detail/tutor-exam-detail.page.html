@@ -207,9 +207,50 @@
       >
         <div class="tutor-exam-detail__modal tutor-exam-detail__modal--iniciar">
           <h2 id="iniciar-modal-title" class="tutor-exam-detail__modal-title">Iniciar examen</h2>
-          <p class="tutor-exam-detail__modal-hint">
-            Confirmá o ajustá el tiempo antes de iniciar. Los alumnos verán esta duración.
-          </p>
+
+          <!-- Selector de modo (D-tarea): "Examen" (heredado, contador server-side)
+               vs "Tarea" (ventana global hasta la fecha límite). El modo cambia
+               el copy y muestra/oculta el date-time picker. -->
+          <div
+            class="tutor-exam-detail__mode"
+            role="radiogroup"
+            aria-label="Modo del examen"
+            data-testid="mode-selector"
+          >
+            <label class="tutor-exam-detail__mode-option">
+              <input
+                type="radio"
+                name="pending-mode"
+                value="examen"
+                data-testid="mode-examen"
+                [checked]="vm.pendingMode() === 'examen'"
+                (change)="onModeChange('examen')"
+              />
+              <span>Examen</span>
+            </label>
+            <label class="tutor-exam-detail__mode-option">
+              <input
+                type="radio"
+                name="pending-mode"
+                value="tarea"
+                data-testid="mode-tarea"
+                [checked]="vm.pendingMode() === 'tarea'"
+                (change)="onModeChange('tarea')"
+              />
+              <span>Tarea</span>
+            </label>
+          </div>
+
+          @if (vm.pendingMode() === 'examen') {
+            <p class="tutor-exam-detail__modal-hint">
+              Confirmá o ajustá el tiempo antes de iniciar. Los alumnos verán esta duración.
+            </p>
+          } @else {
+            <p class="tutor-exam-detail__modal-hint">
+              La tarea queda abierta hasta la fecha límite. Cada alumno tiene esta duración una vez
+              que abre la tarea; el contador corre local en su dispositivo.
+            </p>
+          }
 
           <div class="tutor-exam-detail__mmss">
             <label class="tutor-exam-detail__mmss-field">
@@ -248,9 +289,28 @@
             <span class="tutor-exam-detail__mmss-hint">(mín. 1:00 · máx. 120:00)</span>
           </p>
 
+          @if (vm.pendingMode() === 'tarea') {
+            <label class="tutor-exam-detail__open-until" data-testid="open-until-field">
+              <span class="tutor-exam-detail__open-until-label">Fecha límite</span>
+              <input
+                type="datetime-local"
+                data-testid="open-until-input"
+                [value]="vm.pendingOpenUntilLocal()"
+                (input)="onOpenUntilInput($event)"
+              />
+              <span class="tutor-exam-detail__open-until-hint"> Máx. 2 días desde ahora. </span>
+            </label>
+          }
+
           @if (vm.durationError()) {
             <p class="tutor-exam-detail__modal-error" role="alert">
               {{ vm.durationError() }}
+            </p>
+          }
+
+          @if (vm.openUntilError()) {
+            <p class="tutor-exam-detail__modal-error" role="alert" data-testid="open-until-error">
+              {{ vm.openUntilError() }}
             </p>
           }
 
@@ -304,10 +364,7 @@
                 [disabled]="isCheckboxDisabled(student)"
                 (change)="onToggleStudent(student.studentId)"
               />
-              <span
-                class="tutor-exam-detail__student-checkbox"
-                aria-hidden="true"
-              >
+              <span class="tutor-exam-detail__student-checkbox" aria-hidden="true">
                 <span class="material-symbols-outlined">check</span>
               </span>
               <span class="tutor-exam-detail__student-name">
@@ -388,8 +445,8 @@
           </h2>
           <p class="tutor-exam-detail__modal-hint">
             ¿Seguro que querés deshabilitar a
-            <strong>{{ pendingDesactivarStudentName() }}</strong>? El examen ya
-            está en curso — el alumno no aparecerá en las notas al finalizar.
+            <strong>{{ pendingDesactivarStudentName() }}</strong
+            >? El examen ya está en curso — el alumno no aparecerá en las notas al finalizar.
           </p>
           <div class="tutor-exam-detail__modal-actions tutor-exam-detail__modal-actions--stacked">
             <button
@@ -425,12 +482,10 @@
         data-testid="archivar-modal"
       >
         <div class="tutor-exam-detail__modal">
-          <h2 id="archivar-modal-title" class="tutor-exam-detail__modal-title">
-            Archivar examen
-          </h2>
+          <h2 id="archivar-modal-title" class="tutor-exam-detail__modal-title">Archivar examen</h2>
           <p class="tutor-exam-detail__modal-hint">
-            El examen se sacará de la lista. Las notas de los alumnos siguen
-            disponibles desde el histórico.
+            El examen se sacará de la lista. Las notas de los alumnos siguen disponibles desde el
+            histórico.
           </p>
           <div class="tutor-exam-detail__modal-actions tutor-exam-detail__modal-actions--stacked">
             <button

@@ -134,6 +134,29 @@ export class TutorExamDetailViewModel {
   static readonly DURATION_MIN_SECONDS = 60;
   static readonly DURATION_MAX_SECONDS = 7200;
 
+  // ── Selector de modo (examen | tarea) del modal iniciar ─────────────────────
+  // Cuando el modo es "tarea", el tutor elige adicionalmente una fecha límite
+  // (openUntil). El input viaja como valor de <input type="datetime-local">
+  // (formato "YYYY-MM-DDTHH:mm" en hora local del tutor), y se parsea a Date
+  // en el confirm. El tope de 2 días replica la regla de negocio del server
+  // — el server sigue siendo fuente de verdad, esta validación es solo UX.
+  readonly pendingMode = signal<'examen' | 'tarea'>('examen');
+  readonly pendingOpenUntilLocal = signal<string>('');
+  readonly openUntilError = signal<string | null>(null);
+  static readonly HOMEWORK_MAX_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
+
+  /**
+   * openUntil parseado desde el input datetime-local. null cuando está vacío
+   * o inválido. Un Date parseado del formato `datetime-local` respeta el TZ
+   * local — coincide con lo que el tutor ve/tipea.
+   */
+  readonly pendingOpenUntilDate = computed<Date | null>(() => {
+    const raw = this.pendingOpenUntilLocal().trim();
+    if (raw === '') return null;
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? null : d;
+  });
+
   /**
    * Total en segundos derivado de mm+ss para display en el modal ("Total: 3:30").
    * Retorna null cuando los inputs no son enteros válidos.
@@ -184,6 +207,11 @@ export class TutorExamDetailViewModel {
     const d = this.detail();
     if (!d) return null;
     if (d.finishedAt !== null) return d.finishedAt;
+    // Modo "tarea": el cierre es la fecha límite global, independiente de
+    // cuándo arrancó el tutor. Prevalece sobre startedAt + duration porque en
+    // tarea `duration` es el cap por alumno (client-side), no el cierre real.
+    if (d.openUntil !== null) return d.openUntil;
+    // Modo "examen": startedAt + duration cuando ya arrancó.
     if (d.startedAt !== null) {
       return new Date(d.startedAt.getTime() + d.duration * 1000);
     }
@@ -212,13 +240,29 @@ export class TutorExamDetailViewModel {
 
   /**
    * Hora de cierre formateada "HH:MM" para el header ("CIERRA A LAS 18:09").
-   * Vacío cuando el examen aún no arrancó.
+   * Vacío cuando el examen aún no arrancó. En modo "tarea" con cierre a más
+   * de 24h del `now` el label largo (closeDateTimeText) es el que muestra la
+   * page — este signal sigue devolviendo solo hora para no reventar los tests
+   * de proctored.
    */
   readonly closeTimeText = computed<string>(() => {
     const closeAt = this.effectiveCloseAt();
     if (closeAt === null) return '';
     return formatHHMM(closeAt);
   });
+
+  /**
+   * Cierre formateado como "DD/MM HH:MM" para el modo "tarea" cuando el cierre
+   * puede caer en otro día. La page decide qué signal usar según `esTarea()`.
+   */
+  readonly closeDateTimeText = computed<string>(() => {
+    const closeAt = this.effectiveCloseAt();
+    if (closeAt === null) return '';
+    return `${formatDDMM(closeAt)} ${formatHHMM(closeAt)}`;
+  });
+
+  /** true = detail cargado y `openUntil !== null` (modo tarea). */
+  readonly esTarea = computed<boolean>(() => this.detail()?.openUntil !== null);
 
   /**
    * Prefijo del label de cierre: "Cierra a las" mientras el examen está
@@ -323,7 +367,12 @@ export class TutorExamDetailViewModel {
     if (!d) return;
     this.pendingMinutes.set(Math.floor(d.duration / 60));
     this.pendingSeconds.set(d.duration % 60);
+    // Default modo "examen" — el comportamiento heredado no cambia si el tutor
+    // no toca el selector.
+    this.pendingMode.set('examen');
+    this.pendingOpenUntilLocal.set('');
     this.durationError.set(null);
+    this.openUntilError.set(null);
     this.iniciarModalOpen.set(true);
   }
 
@@ -331,7 +380,10 @@ export class TutorExamDetailViewModel {
     this.iniciarModalOpen.set(false);
     this.pendingMinutes.set(null);
     this.pendingSeconds.set(null);
+    this.pendingMode.set('examen');
+    this.pendingOpenUntilLocal.set('');
     this.durationError.set(null);
+    this.openUntilError.set(null);
   }
 
   // Confirma el modal: valida los minutos y segundos, arma el total en segundos,
@@ -363,21 +415,46 @@ export class TutorExamDetailViewModel {
       return;
     }
 
+    // Validación de openUntil cuando el modo es "tarea". El server también
+    // rechaza fuera de rango con 422 — acá es solo UX temprana.
+    let openUntil: Date | undefined;
+    if (this.pendingMode() === 'tarea') {
+      const parsed = this.pendingOpenUntilDate();
+      if (parsed === null) {
+        this.openUntilError.set('Ingresá una fecha y hora válida para la tarea.');
+        return;
+      }
+      const deltaMs = parsed.getTime() - Date.now();
+      if (deltaMs <= 0) {
+        this.openUntilError.set('La fecha límite debe ser posterior a ahora.');
+        return;
+      }
+      if (deltaMs > TutorExamDetailViewModel.HOMEWORK_MAX_WINDOW_MS) {
+        const maxDays = TutorExamDetailViewModel.HOMEWORK_MAX_WINDOW_MS / (24 * 60 * 60 * 1000);
+        this.openUntilError.set(`La fecha límite no puede exceder ${maxDays} días desde ahora.`);
+        return;
+      }
+      openUntil = parsed;
+    }
+
     const currentDuration = this.detail()?.duration ?? null;
     const override = totalSeconds === currentDuration ? undefined : totalSeconds;
 
     this.iniciarModalOpen.set(false);
     this.durationError.set(null);
+    this.openUntilError.set(null);
     this.pendingMinutes.set(null);
     this.pendingSeconds.set(null);
+    this.pendingOpenUntilLocal.set('');
 
-    await this.iniciar(override);
+    await this.iniciar(override, openUntil);
   }
 
   // Inicia el examen (scheduled → in_progress). Guard D5: solo si canIniciar().
   // `newDuration` opcional en segundos (60..7200). Cuando viene, el back lo
   // persiste atómicamente junto con la transición de estado.
-  async iniciar(newDuration?: number): Promise<void> {
+  // `openUntil` opcional. Cuando viene, el examen arranca en modo "tarea".
+  async iniciar(newDuration?: number, openUntil?: Date): Promise<void> {
     if (!this.canIniciar()) return;
 
     const recordId = this.route.snapshot.paramMap.get('recordId') ?? '';
@@ -385,7 +462,7 @@ export class TutorExamDetailViewModel {
     this.isSaving.set(true);
 
     try {
-      await this.iniciarExamen.execute({ recordId, duration: newDuration });
+      await this.iniciarExamen.execute({ recordId, duration: newDuration, openUntil });
       // Reload detail y upsert store (R4: list reflects new status immediately).
       await this.reloadDetail(recordId);
     } catch (err) {
@@ -588,6 +665,7 @@ export class TutorExamDetailViewModel {
         scheduled: existingExam.scheduled,
         startedAt: detail.startedAt,
         finishedAt: detail.finishedAt,
+        openUntil: detail.openUntil,
       });
       this.store.upsert(updatedExam);
     }
@@ -757,6 +835,12 @@ function formatHHMM(d: Date): string {
   const hh = d.getHours().toString().padStart(2, '0');
   const mm = d.getMinutes().toString().padStart(2, '0');
   return `${hh}:${mm}`;
+}
+
+function formatDDMM(d: Date): string {
+  const dd = d.getDate().toString().padStart(2, '0');
+  const mm = (d.getMonth() + 1).toString().padStart(2, '0');
+  return `${dd}/${mm}`;
 }
 
 function formatRestante(ms: number): string {

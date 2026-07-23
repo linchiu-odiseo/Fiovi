@@ -90,6 +90,7 @@ describe('ProgramarAutoEnvioUseCase', () => {
       scheduled: overrides.scheduled ?? new Date(SCHEDULED_ISO),
       started: 'started' in overrides ? (overrides.started ?? null) : new Date(STARTED_ISO),
       finished: null,
+      openUntil: null,
       serverStatus: new ExamServerStatus(statusValue),
     });
   };

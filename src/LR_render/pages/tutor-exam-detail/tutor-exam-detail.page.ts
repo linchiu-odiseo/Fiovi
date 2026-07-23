@@ -95,6 +95,24 @@ export class TutorExamDetailPage {
     this.vm.pendingSeconds.set(parsed);
   }
 
+  protected onModeChange(mode: 'examen' | 'tarea'): void {
+    this.vm.pendingMode.set(mode);
+    // Al cambiar de modo limpio el error de fecha si el usuario venía
+    // corrigiéndolo — evita mostrar mensajes viejos que ya no aplican.
+    this.vm.openUntilError.set(null);
+  }
+
+  protected onOpenUntilInput(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    if (!target) return;
+    this.vm.pendingOpenUntilLocal.set(target.value);
+    // Reset del error inline en cada teclazo — el usuario ve el error real al
+    // apretar "Iniciar examen", no mientras aún está tipeando.
+    if (this.vm.openUntilError() !== null) {
+      this.vm.openUntilError.set(null);
+    }
+  }
+
   // Etiqueta "mm:ss" del total en el resumen del modal.
   protected formatMmSs(totalSeconds: number | null): string {
     if (totalSeconds === null) return '—';

@@ -18,6 +18,7 @@ function buildExam(overrides: Partial<ConstructorParameters<typeof TutorExam>[0]
     scheduled: new Date('2026-06-01T10:00:00Z'),
     startedAt: null,
     finishedAt: null,
+    openUntil: null,
     ...overrides,
   });
 }
