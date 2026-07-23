@@ -10,6 +10,7 @@ import {
   EnviarSimulacroOutput,
   EnviarSimulacroUseCase,
 } from '../../../../src/L2_application/use-cases/enviar-simulacro.use-case';
+import { EnviarTareaUseCase } from '../../../../src/L2_application/use-cases/enviar-tarea.use-case';
 import {
   AutoEnvioHandle,
   ProgramarAutoEnvioInput,
@@ -325,6 +326,7 @@ const buildExam = (
           ? new Date('2026-06-11T10:00:05Z')
           : null,
     finished: finalized ? new Date('2026-06-11T12:00:00Z') : null,
+    openUntil: null,
     serverStatus: new ExamServerStatus(serverStatusValue),
   });
 };
@@ -362,6 +364,10 @@ describe('SimulacroPageViewModel', () => {
         { provide: GetTodaysExamsUseCase, useValue: fakeGetTodaysExams },
         { provide: MarcarRespuestaUseCase, useValue: fakeMarcar },
         { provide: EnviarSimulacroUseCase, useValue: fakeEnviar },
+        // Reusa fakeEnviar para EnviarTareaUseCase — los tests históricos usan
+        // openUntil: null en las fixtures (modo examen), así el branch tarea
+        // no se dispara; el provide solo satisface la DI del view-model.
+        { provide: EnviarTareaUseCase, useValue: fakeEnviar },
         { provide: ProgramarAutoEnvioUseCase, useValue: fakeProgramar },
         { provide: SeleccionarAdmissionAreaUseCase, useValue: fakeSeleccionarArea },
         { provide: CLOCK, useValue: fakeClock },
@@ -1080,6 +1086,10 @@ describe('SimulacroPageViewModel', () => {
           { provide: GetTodaysExamsUseCase, useValue: fakeGetTodaysExams },
           { provide: MarcarRespuestaUseCase, useValue: fakeMarcar },
           { provide: EnviarSimulacroUseCase, useValue: fakeEnviar },
+        // Reusa fakeEnviar para EnviarTareaUseCase — los tests históricos usan
+        // openUntil: null en las fixtures (modo examen), así el branch tarea
+        // no se dispara; el provide solo satisface la DI del view-model.
+        { provide: EnviarTareaUseCase, useValue: fakeEnviar },
           { provide: ProgramarAutoEnvioUseCase, useValue: fakeProgramar },
           { provide: SeleccionarAdmissionAreaUseCase, useValue: fakeSeleccionarArea },
           { provide: CLOCK, useValue: fakeClock },
@@ -1142,6 +1152,7 @@ describe('SimulacroPageViewModel', () => {
         scheduled: new Date('2026-06-11T09:00:00Z'),
         started: new Date('2026-06-11T09:30:00Z'),
         finished,
+        openUntil: null,
         serverStatus: new ExamServerStatus('in_progress'),
       });
       fakeGetTodaysExams.willResolve([exam]);

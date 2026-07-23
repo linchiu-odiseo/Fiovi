@@ -8,6 +8,7 @@ import { SimulacroPageViewModel } from '../../../../../src/LR_render/view-models
 import { GetTodaysExamsUseCase } from '../../../../../src/L2_application/use-cases/get-todays-exams.use-case';
 import { MarcarRespuestaUseCase } from '../../../../../src/L2_application/use-cases/marcar-respuesta.use-case';
 import { EnviarSimulacroUseCase } from '../../../../../src/L2_application/use-cases/enviar-simulacro.use-case';
+import { EnviarTareaUseCase } from '../../../../../src/L2_application/use-cases/enviar-tarea.use-case';
 import {
   AutoEnvioHandle,
   ProgramarAutoEnvioInput,
@@ -191,6 +192,7 @@ const buildExam = (
           ? new Date('2026-06-11T10:00:05Z')
           : null,
     finished: finalized ? new Date('2026-06-11T12:00:00Z') : null,
+    openUntil: null,
     serverStatus: new ExamServerStatus(serverStatusValue),
   });
 };
@@ -211,6 +213,9 @@ describe('SimulacroPage', () => {
         { provide: GetTodaysExamsUseCase, useValue: fakeGetTodaysExams },
         { provide: MarcarRespuestaUseCase, useValue: fakeMarcar },
         { provide: EnviarSimulacroUseCase, useValue: new FakeEnviarSimulacroUseCase() },
+        // Reusa la misma clase fake para EnviarTareaUseCase — el fixture usa
+        // openUntil: null (modo examen) así el branch tarea no se dispara.
+        { provide: EnviarTareaUseCase, useValue: new FakeEnviarSimulacroUseCase() },
         { provide: ProgramarAutoEnvioUseCase, useValue: new FakeProgramarAutoEnvioUseCase() },
         // Fake mínimo: los tests del page NO ejercitan seleccionarArea. Basta
         // con satisfacer la DI del view-model — un execute que resuelve OK.

@@ -32,6 +32,7 @@ function listItemDto(overrides: Partial<Record<string, unknown>> = {}) {
     scheduled: '2026-06-01T10:00:00Z',
     startedAt: null,
     finishedAt: null,
+    openUntil: null,
     ...overrides,
   };
 }
@@ -362,7 +363,7 @@ describe('HttpTutorExamsApi', () => {
     });
 
     it('envía { duration } en el body cuando el tutor sobrescribe al iniciar', async () => {
-      const pending = adapter.iniciar('rec-1', 1800);
+      const pending = adapter.iniciar('rec-1', { duration: 1800 });
 
       const req = httpMock.expectOne(`${BASE}/virtual-exams/rec-1/start`);
       expect(req.request.method).toBe('POST');
@@ -396,7 +397,7 @@ describe('HttpTutorExamsApi', () => {
     });
 
     it('HTTP 400 (duración fuera de rango) → rechaza con InvalidPayloadError', async () => {
-      const pending = adapter.iniciar('rec-1', 30);
+      const pending = adapter.iniciar('rec-1', { duration: 30 });
       const req = httpMock.expectOne(`${BASE}/virtual-exams/rec-1/start`);
       req.flush({ message: 'duration out of range' }, { status: 400, statusText: 'Bad Request' });
 

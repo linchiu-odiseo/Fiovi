@@ -256,6 +256,7 @@ const buildExam = (
         : finalized
           ? new Date('2026-06-11T12:00:00Z')
           : null,
+    openUntil: null,
     serverStatus: new ExamServerStatus(serverStatusValue),
   });
 };

@@ -55,6 +55,7 @@ describe('HttpExamsApi', () => {
     scheduled: '2026-06-11T10:00:00Z',
     started: '2026-06-11T10:00:05Z',
     finished: null,
+    open_until: null,
     ...overrides,
   });
 
