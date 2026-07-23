@@ -1086,10 +1086,10 @@ describe('SimulacroPageViewModel', () => {
           { provide: GetTodaysExamsUseCase, useValue: fakeGetTodaysExams },
           { provide: MarcarRespuestaUseCase, useValue: fakeMarcar },
           { provide: EnviarSimulacroUseCase, useValue: fakeEnviar },
-        // Reusa fakeEnviar para EnviarTareaUseCase — los tests históricos usan
-        // openUntil: null en las fixtures (modo examen), así el branch tarea
-        // no se dispara; el provide solo satisface la DI del view-model.
-        { provide: EnviarTareaUseCase, useValue: fakeEnviar },
+          // Reusa fakeEnviar para EnviarTareaUseCase — los tests históricos usan
+          // openUntil: null en las fixtures (modo examen), así el branch tarea
+          // no se dispara; el provide solo satisface la DI del view-model.
+          { provide: EnviarTareaUseCase, useValue: fakeEnviar },
           { provide: ProgramarAutoEnvioUseCase, useValue: fakeProgramar },
           { provide: SeleccionarAdmissionAreaUseCase, useValue: fakeSeleccionarArea },
           { provide: CLOCK, useValue: fakeClock },

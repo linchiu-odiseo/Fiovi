@@ -175,9 +175,7 @@ export class SimulacroPageViewModel {
     if (closeAt === null) return '';
     // En tarea la ancla es el myStartedAt local (el alumno arranca su
     // countdown al entrar); en examen sigue siendo el started global del tutor.
-    const anchor = e.esTarea()
-      ? (this.myStartedAt() ?? e.scheduled)
-      : (e.started ?? e.scheduled);
+    const anchor = e.esTarea() ? (this.myStartedAt() ?? e.scheduled) : (e.started ?? e.scheduled);
     const referenceNow = Math.max(this.nowTick().getTime(), anchor.getTime());
     const remainingMs = Math.max(0, closeAt.getTime() - referenceNow);
     return formatRestante(remainingMs);

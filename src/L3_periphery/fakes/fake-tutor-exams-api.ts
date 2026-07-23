@@ -34,10 +34,7 @@ export class FakeTutorExamsApi implements TutorExamsApi {
     return;
   }
 
-  async iniciar(
-    _recordId: string,
-    _opts?: { duration?: number; openUntil?: Date },
-  ): Promise<void> {
+  async iniciar(_recordId: string, _opts?: { duration?: number; openUntil?: Date }): Promise<void> {
     return;
   }
 

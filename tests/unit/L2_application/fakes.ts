@@ -478,10 +478,7 @@ export class FakeTutorExamsApi implements TutorExamsApi {
     return this.iniciarCallsFull;
   }
 
-  async iniciar(
-    recordId: string,
-    opts?: { duration?: number; openUntil?: Date },
-  ): Promise<void> {
+  async iniciar(recordId: string, opts?: { duration?: number; openUntil?: Date }): Promise<void> {
     this.iniciarCalls.push(recordId);
     this.iniciarCallsFull.push({
       recordId,

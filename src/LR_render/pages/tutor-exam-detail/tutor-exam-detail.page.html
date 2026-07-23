@@ -247,8 +247,8 @@
             </p>
           } @else {
             <p class="tutor-exam-detail__modal-hint">
-              La tarea queda abierta hasta la fecha límite. Cada alumno tiene esta duración
-              una vez que abre la tarea; el contador corre local en su dispositivo.
+              La tarea queda abierta hasta la fecha límite. Cada alumno tiene esta duración una vez
+              que abre la tarea; el contador corre local en su dispositivo.
             </p>
           }
 
@@ -290,10 +290,7 @@
           </p>
 
           @if (vm.pendingMode() === 'tarea') {
-            <label
-              class="tutor-exam-detail__open-until"
-              data-testid="open-until-field"
-            >
+            <label class="tutor-exam-detail__open-until" data-testid="open-until-field">
               <span class="tutor-exam-detail__open-until-label">Fecha límite</span>
               <input
                 type="datetime-local"
@@ -301,9 +298,7 @@
                 [value]="vm.pendingOpenUntilLocal()"
                 (input)="onOpenUntilInput($event)"
               />
-              <span class="tutor-exam-detail__open-until-hint">
-                Máx. 2 días desde ahora.
-              </span>
+              <span class="tutor-exam-detail__open-until-hint"> Máx. 2 días desde ahora. </span>
             </label>
           }
 
@@ -369,10 +364,7 @@
                 [disabled]="isCheckboxDisabled(student)"
                 (change)="onToggleStudent(student.studentId)"
               />
-              <span
-                class="tutor-exam-detail__student-checkbox"
-                aria-hidden="true"
-              >
+              <span class="tutor-exam-detail__student-checkbox" aria-hidden="true">
                 <span class="material-symbols-outlined">check</span>
               </span>
               <span class="tutor-exam-detail__student-name">
@@ -453,8 +445,8 @@
           </h2>
           <p class="tutor-exam-detail__modal-hint">
             ¿Seguro que querés deshabilitar a
-            <strong>{{ pendingDesactivarStudentName() }}</strong>? El examen ya
-            está en curso — el alumno no aparecerá en las notas al finalizar.
+            <strong>{{ pendingDesactivarStudentName() }}</strong
+            >? El examen ya está en curso — el alumno no aparecerá en las notas al finalizar.
           </p>
           <div class="tutor-exam-detail__modal-actions tutor-exam-detail__modal-actions--stacked">
             <button
@@ -490,12 +482,10 @@
         data-testid="archivar-modal"
       >
         <div class="tutor-exam-detail__modal">
-          <h2 id="archivar-modal-title" class="tutor-exam-detail__modal-title">
-            Archivar examen
-          </h2>
+          <h2 id="archivar-modal-title" class="tutor-exam-detail__modal-title">Archivar examen</h2>
           <p class="tutor-exam-detail__modal-hint">
-            El examen se sacará de la lista. Las notas de los alumnos siguen
-            disponibles desde el histórico.
+            El examen se sacará de la lista. Las notas de los alumnos siguen disponibles desde el
+            histórico.
           </p>
           <div class="tutor-exam-detail__modal-actions tutor-exam-detail__modal-actions--stacked">
             <button

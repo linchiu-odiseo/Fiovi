@@ -19,11 +19,7 @@ import { TutorExamsApi } from '../../L1_domain/ports/tutor-exams-api';
 export class IniciarExamenUseCase {
   constructor(private readonly api: TutorExamsApi) {}
 
-  async execute(req: {
-    recordId: string;
-    duration?: number;
-    openUntil?: Date;
-  }): Promise<void> {
+  async execute(req: { recordId: string; duration?: number; openUntil?: Date }): Promise<void> {
     return this.api.iniciar(req.recordId, {
       duration: req.duration,
       openUntil: req.openUntil,

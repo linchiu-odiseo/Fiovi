@@ -158,10 +158,7 @@ export class HttpTutorExamsApi implements TutorExamsApi {
   // POST /t/:slug/virtual-exams/:recordId/start
   // Body opcional `{ duration?, openUntil? }`. Cuando `openUntil` viene, el
   // examen arranca en modo "tarea" (ver TutorExamsApi.iniciar). Respuesta: 204.
-  async iniciar(
-    recordId: string,
-    opts?: { duration?: number; openUntil?: Date },
-  ): Promise<void> {
+  async iniciar(recordId: string, opts?: { duration?: number; openUntil?: Date }): Promise<void> {
     // Construimos el body dropeando keys undefined para no enviar `null`
     // implícito ni `{ duration: undefined }` — el server-side zod distingue
     // presencia con `.optional()`.
