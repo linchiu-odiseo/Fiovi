@@ -1,13 +1,17 @@
-// Estilos de /tutor/home (lista de exámenes + perfil del tutor).
-// Estructura: :host → .tutor-exams-list (flex column) → profile-card →
-// stats-card (aulas) → exams-section → footer.
+// Estilos de /tutor/home. Estructura calmada, espeja /student/home:
+//   :host padding-top = --top-chrome (deja el pill de connectivity arriba)
+//     → hero (saludo + frase, clickable a /profile)
+//     → aulas-section
+//     → exams-in-progress-section
+//     → version footer anclado al fondo real
 
 :host {
   display: block;
   min-height: 100dvh;
   background: var(--color-bg);
   color: var(--color-on-surface);
-  padding: var(--space-lg) var(--space-md);
+  padding: calc(env(safe-area-inset-top) + var(--top-chrome)) var(--space-md)
+    env(safe-area-inset-bottom);
   box-sizing: border-box;
   font-family: var(--font-body);
 }
@@ -15,49 +19,73 @@
 .tutor-exams-list {
   max-width: 28rem;
   margin: 0 auto;
-  padding-block: var(--space-lg) var(--space-md);
   display: flex;
   flex-direction: column;
-  gap: var(--space-lg);
-  min-height: calc(100dvh - 3rem);
+  gap: var(--space-2xl);
+  min-height: calc(100dvh - var(--top-chrome) - env(safe-area-inset-top));
   box-sizing: border-box;
 
-  &__header {
+  // Hero: bloque de perfil clickable con saludo + frase serif italic.
+  // Sin borde de card — es la firma tipográfica del home. Padding-top
+  // empuja al gold zone vertical del primer viewport (~38 % desde tope).
+  &__hero {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-xs);
-  }
-
-  &__kicker {
-    margin: 0;
-    font-size: 0.75rem;
-    font-weight: 700;
-    line-height: 1rem;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--color-on-surface-variant);
-  }
-
-  &__greeting {
-    margin: 0;
-    font-family: var(--font-display);
-    font-size: 1.625rem;
-    line-height: 2rem;
-    font-weight: 700;
+    align-items: center;
+    gap: var(--space-md);
+    padding: 8dvh 0.75rem 0;
+    background: transparent;
+    border: none;
     color: var(--color-on-surface);
-    letter-spacing: -0.01em;
+    font-family: var(--font-serif);
+    cursor: pointer;
+    text-align: center;
+    border-radius: var(--radius);
+    transition: opacity 120ms ease;
+
+    &:hover,
+    &:focus-visible {
+      opacity: 0.75;
+    }
+
+    // Variante degradada: perfil no disponible. Solo un leve tinte de
+    // warning-container como fondo — el hero sigue plano tipográficamente.
+    &--degraded {
+      background: var(--color-warning-container);
+      color: var(--color-on-warning-container);
+      padding: var(--space-md) var(--space-md);
+      border-radius: var(--radius-md);
+    }
   }
 
-  &__email {
-    margin: var(--space-xs) 0 0;
+  &__hero-greeting {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: 1.375rem;
+    line-height: 1.75rem;
+    font-weight: 500;
+    font-style: italic;
+    color: var(--color-on-surface);
+  }
+
+  &__hero-quote {
+    margin: 0;
+    max-width: 22rem;
+    font-family: var(--font-serif);
+    font-size: 1rem;
+    line-height: 1.5rem;
     color: var(--color-on-surface-variant);
-    font-size: 0.9rem;
+    font-style: italic;
+  }
+
+  &__hero-skeleton {
+    padding: 8dvh 0.75rem 0;
+    text-align: center;
   }
 
   &__hint {
     margin: var(--space-xs) 0 0;
-    color: var(--color-on-surface-variant);
+    color: var(--color-on-warning-container);
     font-size: 0.85rem;
     line-height: 1.45;
   }
@@ -68,47 +96,10 @@
     font-size: 0.9rem;
   }
 
-  &__footer {
+  // Version footer anclado al fondo real via margin-top: auto. Sin
+  // botón "Cerrar sesión" — se movió a /profile.
+  &__version-footer {
     margin-top: auto;
-
-    button {
-      width: 100%;
-      height: 2.75rem;
-      padding: 0 var(--space-md);
-      border: 1px solid var(--color-outline-variant);
-      border-radius: var(--radius);
-      background: transparent;
-      color: var(--color-on-surface-variant);
-      font-family: var(--font-body);
-      font-size: 0.875rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition:
-        background 120ms ease,
-        border-color 120ms ease;
-
-      &:hover:not(:disabled) {
-        background: var(--color-surface-container-low);
-        border-color: var(--color-primary);
-      }
-
-      &:disabled {
-        opacity: 0.55;
-        cursor: not-allowed;
-      }
-    }
-  }
-
-  &__loading,
-  &__error,
-  &__empty {
-    padding: var(--space-md);
-    text-align: center;
-    color: var(--color-on-surface-variant);
-  }
-
-  &__error {
-    color: var(--color-error);
   }
 
   &__list {
@@ -121,21 +112,6 @@
   }
 }
 
-// Pill "Tutor"
-.role-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.25rem 0.75rem;
-  border-radius: var(--radius-pill);
-  background: var(--color-primary);
-  color: var(--color-on-primary);
-  font-size: 0.75rem;
-  font-weight: 700;
-  line-height: 1rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
 .section-title {
   margin: 0 0 var(--space-xs);
   font-size: 0.75rem;
@@ -144,63 +120,6 @@
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--color-on-surface-variant);
-}
-
-.profile-card {
-  padding: var(--space-md) 1.1rem;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-outline-variant);
-  background: var(--color-surface-container-lowest);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-
-  &--skeleton {
-    opacity: 0.7;
-  }
-
-  &--degraded {
-    border-color: var(--color-warning);
-    background: var(--color-warning-container);
-    color: var(--color-on-warning-container);
-  }
-}
-
-// Fila ícono+texto dentro del profile-card. Espeja el patrón del home del
-// alumno (`home.page.scss .user-info`) para que la jerarquía visual sea
-// idéntica entre alumno y tutor. Encapsulada por Angular al scoparse desde
-// `.profile-card` — no colisiona con estilos globales.
-.profile-card {
-  .user-info {
-    list-style: none;
-    margin: var(--space-xs) 0 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    color: var(--color-on-surface-variant);
-    font-size: 0.875rem;
-
-    li {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
-
-    .material-symbols-outlined {
-      font-size: 1rem;
-      line-height: 1;
-      color: var(--color-on-surface-variant);
-    }
-
-    // Marca el DNI/código en mono para hacerlo visualmente identificable
-    // como dato técnico (mismo criterio que el home del alumno).
-    &__mono {
-      font-family: var(--font-mono);
-      font-size: 0.85rem;
-      letter-spacing: 0.02em;
-    }
-  }
 }
 
 // Sección "Mis aulas": cada aula es una card grande, clickable, con chevron —
@@ -384,10 +303,6 @@
   }
 }
 
-// Card con strip lateral de color por estado — mismo patrón que
-// `home.page.scss .card`. El `<span class="exam-card__strip">` es absolute,
-// ocupa el alto completo del <li> y su color se decide desde los
-// modificadores `--scheduled|--in-progress|--finalized`.
 .exam-card {
   position: relative;
   padding: var(--space-md) 1.1rem var(--space-md) 1.25rem;
@@ -421,9 +336,6 @@
     background: var(--color-outline);
   }
 
-  // Modificadores por estado. Se bindean desde el template según
-  // `exam.serverStatus.value` — el strip verde comunica "en curso"
-  // sin que el tutor tenga que leer el badge.
   &--in-progress &__strip {
     background: var(--color-success);
   }
@@ -471,8 +383,6 @@
     flex-wrap: wrap;
   }
 
-  // Nombre del aula dentro del meta de la card "en curso" — el shortcut del
-  // home es cross-aula, por eso mostramos a qué aula pertenece cada examen.
   &__classroom {
     font-weight: 600;
     color: var(--color-on-surface);

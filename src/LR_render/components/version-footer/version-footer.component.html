@@ -1,3 +1,25 @@
 @if (version) {
-  <footer class="version-footer">Fiovi · versión {{ version }}</footer>
+  <footer class="version-footer">
+    Fiovi · versión {{ version }}
+    @if (pendingUpdate().available) {
+      <button
+        type="button"
+        class="version-footer__update-cta"
+        data-testid="version-footer-update-cta"
+        (click)="onUpdateClick()"
+      >
+        · actualizar a {{ pendingUpdate().toVersion }}
+        <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
+      </button>
+    }
+  </footer>
+}
+
+@if (showConfirmModal()) {
+  <app-update-confirm-modal
+    [fromVersion]="pendingUpdate().fromVersion"
+    [toVersion]="pendingUpdate().toVersion"
+    (dismiss)="onModalCancel()"
+    (accept)="onModalConfirm()"
+  />
 }

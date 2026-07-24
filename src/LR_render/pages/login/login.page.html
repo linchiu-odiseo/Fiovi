@@ -1,11 +1,22 @@
 <main class="login">
   <header class="login__header">
-    <div class="login__brand" aria-hidden="true">L</div>
+    <img
+      src="img/favicon_transparent.png"
+      alt=""
+      class="login__brand-img"
+      width="80"
+      height="80"
+      aria-hidden="true"
+    />
     <h1 class="login__title">Fiovi</h1>
     <p class="login__subtitle">Inicia sesión para continuar</p>
   </header>
 
-  @if (vm.ssoProviders().length > 0) {
+  <!-- Grupo SSO + toggle "Iniciar con email". Toda la sección se oculta
+       cuando el user expande el form de email — el toggle inverso "Volver
+       a Google" al pie del form devuelve la vista a este bloque. Evita
+       mostrar dos CTAs primarios (Google + Ingresar) compitiendo entre sí. -->
+  @if (vm.ssoProviders().length > 0 && !emailFormExpanded()) {
     @for (p of vm.ssoProviders(); track p.provider) {
       <button
         type="button"
@@ -44,92 +55,117 @@
       </button>
     }
 
-    <div class="login__divider" aria-hidden="true">
-      <span class="login__divider-line"></span>
-      <span class="login__divider-label">o continuá con email</span>
-      <span class="login__divider-line"></span>
-    </div>
+    <button
+      type="button"
+      class="login__toggle-email"
+      data-testid="btn-toggle-email"
+      (click)="expandEmailForm()"
+    >
+      Iniciar con email
+    </button>
   }
 
-  <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="login__form">
-    <label class="field">
-      <span class="field__label">Email</span>
-      <div class="field__input-wrap">
-        <span class="material-symbols-outlined field__icon" aria-hidden="true">mail</span>
-        <input
-          type="email"
-          formControlName="email"
-          autocomplete="email"
-          inputmode="email"
-          spellcheck="false"
-          placeholder="alumno@mail.com"
-          class="field__input"
-        />
-      </div>
-      @if (form.controls.email.touched && form.controls.email.errors?.['required']) {
-        <small class="field__hint">El email es obligatorio.</small>
-      }
-      @if (form.controls.email.touched && form.controls.email.errors?.['email']) {
-        <small class="field__hint">Email inválido.</small>
-      }
-    </label>
+  <!--
+    Sección colapsable con el form de email. Siempre montada en el DOM (el
+    captcha widget necesita instanciarse al load para hacer challenge silencioso
+    y tener token listo cuando el usuario expande). Colapso puramente visual
+    con max-height + opacity transitions; el DOM subyacente sigue vivo.
+    Cuando no hay providers SSO, `emailFormEffectivelyExpanded` es true y el
+    form aparece de una — no tiene sentido colapsarlo si es la única vía.
+  -->
+  <section
+    class="login__email-collapse"
+    [class.login__email-collapse--expanded]="emailFormEffectivelyExpanded()"
+    [attr.aria-hidden]="!emailFormEffectivelyExpanded()"
+  >
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="login__form">
+      <label class="field">
+        <div class="field__input-wrap">
+          <span class="material-symbols-outlined field__icon" aria-hidden="true">mail</span>
+          <input
+            type="email"
+            formControlName="email"
+            autocomplete="email"
+            inputmode="email"
+            spellcheck="false"
+            placeholder="Ingresa tu correo electrónico"
+            aria-label="Correo electrónico"
+            class="field__input"
+          />
+        </div>
+        @if (form.controls.email.touched && form.controls.email.errors?.['required']) {
+          <small class="field__hint">El email es obligatorio.</small>
+        }
+        @if (form.controls.email.touched && form.controls.email.errors?.['email']) {
+          <small class="field__hint">Email inválido.</small>
+        }
+      </label>
 
-    <label class="field">
-      <span class="field__label">Contraseña</span>
-      <div class="field__input-wrap">
-        <span class="material-symbols-outlined field__icon" aria-hidden="true">lock</span>
-        <input
-          [type]="passwordVisible() ? 'text' : 'password'"
-          formControlName="password"
-          autocomplete="current-password"
-          placeholder="••••••••"
-          class="field__input field__input--with-toggle"
-        />
+      <label class="field">
+        <div class="field__input-wrap">
+          <span class="material-symbols-outlined field__icon" aria-hidden="true">lock</span>
+          <input
+            [type]="passwordVisible() ? 'text' : 'password'"
+            formControlName="password"
+            autocomplete="current-password"
+            placeholder="Ingresa tu contraseña"
+            aria-label="Contraseña"
+            class="field__input field__input--with-toggle"
+          />
+          <button
+            type="button"
+            class="field__toggle"
+            data-testid="btn-password-toggle"
+            [attr.aria-label]="passwordVisible() ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+            [attr.aria-pressed]="passwordVisible()"
+            (click)="togglePasswordVisibility()"
+          >
+            <span class="material-symbols-outlined" aria-hidden="true">
+              {{ passwordVisible() ? 'visibility_off' : 'visibility' }}
+            </span>
+          </button>
+        </div>
+        @if (form.controls.password.touched && form.controls.password.errors?.['required']) {
+          <small class="field__hint">La contraseña es obligatoria.</small>
+        }
+      </label>
+
+      @if (vm.errorMessage(); as msg) {
+        <p class="error" role="alert">
+          <span class="material-symbols-outlined error__icon" aria-hidden="true">error</span>
+          <span class="error__copy">{{ msg }}</span>
+        </p>
+      }
+
+      @if (captchaEnabled) {
+        <app-captcha-widget #captcha (tokenChange)="onCaptchaTokenChange($event)" />
+      }
+
+      <button
+        type="submit"
+        class="login__submit"
+        [disabled]="form.invalid || vm.isSubmitting() || (captchaEnabled && !captchaToken())"
+      >
+        @if (vm.isSubmitting()) {
+          Ingresando…
+        } @else {
+          Ingresar
+        }
+      </button>
+
+      @if (vm.ssoProviders().length > 0 && emailFormExpanded()) {
         <button
           type="button"
-          class="field__toggle"
-          data-testid="btn-password-toggle"
-          [attr.aria-label]="
-            passwordVisible() ? 'Ocultar contraseña' : 'Mostrar contraseña'
-          "
-          [attr.aria-pressed]="passwordVisible()"
-          (click)="togglePasswordVisibility()"
+          class="login__collapse-email"
+          data-testid="btn-collapse-email"
+          (click)="collapseEmailForm()"
         >
-          <span class="material-symbols-outlined" aria-hidden="true">
-            {{ passwordVisible() ? 'visibility_off' : 'visibility' }}
-          </span>
+          <span class="material-symbols-outlined" aria-hidden="true">expand_less</span>
+          Volver a Google
         </button>
-      </div>
-      @if (form.controls.password.touched && form.controls.password.errors?.['required']) {
-        <small class="field__hint">La contraseña es obligatoria.</small>
       }
-    </label>
-
-    @if (vm.errorMessage(); as msg) {
-      <p class="error" role="alert">
-        <span class="material-symbols-outlined error__icon" aria-hidden="true">error</span>
-        <span class="error__copy">{{ msg }}</span>
-      </p>
-    }
-
-    @if (captchaEnabled) {
-      <app-captcha-widget #captcha (tokenChange)="onCaptchaTokenChange($event)" />
-    }
-
-    <button
-      type="submit"
-      class="login__submit"
-      [disabled]="
-        form.invalid || vm.isSubmitting() || (captchaEnabled && !captchaToken())
-      "
-    >
-      @if (vm.isSubmitting()) {
-        Ingresando…
-      } @else {
-        Ingresar
-      }
-    </button>
-  </form>
+    </form>
+  </section>
 
   <app-version-footer />
 </main>

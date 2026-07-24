@@ -11,13 +11,13 @@
           "/manifest.json",
           "/*.css",
           "/*.js",
-          "/ico-16.ico",
-          "/ico-32.ico",
-          "/ico-48.ico",
-          "/icon-180.png",
-          "/icon-192.png",
-          "/icon-384.png",
-          "/icon-512.png"
+          "/favicon.ico",
+          "/icon_x32.png",
+          "/icon_x180.png",
+          "/icon_x192.png",
+          "/icon_x512.png",
+          "/icon_maskable_x192.png",
+          "/icon_maskable_x512.png"
         ]
       }
     },
@@ -28,6 +28,7 @@
       "resources": {
         "files": [
           "/media/**",
+          "/apple-splash/**",
           "/*.(svg|cur|jpg|jpeg|png|apng|webp|avif|gif|ico|otf|ttf|woff|woff2)"
         ]
       }

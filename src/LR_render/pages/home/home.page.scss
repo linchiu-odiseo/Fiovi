@@ -3,7 +3,11 @@
   min-height: 100dvh;
   background: var(--color-bg);
   color: var(--color-on-surface);
-  padding: var(--space-lg) var(--space-md);
+  // Top: reserva chrome para que el contenido empiece DEBAJO del pill
+  // `.badge` fijo (connectivity-badge). Bottom: 0 — el version-footer
+  // se ancla al fondo real via `margin-top: auto`.
+  padding: calc(env(safe-area-inset-top) + var(--top-chrome)) var(--space-md)
+    env(safe-area-inset-bottom);
   box-sizing: border-box;
   font-family: var(--font-body);
 }
@@ -12,82 +16,72 @@
   position: relative;
   max-width: 28rem;
   margin: 0 auto;
-  padding-block: var(--space-lg) var(--space-md);
   display: flex;
   flex-direction: column;
-  gap: var(--space-lg);
-  min-height: calc(100dvh - 3rem);
+  gap: var(--space-2xl);
+  min-height: calc(100dvh - var(--top-chrome) - env(safe-area-inset-top));
   box-sizing: border-box;
   overflow-y: auto;
   // touch-action: pan-y permite scroll vertical nativo y aún capturamos los
   // touch events para detectar el pull-to-refresh desde scrollTop=0.
   touch-action: pan-y;
 
-  &__header {
+  // Hero: bloque de perfil clickable. Saludo + frase leídos como una
+  // unidad tipográfica única (misma familia serif italic, mismo peso).
+  // Sin borde: es una "firma" visual, no una card. El chevron/afordancia
+  // vive en el hover state + cursor:pointer — el user descubre que es
+  // tap-able al interactuar, no lo grita la vista.
+  //
+  // Posicionamiento: `padding-top: 10dvh` empuja el hero hacia el gold
+  // point vertical (~38 % desde el tope) sin usar valores absolutos.
+  // Aplica solo al primer viewport — al scrollear los exámenes suben
+  // como corresponde.
+  &__hero {
     display: flex;
     flex-direction: column;
-    gap: var(--space-xs);
-  }
-
-  // Fila que agrupa el label "Bienvenido" con el atajo dev "Demo sheet". El
-  // atajo se renderiza a la derecha solo cuando `environment.devTools` es true.
-  &__welcome-row {
-    display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--space-sm);
-  }
-
-  // Label-caps "Bienvenido" — separación estructural por estilo, no por
-  // tamaño. El alumno reconoce que sigue el saludo grande sin que el ojo
-  // tenga que escanear texto.
-  &__welcome {
-    margin: 0;
-    font-size: 0.75rem;
-    font-weight: 700;
-    line-height: 1rem;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--color-on-surface-variant);
-  }
-
-  &__title {
-    margin: 0;
-    font-family: var(--font-display);
-    font-size: 1.625rem;
-    line-height: 2rem;
-    font-weight: 700;
+    gap: var(--space-md);
+    padding: 10dvh 0.75rem 0;
+    background: transparent;
+    border: none;
     color: var(--color-on-surface);
-    letter-spacing: -0.01em;
+    font-family: var(--font-serif);
+    cursor: pointer;
+    text-align: center;
+    border-radius: var(--radius);
+    transition: opacity 120ms ease;
+
+    &:hover,
+    &:focus-visible {
+      opacity: 0.75;
+    }
   }
 
-  &__footer {
-    button {
-      width: 100%;
-      height: 2.75rem;
-      padding: 0 var(--space-md);
-      border: 1px solid var(--color-outline-variant);
-      border-radius: var(--radius);
-      background: transparent;
-      color: var(--color-on-surface-variant);
-      font-family: var(--font-body);
-      font-size: 0.875rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition:
-        background 120ms ease,
-        border-color 120ms ease;
+  &__hero-greeting {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: 1.375rem;
+    line-height: 1.75rem;
+    font-weight: 500;
+    font-style: italic;
+    color: var(--color-on-surface);
+  }
 
-      &:hover:not(:disabled) {
-        background: var(--color-surface-container-low);
-        border-color: var(--color-primary);
-      }
+  &__hero-quote {
+    margin: 0;
+    max-width: 22rem;
+    font-family: var(--font-serif);
+    font-size: 1rem;
+    line-height: 1.5rem;
+    color: var(--color-on-surface-variant);
+    font-style: italic;
+  }
 
-      &:disabled {
-        opacity: 0.55;
-        cursor: not-allowed;
-      }
-    }
+  // Version footer anclado al fondo real: `margin-top: auto` absorbe el
+  // espacio disponible entre exámenes y bottom safe-area. Ausencia de
+  // "Cerrar sesión" en el home es intencional (se mueve a /profile).
+  &__version-footer {
+    margin-top: auto;
   }
 }
 
@@ -106,75 +100,6 @@
   &--visible {
     opacity: 1;
   }
-}
-
-// Lista de filas "icono + texto" debajo del saludo. Usa <ul> semántico,
-// las viñetas se quitan con list-style.
-.user-info {
-  list-style: none;
-  margin: var(--space-xs) 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  color: var(--color-on-surface-variant);
-  font-size: 0.875rem;
-
-  &__row {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-  }
-
-  &__icon {
-    font-size: 1rem;
-    line-height: 1;
-    color: var(--color-on-surface-variant);
-  }
-
-  &__mono {
-    font-family: var(--font-mono);
-    font-size: 0.85rem;
-    letter-spacing: 0.02em;
-  }
-}
-
-// .greeting es el span con el email — mismo selector que conservan los
-// tests de regresión. El estilo es heredado del row, no necesita reglas
-// propias.
-.greeting {
-  font-family: var(--font-body);
-}
-
-// Capa ambient: cita "splash Minecraft / epígrafe" centrada en su columna
-// izquierda + png de marca a la derecha alineado vertical. Press Start 2P
-// pega su personalidad sin gritar — el color on-surface-variant lo
-// silencia para que no compita con el saludo o las cards.
-.quote-figure {
-  margin: var(--space-md) 0 0;
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-}
-
-.quote {
-  flex: 1;
-  margin: 0;
-  font-family: var(--font-pixel);
-  font-size: 0.6875rem;
-  line-height: 1.95;
-  color: var(--color-on-surface-variant);
-  text-align: center;
-  text-transform: lowercase;
-}
-
-.quote__img {
-  width: 5rem;
-  height: 5rem;
-  object-fit: contain;
-  flex-shrink: 0;
-  user-select: none;
-  pointer-events: none;
 }
 
 .banner {
@@ -342,9 +267,6 @@
     color: var(--color-on-surface-variant);
   }
 
-  // Ícono inline "hourglass_top" junto a "Pendiente de calificación".
-  // Tamaño chico (14 px) para no robar la atención del nombre del simulacro
-  // y alineado vertical sutil con el texto.
   &__secondary-icon {
     font-size: 0.875rem;
     vertical-align: -2px;
@@ -359,32 +281,5 @@
     color: var(--color-outline);
     font-size: 1.25rem;
     pointer-events: none;
-  }
-}
-
-// Atajo dev-only a /demo-sheet. Chip compacto al costado de "Bienvenido",
-// borde punteado para señalar "esto no es UI real".
-.demo-sheet-link {
-  padding: 0.2rem 0.6rem;
-  border-radius: var(--radius-pill);
-  border: 1px dashed var(--color-outline-variant);
-  background: transparent;
-  color: var(--color-on-surface-variant);
-  font-family: var(--font-body);
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition:
-    background 120ms ease,
-    border-color 120ms ease,
-    color 120ms ease;
-
-  &:hover,
-  &:focus-visible {
-    background: var(--color-surface-container-low);
-    border-color: var(--color-primary);
-    color: var(--color-primary);
   }
 }

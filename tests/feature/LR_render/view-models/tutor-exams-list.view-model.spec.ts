@@ -1,11 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { Router } from '@angular/router';
 import { TutorExamsListViewModel } from '../../../../src/LR_render/view-models/tutor-exams-list.view-model';
 import { GetExamsEnCursoUseCase } from '../../../../src/L2_application/use-cases/get-exams-en-curso.use-case';
 import { GetProfileUseCase } from '../../../../src/L2_application/use-cases/get-profile.use-case';
 import { GetIdentityUseCase } from '../../../../src/L2_application/use-cases/get-identity.use-case';
-import { LogoutUseCase } from '../../../../src/L2_application/use-cases/logout.use-case';
 import { ExamEnCurso } from '../../../../src/L1_domain/entities/exam-en-curso';
 import { NetworkError } from '../../../../src/L1_domain/errors/network.error';
 import { ServerTime } from '../../../../src/L1_domain/value-objects/server-time';
@@ -71,34 +69,15 @@ class FakeGetIdentity {
   }
 }
 
-class FakeLogout {
-  public calls = 0;
-  async execute(): Promise<void> {
-    this.calls++;
-  }
-}
-
-class FakeRouter {
-  public navigated: unknown[][] = [];
-  async navigate(commands: unknown[]): Promise<boolean> {
-    this.navigated.push(commands);
-    return true;
-  }
-}
-
 describe('TutorExamsListViewModel (home tutor)', () => {
   let getExams: FakeGetExamsEnCurso;
   let getProfile: FakeGetProfile;
   let getIdentity: FakeGetIdentity;
-  let logout: FakeLogout;
-  let router: FakeRouter;
 
   beforeEach(async () => {
     getExams = new FakeGetExamsEnCurso();
     getProfile = new FakeGetProfile();
     getIdentity = new FakeGetIdentity();
-    logout = new FakeLogout();
-    router = new FakeRouter();
 
     TestBed.resetTestingModule();
     await TestBed.configureTestingModule({
@@ -107,8 +86,6 @@ describe('TutorExamsListViewModel (home tutor)', () => {
         { provide: GetExamsEnCursoUseCase, useValue: getExams },
         { provide: GetProfileUseCase, useValue: getProfile },
         { provide: GetIdentityUseCase, useValue: getIdentity },
-        { provide: LogoutUseCase, useValue: logout },
-        { provide: Router, useValue: router },
       ],
     }).compileComponents();
   });
@@ -174,25 +151,6 @@ describe('TutorExamsListViewModel (home tutor)', () => {
       await vm.start();
 
       expect(vm.inProgressCountFor('any-classroom')).toBe(0);
-    });
-  });
-
-  describe('signOut()', () => {
-    it('invoca logout y navega a /login', async () => {
-      const vm = createVm();
-      await vm.signOut();
-
-      expect(logout.calls).toBe(1);
-      expect(router.navigated).toEqual([['/login']]);
-    });
-
-    it('el guard isSigningOut previene doble ejecución', async () => {
-      const vm = createVm();
-      const first = vm.signOut();
-      await vm.signOut(); // debería ser no-op mientras first está en vuelo
-      await first;
-
-      expect(logout.calls).toBe(1);
     });
   });
 });

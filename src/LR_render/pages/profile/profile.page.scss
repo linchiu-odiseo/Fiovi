@@ -1,0 +1,213 @@
+:host {
+  display: block;
+  min-height: 100dvh;
+  background: var(--color-bg);
+  color: var(--color-on-surface);
+  padding: calc(env(safe-area-inset-top) + var(--top-chrome)) var(--space-md)
+    env(safe-area-inset-bottom);
+  box-sizing: border-box;
+  font-family: var(--font-body);
+}
+
+.profile {
+  max-width: 28rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+  min-height: calc(100dvh - var(--top-chrome) - env(safe-area-inset-top));
+  box-sizing: border-box;
+
+  &__topbar {
+    display: flex;
+    align-items: center;
+  }
+
+  &__back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.4rem 0.75rem 0.4rem 0.4rem;
+    background: transparent;
+    border: none;
+    color: var(--color-primary);
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: var(--radius);
+
+    &:hover,
+    &:focus-visible {
+      background: var(--color-surface-container-low);
+    }
+
+    .material-symbols-outlined {
+      font-size: 1.25rem;
+    }
+  }
+
+  // Bloque identity: badge chico arriba-izq + nombre grande + email + código.
+  // Sin card border — es header, no card. El badge acá reemplaza al que
+  // estaba a la derecha del topbar (donde molestaba visualmente).
+  &__identity {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.15rem;
+    padding: 0 0.25rem;
+  }
+
+  &__name {
+    margin: 0.4rem 0 0;
+    font-family: var(--font-serif);
+    font-size: 2rem;
+    line-height: 2.375rem;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    color: var(--color-on-surface);
+  }
+
+  &__email {
+    margin: 0.15rem 0 0;
+    color: var(--color-on-surface-variant);
+    font-size: 0.95rem;
+  }
+
+  &__code {
+    margin: 0;
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    letter-spacing: 0.02em;
+  }
+
+  &__footer {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-sm);
+  }
+
+  // Logout deliberadamente discreto — outlined text sin color destructivo.
+  // Rojo implica "peligro/destructivo"; cerrar sesión no destruye datos
+  // (los borradores viven en el back), es una salida. Un neutral se lee
+  // menos ansioso y no espanta al usuario.
+  &__logout {
+    width: 100%;
+    height: 2.75rem;
+    padding: 0 var(--space-md);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-body);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      background 120ms ease,
+      border-color 120ms ease;
+
+    &:hover:not(:disabled) {
+      background: var(--color-surface-container-low);
+      border-color: var(--color-primary);
+    }
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+  }
+}
+
+// Pastilla chica `student` / `tutor` — mimetiza el look del pill de
+// connectivity-badge (online/offline): mini pill, lowercase, peso 600.
+// Sigue siendo azul primary para diferenciar "rol" de "conexión", pero
+// el volumen visual es equivalente — no molesta.
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-family: var(--font-body);
+  font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+// Lista de apartados al estilo iOS Settings. Bordes/fondo agrupan
+// visualmente los 5 ítems sin necesitar caption de grupo.
+.menu-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-outline-variant);
+  background: var(--color-surface-container-lowest);
+  overflow: hidden;
+
+  li + li {
+    border-top: 1px solid var(--color-outline-variant);
+  }
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.875rem 1rem;
+  background: transparent;
+  border: none;
+  color: var(--color-on-surface);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  cursor: pointer;
+  text-align: left;
+  transition: background 120ms ease;
+
+  &:hover,
+  &:focus-visible {
+    background: var(--color-surface-container-low);
+  }
+
+  &__icon {
+    color: var(--color-on-surface-variant);
+    font-size: 1.25rem;
+    flex-shrink: 0;
+  }
+
+  &__label {
+    flex: 1;
+  }
+
+  // Hint gris pequeño en italic — indica estado ("Próximamente",
+  // versión actual, "Buscando…") sin deshabilitar el ítem visualmente.
+  // Modificadores para señalar acción disponible (--action, azul) o
+  // estado success (--ok, verde). Los ítems no llevan chevron: la
+  // ausencia visual es intencional — el menú se lee más plano y las
+  // acciones se descubren por el hint / cambio de estado en tap.
+  &__hint {
+    color: var(--color-on-surface-variant);
+    font-size: 0.75rem;
+    font-style: italic;
+
+    &--action {
+      color: var(--color-primary);
+      font-weight: 600;
+      font-style: normal;
+    }
+
+    &--ok {
+      color: var(--color-success);
+      font-weight: 600;
+      font-style: normal;
+    }
+  }
+}

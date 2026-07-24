@@ -124,50 +124,65 @@ export class TutorExamDetailViewModel {
   readonly actionError = signal<string | null>(null);
 
   // Modal para editar la duración al iniciar. `iniciarModalOpen()` gobierna
-  // la visibilidad. La duración se edita como minutos + segundos (más humano
-  // que segundos crudos) y se envía al back convertida a segundos.
-  // Rango válido: 60s (1:00) .. 7200s (120:00) — mismo que el back.
+  // la visibilidad. La duración se edita como MINUTOS enteros (los segundos
+  // se fijan en 0 — ningún tutor configura exams con precisión de segundos).
+  // Rango válido: 1 .. 180 min — mismo que el back. El tope NO se expone
+  // en la UI; si intenta pasarse, el error inline lo frena antes del round-trip.
+  //
+  // El display es tap-to-edit: por default se muestra "MM:00 min ✏️" como
+  // texto grande; al tap se convierte en un input focused. `editingDuration`
+  // gobierna ese toggle. Mismo patrón para el bloque deadline en tarea.
   readonly iniciarModalOpen = signal(false);
   readonly pendingMinutes = signal<number | null>(null);
-  readonly pendingSeconds = signal<number | null>(null);
   readonly durationError = signal<string | null>(null);
+  readonly editingDuration = signal(false);
   static readonly DURATION_MIN_SECONDS = 60;
-  static readonly DURATION_MAX_SECONDS = 7200;
+  static readonly DURATION_MAX_SECONDS = 10800;
 
   // ── Selector de modo (examen | tarea) del modal iniciar ─────────────────────
-  // Cuando el modo es "tarea", el tutor elige adicionalmente una fecha límite
-  // (openUntil). El input viaja como valor de <input type="datetime-local">
-  // (formato "YYYY-MM-DDTHH:mm" en hora local del tutor), y se parsea a Date
-  // en el confirm. El tope de 2 días replica la regla de negocio del server
-  // — el server sigue siendo fuente de verdad, esta validación es solo UX.
+  // En modo "tarea" el tutor elige (a) qué DÍA cierra (rueda horizontal
+  // con los próximos N días — chips "HOY 24", "MAÑ 25", "JUE 26"…) y
+  // (b) a qué HORA entera cierra (rueda 1..23). Se eliminó el input
+  // "días + horas relativas" porque forzaba al tutor a sumar manualmente
+  // para llegar a "dentro de 2 semanas". El tope de días es regla del
+  // server; en el front lo capeamos en HOMEWORK_MAX_DAYS.
   readonly pendingMode = signal<'examen' | 'tarea'>('examen');
-  readonly pendingOpenUntilLocal = signal<string>('');
+  readonly pendingDeadlineDayOffset = signal<number | null>(null);
+  readonly pendingDeadlineHour = signal<number | null>(null);
   readonly openUntilError = signal<string | null>(null);
-  static readonly HOMEWORK_MAX_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
+  /**
+   * Offset máximo (inclusivo) para el chip de día más lejano ofrecido.
+   * 10 = "hoy + 10 días" → 11 chips totales (offsets 0..10). El server
+   * también rechaza ventanas mayores; este cap es solo para no ofrecer
+   * chips que van a fallar.
+   */
+  static readonly HOMEWORK_MAX_DAY_OFFSET = 10;
 
   /**
-   * openUntil parseado desde el input datetime-local. null cuando está vacío
-   * o inválido. Un Date parseado del formato `datetime-local` respeta el TZ
-   * local — coincide con lo que el tutor ve/tipea.
+   * Fecha absoluta de cierre derivada del día + hora seleccionados. Toma
+   * `now`, avanza `dayOffset` días, y setea la hora entera con minuto/seg 0.
+   * Retorna null cuando alguno de los signals es null.
    */
   readonly pendingOpenUntilDate = computed<Date | null>(() => {
-    const raw = this.pendingOpenUntilLocal().trim();
-    if (raw === '') return null;
-    const d = new Date(raw);
-    return Number.isNaN(d.getTime()) ? null : d;
+    const offset = this.pendingDeadlineDayOffset();
+    const hour = this.pendingDeadlineHour();
+    if (offset === null || hour === null) return null;
+    if (!Number.isInteger(offset) || !Number.isInteger(hour)) return null;
+    const d = new Date();
+    d.setDate(d.getDate() + offset);
+    d.setHours(hour, 0, 0, 0);
+    return d;
   });
 
   /**
-   * Total en segundos derivado de mm+ss para display en el modal ("Total: 3:30").
-   * Retorna null cuando los inputs no son enteros válidos.
+   * Total en segundos derivado de minutos (segundos = 0 fijo en la UI). Retorna
+   * null cuando el input no es entero válido. Se usa para el display del tutor
+   * y como fuente del `override` en `confirmIniciarModal()`.
    */
   readonly pendingTotalSeconds = computed<number | null>(() => {
     const m = this.pendingMinutes();
-    const s = this.pendingSeconds();
-    if (m === null || s === null) return null;
-    if (!Number.isFinite(m) || !Number.isFinite(s)) return null;
-    if (!Number.isInteger(m) || !Number.isInteger(s)) return null;
-    return m * 60 + s;
+    if (m === null || !Number.isFinite(m) || !Number.isInteger(m)) return null;
+    return m * 60;
   });
 
   // Modal de confirmación para finalizar. Requerido por UX: cerrar antes de
@@ -220,10 +235,15 @@ export class TutorExamDetailViewModel {
 
   /**
    * Countdown formateado. Recomputa cada tick del reloj server-anchored.
-   *   ≥ 5 min → "X min restantes"
-   *   < 5 min → "MM:SS"
-   *   ≤ 0     → "00:00"
-   * Vacío cuando aún no hay cierre determinable (examen no arrancado).
+   *
+   * En modo examen (siempre corto, ≤ 3h): reloj digital corriendo (MM:SS
+   * o HH:MM:SS). El tutor está observando en tiempo real.
+   *
+   * En modo tarea (puede durar días): formato humano hasta los últimos 5
+   * min, donde recién baja a MM:SS. Ver `formatRestanteTarea` para el
+   * detalle de tramos.
+   *
+   * Vacío cuando aún no hay cierre determinable (no arrancado).
    */
   readonly countdownRestante = computed<string>(() => {
     const closeAt = this.effectiveCloseAt();
@@ -235,6 +255,7 @@ export class TutorExamDetailViewModel {
     const anchor = this.detail()?.startedAt ?? new Date(0);
     const referenceNow = Math.max(this.nowTick().getTime(), anchor.getTime());
     const remainingMs = Math.max(0, closeAt.getTime() - referenceNow);
+    if (this.esTarea()) return formatRestanteTarea(remainingMs);
     return formatRestante(remainingMs);
   });
 
@@ -359,47 +380,48 @@ export class TutorExamDetailViewModel {
 
   // ── Actions ─────────────────────────────────────────────────────────────────
 
-  // Abre el modal de "iniciar examen" precargando la duración actual del
-  // detail como minutos + segundos. El tutor puede aceptar como está o editar.
+  // Abre el modal de "iniciar actividad" precargando la duración actual del
+  // detail como minutos enteros (redondeados). Segundos siempre 0 en la UI —
+  // configurar exams con precisión de segundos no es un caso real.
   openIniciarModal(): void {
     if (!this.canIniciar()) return;
     const d = this.detail();
     if (!d) return;
-    this.pendingMinutes.set(Math.floor(d.duration / 60));
-    this.pendingSeconds.set(d.duration % 60);
+    this.pendingMinutes.set(Math.round(d.duration / 60));
     // Default modo "examen" — el comportamiento heredado no cambia si el tutor
-    // no toca el selector.
+    // no toca el selector. Defaults del deadline: mañana (offset=1) a las 23h
+    // (fin del día). Cubre el caso típico "abro tarea hoy, cierra mañana a la
+    // noche".
     this.pendingMode.set('examen');
-    this.pendingOpenUntilLocal.set('');
+    this.pendingDeadlineDayOffset.set(1);
+    this.pendingDeadlineHour.set(23);
     this.durationError.set(null);
     this.openUntilError.set(null);
+    this.editingDuration.set(false);
     this.iniciarModalOpen.set(true);
   }
 
   cancelIniciarModal(): void {
     this.iniciarModalOpen.set(false);
     this.pendingMinutes.set(null);
-    this.pendingSeconds.set(null);
     this.pendingMode.set('examen');
-    this.pendingOpenUntilLocal.set('');
+    this.pendingDeadlineDayOffset.set(null);
+    this.pendingDeadlineHour.set(null);
     this.durationError.set(null);
     this.openUntilError.set(null);
+    this.editingDuration.set(false);
   }
 
-  // Confirma el modal: valida los minutos y segundos, arma el total en segundos,
-  // y dispara `iniciar()` con el override si el tutor cambió el valor original.
+  // Confirma el modal: valida los minutos, arma el total en segundos (segundos
+  // siempre 0 en la UI), y dispara `iniciar()` con el override si el tutor
+  // cambió el valor original.
   async confirmIniciarModal(): Promise<void> {
     const m = this.pendingMinutes();
-    const s = this.pendingSeconds();
     const min = TutorExamDetailViewModel.DURATION_MIN_SECONDS;
     const max = TutorExamDetailViewModel.DURATION_MAX_SECONDS;
 
-    if (m === null || s === null || !Number.isInteger(m) || !Number.isInteger(s)) {
-      this.durationError.set('Ingresá minutos y segundos como números enteros.');
-      return;
-    }
-    if (s < 0 || s > 59) {
-      this.durationError.set('Los segundos deben estar entre 0 y 59.');
+    if (m === null || !Number.isInteger(m)) {
+      this.durationError.set('Ingresá los minutos como número entero.');
       return;
     }
     if (m < 0) {
@@ -407,31 +429,27 @@ export class TutorExamDetailViewModel {
       return;
     }
 
-    const totalSeconds = m * 60 + s;
+    const totalSeconds = m * 60;
     if (totalSeconds < min || totalSeconds > max) {
       const minMm = Math.floor(min / 60);
       const maxMm = Math.floor(max / 60);
-      this.durationError.set(`La duración debe estar entre ${minMm}:00 y ${maxMm}:00.`);
+      this.durationError.set(`La duración debe estar entre ${minMm} y ${maxMm} minutos.`);
       return;
     }
 
     // Validación de openUntil cuando el modo es "tarea". El server también
-    // rechaza fuera de rango con 422 — acá es solo UX temprana.
+    // rechaza fuera de rango con 422 — acá es solo UX temprana. Los signals
+    // son ruedas discretas: offset de días (0..MAX-1) y hora entera (1..23).
+    // La única corner case que puede fallar: día=hoy + hora ya pasada.
     let openUntil: Date | undefined;
     if (this.pendingMode() === 'tarea') {
       const parsed = this.pendingOpenUntilDate();
       if (parsed === null) {
-        this.openUntilError.set('Ingresá una fecha y hora válida para la tarea.');
+        this.openUntilError.set('Elegí día y hora de cierre.');
         return;
       }
-      const deltaMs = parsed.getTime() - Date.now();
-      if (deltaMs <= 0) {
-        this.openUntilError.set('La fecha límite debe ser posterior a ahora.');
-        return;
-      }
-      if (deltaMs > TutorExamDetailViewModel.HOMEWORK_MAX_WINDOW_MS) {
-        const maxDays = TutorExamDetailViewModel.HOMEWORK_MAX_WINDOW_MS / (24 * 60 * 60 * 1000);
-        this.openUntilError.set(`La fecha límite no puede exceder ${maxDays} días desde ahora.`);
+      if (parsed.getTime() <= Date.now()) {
+        this.openUntilError.set('La hora ya pasó. Elegí otro día u otra hora.');
         return;
       }
       openUntil = parsed;
@@ -444,8 +462,9 @@ export class TutorExamDetailViewModel {
     this.durationError.set(null);
     this.openUntilError.set(null);
     this.pendingMinutes.set(null);
-    this.pendingSeconds.set(null);
-    this.pendingOpenUntilLocal.set('');
+    this.pendingDeadlineDayOffset.set(null);
+    this.pendingDeadlineHour.set(null);
+    this.editingDuration.set(false);
 
     await this.iniciar(override, openUntil);
   }
@@ -854,4 +873,28 @@ function formatRestante(ms: number): string {
   // ver "00:15:00", pero uno de 90 min sí "01:30:00" (más natural que 90:00).
   if (hh > 0) return `${pad(hh)}:${pad(mm)}:${pad(ss)}`;
   return `${pad(mm)}:${pad(ss)}`;
+}
+
+// Formato humano para el countdown de tarea (puede durar días). Escalona:
+//   > 24h        → "1 día 5 h" / "3 días"
+//   1h – 24h     → "5 h 32 min" / "12 h"
+//   5min – 1h    → "32 min"
+//   < 5min       → cae a MM:SS (mismo reloj que examen — momento de acción).
+// Mostrar segundos cuando faltan días es ruido puro (2 días 5 h 12 min 43 s
+// no da información accionable), por eso solo aparecen en el último tramo.
+function formatRestanteTarea(ms: number): string {
+  if (ms <= 0) return '00:00';
+  const totalSeconds = Math.ceil(ms / 1_000);
+  if (totalSeconds < 5 * 60) return formatRestante(ms);
+  const days = Math.floor(totalSeconds / 86_400);
+  const hours = Math.floor((totalSeconds % 86_400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  if (days > 0) {
+    const dLabel = days === 1 ? 'día' : 'días';
+    return hours > 0 ? `${days} ${dLabel} ${hours} h` : `${days} ${dLabel}`;
+  }
+  if (hours > 0) {
+    return minutes > 0 ? `${hours} h ${minutes} min` : `${hours} h`;
+  }
+  return `${minutes} min`;
 }
