@@ -1,10 +1,7 @@
 import { Component, DestroyRef, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import { LogoutUseCase } from '../../../L2_application/use-cases/logout.use-case';
-import { PwaUpdateService } from '../../../L3_periphery/pwa/pwa-update.service';
 import { environment } from '../../../environments/environment';
-import { UpdateBannerComponent } from '../../components/update-banner/update-banner.component';
-import { UpdateConfirmModalComponent } from '../../components/update-confirm-modal/update-confirm-modal.component';
 import { VersionFooterComponent } from '../../components/version-footer/version-footer.component';
 import { HomePageViewModel, SimulacroCard } from '../../view-models/home.view-model';
 
@@ -18,7 +15,7 @@ const PULL_MAX_VISUAL_PX = 120;
   selector: 'app-home-page',
   templateUrl: './home.page.html',
   styleUrl: './home.page.scss',
-  imports: [UpdateBannerComponent, UpdateConfirmModalComponent, VersionFooterComponent],
+  imports: [VersionFooterComponent],
   providers: [HomePageViewModel],
 })
 export class HomePage {
@@ -26,10 +23,8 @@ export class HomePage {
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   protected readonly vm = inject(HomePageViewModel);
-  protected readonly pwa = inject(PwaUpdateService);
 
   protected readonly isSigningOut = signal(false);
-  protected readonly showConfirmModal = signal(false);
   // Atajo a la ruta dev `/demo-sheet`. Gate por `environment.devTools` (flag
   // `DEV_TOOLS` en `.env`). En un build de prod con `DEV_TOOLS=false` el
   // template no lo renderiza.
@@ -73,19 +68,6 @@ export class HomePage {
 
   protected retry(): void {
     void this.vm.refresh();
-  }
-
-  protected onBannerTap(): void {
-    this.showConfirmModal.set(true);
-  }
-
-  protected onModalCancel(): void {
-    this.showConfirmModal.set(false);
-  }
-
-  protected onModalConfirm(): void {
-    // El reload reinicia el contexto; no es necesario resetear showConfirmModal.
-    void this.pwa.applyUpdate();
   }
 
   protected onTouchStart(event: TouchEvent): void {

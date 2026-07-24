@@ -34,8 +34,6 @@
       </ul>
     </section>
 
-    <app-update-banner (tap)="onBannerTap()" />
-
     <!-- Mis aulas: cards principales del home. Cada aula es la puerta de entrada
          a la jerarquía Aula → Curso → Examen. -->
     <section class="aulas-section" data-testid="classrooms-section">
@@ -150,12 +148,3 @@
 
   <app-version-footer />
 </main>
-
-@if (showConfirmModal()) {
-  <app-update-confirm-modal
-    [fromVersion]="pwa.pendingUpdate().fromVersion"
-    [toVersion]="pwa.pendingUpdate().toVersion"
-    (dismiss)="onModalCancel()"
-    (accept)="onModalConfirm()"
-  />
-}

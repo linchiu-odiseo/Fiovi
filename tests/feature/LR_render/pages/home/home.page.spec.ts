@@ -454,35 +454,37 @@ describe('HomePage', () => {
       return fixture;
     };
 
-    // 14.2 — banner ausente cuando no hay update.
-    it('NO renderiza el banner cuando pendingUpdate().available es false', async () => {
+    // El CTA de update ahora vive dentro de <app-version-footer /> como link
+    // inline junto a la versión, en vez del banner post-header original.
+    // La lógica end-to-end (available → CTA visible → tap → modal → apply)
+    // se mantiene idéntica; solo cambia el selector.
+    const ctaSelector = '[data-testid="version-footer-update-cta"]';
+
+    // 14.2 — CTA ausente cuando no hay update.
+    it('NO renderiza el CTA de update cuando pendingUpdate().available es false', async () => {
       fakePwa.pendingUpdate.set({ available: false, fromVersion: '', toVersion: '' });
       const fixture = await mountHome();
       const el = fixture.nativeElement as HTMLElement;
-      expect(el.textContent ?? '').not.toContain('Hay una versión nueva');
-      expect(el.querySelector('.banner--update')).toBeNull();
+      expect(el.querySelector(ctaSelector)).toBeNull();
     });
 
-    // 14.3 — banner visible con copy exacto cuando available === true.
-    it('renderiza el banner con el copy literal cuando available es true', async () => {
+    // 14.3 — CTA visible con toVersion cuando available === true.
+    it('renderiza el CTA en el footer con la nueva versión cuando available es true', async () => {
       fakePwa.pendingUpdate.set({ available: true, fromVersion: '1.0.0', toVersion: '1.1.0' });
       const fixture = await mountHome();
       const el = fixture.nativeElement as HTMLElement;
-      const banner = el.querySelector('.banner--update');
-      expect(banner).not.toBeNull();
-      expect(banner?.textContent).toContain('Hay una versión nueva — Toca para actualizar');
+      const cta = el.querySelector(ctaSelector);
+      expect(cta).not.toBeNull();
+      expect(cta?.textContent).toContain('actualizar a 1.1.0');
     });
 
-    // 14.4 — tap en el banner → modal abierto con título exacto.
-    it('tap en el banner abre el modal con título "Actualizar Fiovi"', async () => {
+    // 14.4 — tap en el CTA → modal abierto con título exacto.
+    it('tap en el CTA del footer abre el modal con título "Actualizar Fiovi"', async () => {
       fakePwa.pendingUpdate.set({ available: true, fromVersion: '1.0.0', toVersion: '1.1.0' });
       const fixture = await mountHome();
       const el = fixture.nativeElement as HTMLElement;
-      const bannerButton = el.querySelector('.banner--update') as HTMLButtonElement;
-      bannerButton.click();
+      (el.querySelector(ctaSelector) as HTMLButtonElement).click();
       fixture.detectChanges();
-      // El modal se renderiza FUERA del <main> en el host del componente,
-      // así que lo buscamos en el host de la fixture.
       const host = fixture.debugElement.nativeElement as HTMLElement;
       const title = host.querySelector('[role="dialog"] .modal__title');
       expect(title?.textContent).toContain('Actualizar Fiovi');
@@ -493,15 +495,13 @@ describe('HomePage', () => {
       fakePwa.pendingUpdate.set({ available: true, fromVersion: '1.0.0', toVersion: '1.1.0' });
       const fixture = await mountHome();
       const host = fixture.debugElement.nativeElement as HTMLElement;
-      (host.querySelector('.banner--update') as HTMLButtonElement).click();
+      (host.querySelector(ctaSelector) as HTMLButtonElement).click();
       fixture.detectChanges();
 
       const rows = host.querySelectorAll('[role="dialog"] .modal__version-row');
       expect(rows.length).toBe(2);
-      // Row 0: Versión actual.
       expect(rows[0]?.textContent).toContain('Versión actual');
       expect(rows[0]?.textContent).toContain('1.0.0');
-      // Row 1: Versión nueva.
       expect(rows[1]?.textContent).toContain('Versión nueva');
       expect(rows[1]?.textContent).toContain('1.1.0');
     });
@@ -511,7 +511,7 @@ describe('HomePage', () => {
       fakePwa.pendingUpdate.set({ available: true, fromVersion: '—', toVersion: '1.1.0' });
       const fixture = await mountHome();
       const host = fixture.debugElement.nativeElement as HTMLElement;
-      (host.querySelector('.banner--update') as HTMLButtonElement).click();
+      (host.querySelector(ctaSelector) as HTMLButtonElement).click();
       fixture.detectChanges();
 
       const rows = host.querySelectorAll('[role="dialog"] .modal__version-row');
@@ -519,16 +519,15 @@ describe('HomePage', () => {
       expect(rows[1]?.textContent).toContain('1.1.0');
     });
 
-    // 14.7 — click en Cancelar cierra el modal, banner sigue visible.
-    it('click en Cancelar cierra el modal y el banner sigue visible', async () => {
+    // 14.7 — click en Cancelar cierra el modal, CTA sigue visible.
+    it('click en Cancelar cierra el modal y el CTA sigue visible', async () => {
       fakePwa.pendingUpdate.set({ available: true, fromVersion: '1.0.0', toVersion: '1.1.0' });
       const fixture = await mountHome();
       const host = fixture.debugElement.nativeElement as HTMLElement;
-      (host.querySelector('.banner--update') as HTMLButtonElement).click();
+      (host.querySelector(ctaSelector) as HTMLButtonElement).click();
       fixture.detectChanges();
       expect(host.querySelector('[role="dialog"]')).not.toBeNull();
 
-      // El botón Cancelar es el .modal__btn--ghost.
       const cancelBtn = host.querySelector(
         '[role="dialog"] .modal__btn--ghost',
       ) as HTMLButtonElement;
@@ -536,8 +535,7 @@ describe('HomePage', () => {
       fixture.detectChanges();
 
       expect(host.querySelector('[role="dialog"]')).toBeNull();
-      // El banner sigue ahí (no se invocó applyUpdate, available sigue true).
-      expect(host.querySelector('.banner--update')).not.toBeNull();
+      expect(host.querySelector(ctaSelector)).not.toBeNull();
       expect(fakePwa.applyUpdate).not.toHaveBeenCalled();
     });
 
@@ -546,7 +544,7 @@ describe('HomePage', () => {
       fakePwa.pendingUpdate.set({ available: true, fromVersion: '1.0.0', toVersion: '1.1.0' });
       const fixture = await mountHome();
       const host = fixture.debugElement.nativeElement as HTMLElement;
-      (host.querySelector('.banner--update') as HTMLButtonElement).click();
+      (host.querySelector(ctaSelector) as HTMLButtonElement).click();
       fixture.detectChanges();
 
       const confirmBtn = host.querySelector(
@@ -563,13 +561,12 @@ describe('HomePage', () => {
       fakePwa.pendingUpdate.set({ available: true, fromVersion: '1.0.0', toVersion: '1.1.0' });
       const fixture = await mountHome();
       const host = fixture.debugElement.nativeElement as HTMLElement;
-      (host.querySelector('.banner--update') as HTMLButtonElement).click();
+      (host.querySelector(ctaSelector) as HTMLButtonElement).click();
       fixture.detectChanges();
 
       const dialog = host.querySelector('[role="dialog"]');
       expect(dialog).not.toBeNull();
       const text = dialog?.textContent ?? '';
-      // Regex case-insensitive cubriendo singular/plural y variantes con/sin tilde.
       const forbidden =
         /se borrar[áa]n|vas a perder|se eliminar[áa]n|se borran|se pierden|se eliminan/i;
       expect(forbidden.test(text)).toBe(false);
