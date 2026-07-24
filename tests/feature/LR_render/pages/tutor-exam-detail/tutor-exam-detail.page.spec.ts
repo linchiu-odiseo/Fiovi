@@ -122,6 +122,7 @@ class FakeTutorExamDetailViewModel {
   readonly countdownRestante = () => '';
   readonly closeTimeText = () => '';
   readonly closeLabelPrefix = () => 'Cierra a las';
+  readonly esTarea = () => this.detail()?.openUntil !== undefined && this.detail()?.openUntil !== null;
 
   async load(): Promise<void> {
     /* no-op */

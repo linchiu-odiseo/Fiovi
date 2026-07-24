@@ -84,6 +84,29 @@
     }
   }
 
+  // Chip de tipo (examen | tarea) — outline en vez de fill para diferenciarlo
+  // del status-chip (que va relleno). Va al lado del status; el color por
+  // default es neutro (examen); el modifier `--tarea` lo pinta con el primario
+  // porque tarea es la variante menos común y vale hacerla saltar.
+  &__type-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.55rem;
+    border-radius: var(--radius-pill);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    background: transparent;
+    color: var(--color-on-surface-variant);
+    border: 1px solid var(--color-on-surface-variant);
+
+    &--tarea {
+      color: var(--color-primary);
+      border-color: var(--color-primary);
+    }
+  }
+
   // Cajetín de rotulación técnica: card con celdas separadas por bordes
   // internos. Divider entre todo hijo directo distinto al primero para
   // stackear bp-cell / bp-row / bp-cell--countdown uniformemente.
@@ -445,6 +468,10 @@
     inset: 0;
     background: rgba(0, 0, 0, 0.55);
     display: grid;
+    // minmax(0, 1fr) evita que el track del grid se autosize al max-content
+    // del modal — sin esto, en mobile (viewport < 26rem) el modal se
+    // renderiza a 26rem y se sale a la derecha (ver iPhone SE 375px).
+    grid-template-columns: minmax(0, 1fr);
     place-items: end center;
     padding: var(--space-md);
     z-index: 20;

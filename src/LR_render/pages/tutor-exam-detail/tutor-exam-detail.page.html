@@ -45,6 +45,19 @@
           data-testid="status-chip"
           >{{ sc.label }}</span
         >
+        <!-- Chip de tipo (examen | tarea). Solo aparece una vez que el
+             tipo está determinado por el back: para exámenes ya iniciados
+             (in_progress / finalized) el `esTarea()` es autoritativo; en
+             programado el tipo se define en el modal de iniciar, así que
+             mostrar acá "EXAMEN" por defecto sería mentir. -->
+        @if (detail.startedAt) {
+          <span
+            class="tutor-exam-detail__type-chip"
+            [class.tutor-exam-detail__type-chip--tarea]="vm.esTarea()"
+            data-testid="type-chip"
+            >{{ vm.esTarea() ? 'Tarea' : 'Examen' }}</span
+          >
+        }
       </div>
     </header>
 
@@ -88,6 +101,26 @@
           <div class="tutor-exam-detail__bp-cell">
             <p class="tutor-exam-detail__bp-label">Hora inicio</p>
             <p class="tutor-exam-detail__bp-value">{{ formatTime(detail.startedAt) }}</p>
+          </div>
+        </div>
+      }
+
+      <!-- Row de fecha/hora límite solo en tarea. En examen el cierre es
+           startedAt + duration (ya visible en el countdown), pero en tarea
+           el openUntil puede caer días después — el tutor necesita ver la
+           fecha absoluta, no solo "quedan 2 días". -->
+      @if (vm.esTarea() && detail.openUntil; as openUntil) {
+        <div
+          class="tutor-exam-detail__bp-row tutor-exam-detail__bp-row--2"
+          data-testid="deadline-row"
+        >
+          <div class="tutor-exam-detail__bp-cell">
+            <p class="tutor-exam-detail__bp-label">Fecha límite</p>
+            <p class="tutor-exam-detail__bp-value">{{ formatDate(openUntil) }}</p>
+          </div>
+          <div class="tutor-exam-detail__bp-cell">
+            <p class="tutor-exam-detail__bp-label">Hora límite</p>
+            <p class="tutor-exam-detail__bp-value">{{ formatTime(openUntil) }}</p>
           </div>
         </div>
       }

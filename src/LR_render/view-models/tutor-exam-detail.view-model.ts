@@ -220,10 +220,15 @@ export class TutorExamDetailViewModel {
 
   /**
    * Countdown formateado. Recomputa cada tick del reloj server-anchored.
-   *   ≥ 5 min → "X min restantes"
-   *   < 5 min → "MM:SS"
-   *   ≤ 0     → "00:00"
-   * Vacío cuando aún no hay cierre determinable (examen no arrancado).
+   *
+   * En modo examen (siempre corto, ≤ 3h): reloj digital corriendo (MM:SS
+   * o HH:MM:SS). El tutor está observando en tiempo real.
+   *
+   * En modo tarea (puede durar días): formato humano hasta los últimos 5
+   * min, donde recién baja a MM:SS. Ver `formatRestanteTarea` para el
+   * detalle de tramos.
+   *
+   * Vacío cuando aún no hay cierre determinable (no arrancado).
    */
   readonly countdownRestante = computed<string>(() => {
     const closeAt = this.effectiveCloseAt();
@@ -235,6 +240,7 @@ export class TutorExamDetailViewModel {
     const anchor = this.detail()?.startedAt ?? new Date(0);
     const referenceNow = Math.max(this.nowTick().getTime(), anchor.getTime());
     const remainingMs = Math.max(0, closeAt.getTime() - referenceNow);
+    if (this.esTarea()) return formatRestanteTarea(remainingMs);
     return formatRestante(remainingMs);
   });
 
@@ -854,4 +860,28 @@ function formatRestante(ms: number): string {
   // ver "00:15:00", pero uno de 90 min sí "01:30:00" (más natural que 90:00).
   if (hh > 0) return `${pad(hh)}:${pad(mm)}:${pad(ss)}`;
   return `${pad(mm)}:${pad(ss)}`;
+}
+
+// Formato humano para el countdown de tarea (puede durar días). Escalona:
+//   > 24h        → "1 día 5 h" / "3 días"
+//   1h – 24h     → "5 h 32 min" / "12 h"
+//   5min – 1h    → "32 min"
+//   < 5min       → cae a MM:SS (mismo reloj que examen — momento de acción).
+// Mostrar segundos cuando faltan días es ruido puro (2 días 5 h 12 min 43 s
+// no da información accionable), por eso solo aparecen en el último tramo.
+function formatRestanteTarea(ms: number): string {
+  if (ms <= 0) return '00:00';
+  const totalSeconds = Math.ceil(ms / 1_000);
+  if (totalSeconds < 5 * 60) return formatRestante(ms);
+  const days = Math.floor(totalSeconds / 86_400);
+  const hours = Math.floor((totalSeconds % 86_400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  if (days > 0) {
+    const dLabel = days === 1 ? 'día' : 'días';
+    return hours > 0 ? `${days} ${dLabel} ${hours} h` : `${days} ${dLabel}`;
+  }
+  if (hours > 0) {
+    return minutes > 0 ? `${hours} h ${minutes} min` : `${hours} h`;
+  }
+  return `${minutes} min`;
 }
