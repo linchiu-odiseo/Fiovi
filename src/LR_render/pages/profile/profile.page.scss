@@ -3,7 +3,8 @@
   min-height: 100dvh;
   background: var(--color-bg);
   color: var(--color-on-surface);
-  padding: var(--space-md) var(--space-md) var(--space-lg);
+  padding: calc(env(safe-area-inset-top) + var(--top-chrome)) var(--space-md)
+    env(safe-area-inset-bottom);
   box-sizing: border-box;
   font-family: var(--font-body);
 }
@@ -14,14 +15,12 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-xl);
-  min-height: calc(100dvh - 3rem);
+  min-height: calc(100dvh - var(--top-chrome) - env(safe-area-inset-top));
   box-sizing: border-box;
 
   &__topbar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--space-sm);
   }
 
   &__back {
@@ -48,17 +47,19 @@
     }
   }
 
-  // Bloque identity: nombre grande + email + código. Sin card border — es
-  // header, no card. Encabeza la vista como una firma calmada.
+  // Bloque identity: badge chico arriba-izq + nombre grande + email + código.
+  // Sin card border — es header, no card. El badge acá reemplaza al que
+  // estaba a la derecha del topbar (donde molestaba visualmente).
   &__identity {
     display: flex;
     flex-direction: column;
+    align-items: flex-start;
     gap: 0.15rem;
     padding: 0 0.25rem;
   }
 
   &__name {
-    margin: 0;
+    margin: 0.4rem 0 0;
     font-family: var(--font-serif);
     font-size: 2rem;
     line-height: 2.375rem;
@@ -90,9 +91,9 @@
   }
 
   // Logout deliberadamente discreto — outlined text sin color destructivo.
-  // La decisión de rojo/no-rojo: rojo implica "peligro/destructivo"; cerrar
-  // sesión no destruye datos (los borradores viven en el back), es una
-  // salida. Un neutral se lee menos ansioso y no espanta al usuario.
+  // Rojo implica "peligro/destructivo"; cerrar sesión no destruye datos
+  // (los borradores viven en el back), es una salida. Un neutral se lee
+  // menos ansioso y no espanta al usuario.
   &__logout {
     width: 100%;
     height: 2.75rem;
@@ -121,43 +122,27 @@
   }
 }
 
-// Badge chico STUDENT / TUTOR — visualmente pareado con el chip
-// `.demo-sheet-link` / `.menu-item__hint` para no gritar. Comparte tokens
-// con el badge del home; el peso reducido es intencional (rol es contexto
-// de fondo, no protagonista).
+// Pastilla chica `student` / `tutor` — mimetiza el look del pill de
+// connectivity-badge (online/offline): mini pill, lowercase, peso 600.
+// Sigue siendo azul primary para diferenciar "rol" de "conexión", pero
+// el volumen visual es equivalente — no molesta.
 .role-badge {
   display: inline-flex;
   align-items: center;
-  padding: 0.2rem 0.55rem;
+  padding: 0.15rem 0.5rem;
   border-radius: var(--radius-pill);
   background: var(--color-primary);
   color: var(--color-on-primary);
-  font-size: 0.6875rem;
-  font-weight: 700;
-  line-height: 1rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-family: var(--font-body);
+  font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: none;
 }
 
-// Grupo de menú al estilo iOS Settings: caption uppercase gris + lista.
-// La lista tiene borde/fondo propio para agrupar ópticamente y separar
-// del otro grupo sin necesitar divisores explícitos.
-.menu-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-
-  &__caption {
-    margin: 0 0.25rem;
-    font-size: 0.75rem;
-    font-weight: 700;
-    line-height: 1rem;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--color-on-surface-variant);
-  }
-}
-
+// Lista de apartados al estilo iOS Settings. Bordes/fondo agrupan
+// visualmente los 5 ítems sin necesitar caption de grupo.
 .menu-list {
   list-style: none;
   padding: 0;
@@ -202,18 +187,27 @@
     flex: 1;
   }
 
-  // Hint "Próximamente" en gris pequeño — indica que el destino no está
-  // implementado sin desactivar el ítem (evita el look "disabled" gris
-  // triste y mantiene consistencia visual con los ítems activos).
+  // Hint gris pequeño en italic — indica estado ("Próximamente",
+  // versión actual, "Buscando…") sin deshabilitar el ítem visualmente.
+  // Modificadores para señalar acción disponible (--action, azul) o
+  // estado success (--ok, verde). Los ítems no llevan chevron: la
+  // ausencia visual es intencional — el menú se lee más plano y las
+  // acciones se descubren por el hint / cambio de estado en tap.
   &__hint {
     color: var(--color-on-surface-variant);
     font-size: 0.75rem;
     font-style: italic;
-  }
 
-  &__chevron {
-    color: var(--color-outline);
-    font-size: 1.25rem;
-    flex-shrink: 0;
+    &--action {
+      color: var(--color-primary);
+      font-weight: 600;
+      font-style: normal;
+    }
+
+    &--ok {
+      color: var(--color-success);
+      font-weight: 600;
+      font-style: normal;
+    }
   }
 }
