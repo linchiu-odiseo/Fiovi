@@ -6,6 +6,8 @@ import { ExamEnCurso } from '../../L1_domain/entities/exam-en-curso';
 import { NetworkError } from '../../L1_domain/errors/network.error';
 import { TutorProfile, TutorClassroom } from '../../L1_domain/value-objects/tutor-profile';
 import { ProfileNotAvailableError } from '../../L1_domain/errors/profile-not-available.error';
+import { randomGreeting } from '../pages/home/greetings';
+import { randomTutorQuote } from '../pages/tutor-exams-list/tutor-quotes';
 
 // View-model de /tutor/home. Provider-local al TutorExamsListPage (NO
 // providedIn root) para que cada montaje arranque limpio.
@@ -47,6 +49,13 @@ export class TutorExamsListViewModel {
   readonly hasClassrooms = computed(() => this.classrooms().length > 0);
 
   readonly hasExamsEnCurso = computed(() => this.examsEnCurso().length > 0);
+
+  // Hero ambient del /tutor/home: saludo aleatorio + frase motivadora. Se
+  // fijan al montar la VM y no rotan durante el fetch (mismo criterio que
+  // /student/home). Set editable en `pages/tutor-exams-list/tutor-quotes.ts`
+  // y `pages/home/greetings.ts` (saludos compartidos entre student y tutor).
+  readonly greeting = signal(randomGreeting());
+  readonly quote = signal(randomTutorQuote());
 
   // Índice classroomId → cantidad de exámenes in_progress. Alimenta el badge
   // "N en curso" sobre cada card de aula sin necesidad de un fetch por aula.

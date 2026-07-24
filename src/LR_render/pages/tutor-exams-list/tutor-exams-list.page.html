@@ -1,10 +1,8 @@
 <main class="tutor-exams-list">
-  <!-- Profile card: skeleton / degraded / normal. En todos los estados es un
-       <button> que abre /profile — la card completa es la CTA al perfil.
-       Sin borde de card: es la firma tipográfica del home, no un widget. -->
+  <!-- Hero: bloque de perfil clickable con saludo + frase para tutor. -->
   @if (vm.profileLoading()) {
     <section
-      class="tutor-exams-list__greeting-skeleton"
+      class="tutor-exams-list__hero-skeleton"
       data-testid="profile-skeleton"
       aria-busy="true"
     >
@@ -13,31 +11,24 @@
   } @else if (vm.profileUnavailable()) {
     <button
       type="button"
-      class="tutor-exams-list__greeting-link tutor-exams-list__greeting-link--degraded"
+      class="tutor-exams-list__hero tutor-exams-list__hero--degraded"
       data-testid="profile-card-degraded"
       (click)="onProfileClick()"
       aria-label="Ver perfil"
     >
-      <div>
-        <h1 class="tutor-exams-list__greeting">Hola</h1>
-        <p class="tutor-exams-list__hint">Perfil no disponible. Contactá a tu administrador.</p>
-      </div>
-      <span class="material-symbols-outlined tutor-exams-list__greeting-chevron" aria-hidden="true">
-        chevron_right
-      </span>
+      <p class="tutor-exams-list__hero-greeting">{{ vm.greeting() }}</p>
+      <p class="tutor-exams-list__hint">Perfil no disponible. Contactá a tu administrador.</p>
     </button>
   } @else {
     <button
       type="button"
-      class="tutor-exams-list__greeting-link"
+      class="tutor-exams-list__hero"
       data-testid="profile-card"
       (click)="onProfileClick()"
       aria-label="Ver perfil"
     >
-      <h1 class="tutor-exams-list__greeting">Hola, {{ vm.userName() }}</h1>
-      <span class="material-symbols-outlined tutor-exams-list__greeting-chevron" aria-hidden="true">
-        chevron_right
-      </span>
+      <p class="tutor-exams-list__hero-greeting">{{ vm.greeting() }} {{ vm.userName() }}</p>
+      <blockquote class="tutor-exams-list__hero-quote">{{ vm.quote() }}</blockquote>
     </button>
 
     <!-- Mis aulas: cards principales del home. Cada aula es la puerta de entrada

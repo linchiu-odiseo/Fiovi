@@ -19,22 +19,16 @@
   </div>
 
   @if (vm.userEmail(); as e) {
-    <header class="home__header">
-      <button
-        type="button"
-        class="home__greeting-link"
-        data-testid="profile-card"
-        (click)="onProfileClick()"
-        aria-label="Ver perfil"
-      >
-        <h1 class="home__greeting">Hola, {{ vm.userName() ?? e }}</h1>
-        <span class="material-symbols-outlined home__greeting-chevron" aria-hidden="true">
-          chevron_right
-        </span>
-      </button>
-
-      <blockquote class="home__quote">{{ vm.quote() }}</blockquote>
-    </header>
+    <button
+      type="button"
+      class="home__hero"
+      data-testid="profile-card"
+      (click)="onProfileClick()"
+      aria-label="Ver perfil"
+    >
+      <p class="home__hero-greeting">{{ vm.greeting() }} {{ vm.userName() ?? e }}</p>
+      <blockquote class="home__hero-quote">{{ vm.quote() }}</blockquote>
+    </button>
   }
 
   @if (vm.offlineStorageBlocked()) {

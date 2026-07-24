@@ -281,7 +281,7 @@ describe('HomePage', () => {
       // Con perfil resuelto (fake por default), userName = "Fulano Panda".
       // Sin perfil, el template hace fallback a userEmail. Ambos son válidos
       // como señal "el header tiene datos del user activo".
-      const greeting = el.querySelector('.home__greeting')?.textContent ?? '';
+      const greeting = el.querySelector('.home__hero-greeting')?.textContent ?? '';
       expect(greeting).toMatch(/Fulano Panda|fulano@panda\.test/);
     });
 
@@ -293,12 +293,12 @@ describe('HomePage', () => {
       await fixture.whenStable();
       fixture.detectChanges();
       const el = fixture.nativeElement as HTMLElement;
-      expect(el.querySelector('.home__greeting')).toBeNull();
+      expect(el.querySelector('.home__hero-greeting')).toBeNull();
     });
   });
 
   // Nota: el logout ya no vive en /home (se movió a /profile como parte del
-  // hub de cuenta). El tap sobre `.home__greeting` navega a
+  // hub de cuenta). El tap sobre `.home__hero-greeting` navega a
   // /profile y desde ahí el user cierra sesión — coverage vive en el spec
   // de la ProfilePage.
 
@@ -418,14 +418,14 @@ describe('HomePage', () => {
   });
 
   describe('cita ambient', () => {
-    it('renderiza una entrada del set INSPIRATIONAL_QUOTES dentro de <blockquote class="home__quote">', async () => {
+    it('renderiza una entrada del set INSPIRATIONAL_QUOTES dentro de <blockquote class="home__hero-quote">', async () => {
       const fixture = TestBed.createComponent(HomePage);
       fixture.detectChanges();
       await flushPromises();
       await fixture.whenStable();
       fixture.detectChanges();
       const blockquote = (fixture.nativeElement as HTMLElement).querySelector(
-        'blockquote.home__quote',
+        'blockquote.home__hero-quote',
       );
       expect(blockquote).not.toBeNull();
       const { INSPIRATIONAL_QUOTES } =
