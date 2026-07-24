@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild, inject, signal } from '@angular/core';
+import { Component, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { apiPath } from '../../../L3_periphery/http/api-paths';
@@ -54,6 +54,15 @@ export class LoginPage implements OnInit {
   protected readonly captchaToken = signal<string | null>(null);
   protected readonly passwordVisible = signal(false);
 
+  // Progressive disclosure del form de email. Cuando hay providers SSO, el
+  // form arranca colapsado (la mayoría entra con Google) y se expande a
+  // pedido con un link. Sin providers, el signal queda irrelevante — el
+  // computed abajo fuerza expandido para no dejar la pantalla sin form.
+  protected readonly emailFormExpanded = signal(false);
+  protected readonly emailFormEffectivelyExpanded = computed(
+    () => this.emailFormExpanded() || this.vm.ssoProviders().length === 0,
+  );
+
   @ViewChild('captcha') private captchaWidget?: CaptchaWidgetComponent;
 
   ngOnInit(): void {
@@ -104,6 +113,14 @@ export class LoginPage implements OnInit {
 
   protected togglePasswordVisibility(): void {
     this.passwordVisible.update((v) => !v);
+  }
+
+  protected expandEmailForm(): void {
+    this.emailFormExpanded.set(true);
+  }
+
+  protected collapseEmailForm(): void {
+    this.emailFormExpanded.set(false);
   }
 
   protected onSsoProviderClick(provider: string): void {

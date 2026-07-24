@@ -63,6 +63,10 @@
     'Hanken Grotesk', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --font-pixel: 'Press Start 2P', ui-monospace, monospace;
+  /* Serif editorial — inspirado en el hero de claude.ai/login. Usado
+     puntualmente en headers de pantallas "portal" (login, splash) para dar
+     tono formal sin invadir el resto de la app sans. */
+  --font-serif: 'Fraunces', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
 }
 
 *,
