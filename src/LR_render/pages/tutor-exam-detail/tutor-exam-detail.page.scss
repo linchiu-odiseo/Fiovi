@@ -463,6 +463,9 @@
     font-size: 0.875rem;
   }
 
+  // Backdrop siempre centra el modal (desktop y mobile). Antes usaba
+  // bottom-sheet en <480px pero UX pide igualar plataformas — un modal
+  // centrado se lee como "diálogo" en todo tamaño.
   &__modal-backdrop {
     position: fixed;
     inset: 0;
@@ -472,13 +475,9 @@
     // del modal — sin esto, en mobile (viewport < 26rem) el modal se
     // renderiza a 26rem y se sale a la derecha (ver iPhone SE 375px).
     grid-template-columns: minmax(0, 1fr);
-    place-items: end center;
+    place-items: center;
     padding: var(--space-md);
     z-index: 20;
-
-    @media (min-width: 30rem) {
-      place-items: center;
-    }
   }
 
   &__modal {
@@ -499,10 +498,50 @@
     padding-block: var(--space-lg);
   }
 
+  // Header del modal "iniciar actividad": título a la izquierda + botón X
+  // a la derecha. Reemplaza el botón "Cancelar" del pie — menos ruido, y
+  // la X arriba-derecha es el patrón universal para modales.
+  &__iniciar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+  }
+
   &__modal-title {
     margin: 0;
     font-size: 1.15rem;
     font-weight: 700;
+  }
+
+  &__modal-close {
+    appearance: none;
+    background: transparent;
+    border: none;
+    padding: 0.35rem;
+    margin: -0.35rem;
+    border-radius: var(--radius);
+    color: var(--color-on-surface-variant);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 120ms ease;
+
+    &:hover:not(:disabled),
+    &:focus-visible {
+      background: var(--color-surface-container-low);
+      color: var(--color-on-surface);
+    }
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .material-symbols-outlined {
+      font-size: 1.5rem;
+    }
   }
 
   &__modal-hint {
@@ -512,150 +551,137 @@
     line-height: 1.45;
   }
 
-  &__modal-field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    font-size: 0.85rem;
-    color: var(--color-on-surface-variant);
-
-    input {
-      appearance: none;
-      background: var(--color-surface-container-lowest);
-      border: 1px solid var(--color-outline-variant);
-      border-radius: var(--radius-sm);
-      padding: 0.6rem 0.75rem;
-      font-size: 1rem;
-      color: var(--color-on-surface);
+  // Modal iniciar-actividad — cajetín blueprint compacto: hereda de
+  // `.__blueprint`. Padding vertical mayor en las celdas para acomodar
+  // el value grande de la duración.
+  &__iniciar-bp {
+    > .tutor-exam-detail__bp-cell {
+      padding: 0.75rem 1rem;
     }
   }
 
-  &__mmss {
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    gap: 0.6rem;
+  // Duración display dentro de la celda blueprint: ícono lápiz tenue a la
+  // IZQUIERDA + valor mono grande + unidad tenue a la derecha. Se centra
+  // en la celda (align-self) para dar peso visual al value; el label
+  // "DURACIÓN" se queda arriba-izquierda como en el resto del blueprint.
+  &__duration-display {
+    appearance: none;
+    background: transparent;
+    border: none;
+    padding: 0.25rem 0;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    cursor: pointer;
+    color: var(--color-on-surface);
+    font-family: inherit;
+    align-self: center;
   }
 
-  &__mmss-field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    flex: 1;
-    max-width: 8rem;
-
-    input {
-      appearance: none;
-      background: var(--color-surface-container-lowest);
-      border: 1px solid var(--color-outline-variant);
-      border-radius: var(--radius);
-      padding: 0.9rem 0.75rem;
-      font-size: 1.75rem;
-      font-weight: 700;
-      font-variant-numeric: tabular-nums;
-      text-align: center;
-      color: var(--color-on-surface);
-      min-height: 3.5rem;
-      box-sizing: border-box;
-
-      &:focus-visible {
-        border-color: var(--color-primary, #1a56db);
-        outline: none;
-        box-shadow: 0 0 0 2px rgba(26, 86, 219, 0.25);
-      }
-    }
-  }
-
-  &__mmss-label {
-    font-size: 0.75rem;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    text-align: center;
-    color: var(--color-on-surface-variant);
-  }
-
-  &__mmss-separator {
-    font-size: 2rem;
+  &__duration-value {
+    font-family: var(--font-mono, monospace);
+    font-size: 1.5rem;
     font-weight: 700;
-    color: var(--color-on-surface-variant);
-    padding-bottom: 0.85rem;
     line-height: 1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.005em;
   }
 
-  &__mmss-total {
-    margin: 0;
-    text-align: center;
-    font-size: 1rem;
+  &__duration-unit {
+    font-size: 0.75rem;
+    color: var(--color-on-surface-variant);
+    font-weight: 600;
+    font-family: var(--font-mono, monospace);
+    text-transform: lowercase;
+  }
+
+  &__duration-edit-icon {
+    font-size: 0.95rem;
+    color: var(--color-outline);
+    align-self: center;
+  }
+
+  &__duration-edit {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    padding: 0.25rem 0;
+    align-self: center;
+  }
+
+  &__duration-edit-input {
+    appearance: none;
+    -moz-appearance: textfield;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid var(--color-primary);
+    width: 4rem;
+    padding: 0.05rem 0.15rem;
+    text-align: left;
+    font-family: var(--font-mono, monospace);
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.005em;
     color: var(--color-on-surface);
 
-    strong {
-      font-variant-numeric: tabular-nums;
-      font-weight: 700;
+    &::-webkit-outer-spin-button,
+    &::-webkit-inner-spin-button {
+      appearance: none;
+      margin: 0;
+    }
+
+    &:focus-visible {
+      outline: none;
     }
   }
 
-  &__mmss-hint {
-    display: block;
-    margin-top: 0.15rem;
-    font-size: 0.75rem;
-    color: var(--color-on-surface-variant);
-  }
-
+  // Segmented control "Examen | Tarea": el radio real queda escondido
+  // (posición absoluta con clip-path) para conservar accesibilidad —
+  // el highlight visual va en el label. Fondo gris del contenedor +
+  // pill blanca para la opción activa dan el look tab tipo iOS.
   &__mode {
-    display: flex;
-    gap: var(--space-sm);
-    justify-content: center;
-    margin: 0.5rem 0 0.4rem;
+    display: inline-flex;
+    align-self: center;
+    padding: 4px;
+    background: var(--color-surface-container);
+    border-radius: var(--radius-pill);
+    gap: 2px;
   }
 
   &__mode-option {
+    position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
-    font-size: 0.95rem;
-    cursor: pointer;
-    padding: 0.3rem 0.6rem;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--color-outline-variant, rgba(0, 0, 0, 0.12));
-
-    input[type='radio'] {
-      accent-color: var(--color-primary);
-      cursor: pointer;
-    }
-  }
-
-  &__open-until {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    margin: 0.5rem 0 0.1rem;
-
-    input[type='datetime-local'] {
-      appearance: none;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--color-outline, rgba(0, 0, 0, 0.24));
-      padding: 0.55rem 0.7rem;
-      font-size: 1rem;
-      font-family: inherit;
-      background: var(--color-surface, #fff);
-      color: var(--color-on-surface, #1a1a1a);
-
-      &:focus {
-        outline: 2px solid var(--color-primary);
-        outline-offset: 1px;
-      }
-    }
-  }
-
-  &__open-until-label {
+    justify-content: center;
+    min-width: 5.5rem;
+    padding: 0.4rem 1rem;
+    border-radius: var(--radius-pill);
     font-size: 0.85rem;
     font-weight: 600;
     color: var(--color-on-surface-variant);
-  }
+    cursor: pointer;
+    transition:
+      background 120ms ease,
+      color 120ms ease;
 
-  &__open-until-hint {
-    font-size: 0.75rem;
-    color: var(--color-on-surface-variant);
+    input[type='radio'] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      margin: 0;
+      cursor: pointer;
+    }
+
+    &--active {
+      background: var(--color-surface-container-lowest);
+      color: var(--color-on-surface);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+    }
+
+    &:focus-within:not(&--active) {
+      background: var(--color-surface-container-low);
+    }
   }
 
   &__modal-error {
