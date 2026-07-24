@@ -283,14 +283,16 @@
       color: var(--color-outline);
     }
 
-    // outline nativo respeta border-radius de forma limpia en todos los
-    // engines. La versión previa (border-color + box-shadow) mostraba
-    // artifacts en las esquinas por subpixel misalignment.
+    // Focus ring via box-shadow: comparte el mismo cálculo interno que
+    // border-radius y renderiza esquinas 100% redondeadas sin muescas ni
+    // subpixel artifacts (a diferencia de `outline` que en Chrome mobile
+    // con outline-offset:0 y border-radius mostraba cortes en las esquinas).
+    // El shadow translúcido (color-mix) crea un halo suave estilo Material
+    // 3 sin depender de valores rgba hardcodeados.
     &:focus-visible {
-      outline: 2px solid var(--color-primary);
-      outline-offset: 0;
-      border-color: transparent;
-      box-shadow: none;
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-primary) 22%, transparent);
     }
   }
 
