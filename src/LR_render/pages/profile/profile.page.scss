@@ -1,0 +1,219 @@
+:host {
+  display: block;
+  min-height: 100dvh;
+  background: var(--color-bg);
+  color: var(--color-on-surface);
+  padding: var(--space-md) var(--space-md) var(--space-lg);
+  box-sizing: border-box;
+  font-family: var(--font-body);
+}
+
+.profile {
+  max-width: 28rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+  min-height: calc(100dvh - 3rem);
+  box-sizing: border-box;
+
+  &__topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+  }
+
+  &__back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.4rem 0.75rem 0.4rem 0.4rem;
+    background: transparent;
+    border: none;
+    color: var(--color-primary);
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: var(--radius);
+
+    &:hover,
+    &:focus-visible {
+      background: var(--color-surface-container-low);
+    }
+
+    .material-symbols-outlined {
+      font-size: 1.25rem;
+    }
+  }
+
+  // Bloque identity: nombre grande + email + código. Sin card border — es
+  // header, no card. Encabeza la vista como una firma calmada.
+  &__identity {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0 0.25rem;
+  }
+
+  &__name {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: 2rem;
+    line-height: 2.375rem;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    color: var(--color-on-surface);
+  }
+
+  &__email {
+    margin: 0.15rem 0 0;
+    color: var(--color-on-surface-variant);
+    font-size: 0.95rem;
+  }
+
+  &__code {
+    margin: 0;
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    letter-spacing: 0.02em;
+  }
+
+  &__footer {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-sm);
+  }
+
+  // Logout deliberadamente discreto — outlined text sin color destructivo.
+  // La decisión de rojo/no-rojo: rojo implica "peligro/destructivo"; cerrar
+  // sesión no destruye datos (los borradores viven en el back), es una
+  // salida. Un neutral se lee menos ansioso y no espanta al usuario.
+  &__logout {
+    width: 100%;
+    height: 2.75rem;
+    padding: 0 var(--space-md);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-body);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      background 120ms ease,
+      border-color 120ms ease;
+
+    &:hover:not(:disabled) {
+      background: var(--color-surface-container-low);
+      border-color: var(--color-primary);
+    }
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+  }
+}
+
+// Badge chico STUDENT / TUTOR — visualmente pareado con el chip
+// `.demo-sheet-link` / `.menu-item__hint` para no gritar. Comparte tokens
+// con el badge del home; el peso reducido es intencional (rol es contexto
+// de fondo, no protagonista).
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+// Grupo de menú al estilo iOS Settings: caption uppercase gris + lista.
+// La lista tiene borde/fondo propio para agrupar ópticamente y separar
+// del otro grupo sin necesitar divisores explícitos.
+.menu-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  &__caption {
+    margin: 0 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--color-on-surface-variant);
+  }
+}
+
+.menu-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-outline-variant);
+  background: var(--color-surface-container-lowest);
+  overflow: hidden;
+
+  li + li {
+    border-top: 1px solid var(--color-outline-variant);
+  }
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.875rem 1rem;
+  background: transparent;
+  border: none;
+  color: var(--color-on-surface);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  cursor: pointer;
+  text-align: left;
+  transition: background 120ms ease;
+
+  &:hover,
+  &:focus-visible {
+    background: var(--color-surface-container-low);
+  }
+
+  &__icon {
+    color: var(--color-on-surface-variant);
+    font-size: 1.25rem;
+    flex-shrink: 0;
+  }
+
+  &__label {
+    flex: 1;
+  }
+
+  // Hint "Próximamente" en gris pequeño — indica que el destino no está
+  // implementado sin desactivar el ítem (evita el look "disabled" gris
+  // triste y mantiene consistencia visual con los ítems activos).
+  &__hint {
+    color: var(--color-on-surface-variant);
+    font-size: 0.75rem;
+    font-style: italic;
+  }
+
+  &__chevron {
+    color: var(--color-outline);
+    font-size: 1.25rem;
+    flex-shrink: 0;
+  }
+}

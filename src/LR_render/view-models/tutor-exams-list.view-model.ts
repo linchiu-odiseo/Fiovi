@@ -1,9 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
 import { GetExamsEnCursoUseCase } from '../../L2_application/use-cases/get-exams-en-curso.use-case';
 import { GetProfileUseCase } from '../../L2_application/use-cases/get-profile.use-case';
 import { GetIdentityUseCase } from '../../L2_application/use-cases/get-identity.use-case';
-import { LogoutUseCase } from '../../L2_application/use-cases/logout.use-case';
 import { ExamEnCurso } from '../../L1_domain/entities/exam-en-curso';
 import { NetworkError } from '../../L1_domain/errors/network.error';
 import { TutorProfile, TutorClassroom } from '../../L1_domain/value-objects/tutor-profile';
@@ -26,8 +24,6 @@ export class TutorExamsListViewModel {
   private readonly getExamsEnCurso = inject(GetExamsEnCursoUseCase);
   private readonly getProfile = inject(GetProfileUseCase);
   private readonly getIdentity = inject(GetIdentityUseCase);
-  private readonly logout = inject(LogoutUseCase);
-  private readonly router = inject(Router);
 
   // Exámenes actualmente in_progress a través de TODAS las aulas del tutor.
   // Alimenta la sección "Exámenes en curso" y los badges por card de aula.
@@ -61,8 +57,6 @@ export class TutorExamsListViewModel {
     }
     return map;
   });
-
-  readonly isSigningOut = signal(false);
 
   private started = false;
 
@@ -99,17 +93,6 @@ export class TutorExamsListViewModel {
   /** Devuelve el contador de exámenes in_progress de un aula (0 si ninguno). */
   inProgressCountFor(classroomId: string): number {
     return this.inProgressByClassroom().get(classroomId) ?? 0;
-  }
-
-  async signOut(): Promise<void> {
-    if (this.isSigningOut()) return;
-    this.isSigningOut.set(true);
-    try {
-      await this.logout.execute();
-      await this.router.navigate(['/login']);
-    } finally {
-      this.isSigningOut.set(false);
-    }
   }
 
   private async loadProfile(): Promise<void> {

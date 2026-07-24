@@ -1,38 +1,44 @@
 <main class="tutor-exams-list">
-  <header class="tutor-exams-list__header">
-    <span class="role-badge">Tutor</span>
-    <p class="tutor-exams-list__kicker">Modo tutor</p>
-  </header>
-
-  <!-- Profile card: skeleton / degraded / normal -->
+  <!-- Profile card: skeleton / degraded / normal. En todos los estados es un
+       <button> que abre /profile — la card completa es la CTA al perfil.
+       Sin borde de card: es la firma tipográfica del home, no un widget. -->
   @if (vm.profileLoading()) {
     <section
-      class="profile-card profile-card--skeleton"
+      class="tutor-exams-list__greeting-skeleton"
       data-testid="profile-skeleton"
       aria-busy="true"
     >
       <p class="tutor-exams-list__skeleton-line">Cargando perfil…</p>
     </section>
   } @else if (vm.profileUnavailable()) {
-    <section class="profile-card profile-card--degraded" data-testid="profile-card-degraded">
-      <h1 class="tutor-exams-list__greeting">Hola</h1>
-      <p class="tutor-exams-list__email">{{ vm.userEmail() }}</p>
-      <p class="tutor-exams-list__hint">Perfil no disponible. Contactá a tu administrador.</p>
-    </section>
+    <button
+      type="button"
+      class="tutor-exams-list__greeting-link tutor-exams-list__greeting-link--degraded"
+      data-testid="profile-card-degraded"
+      (click)="onProfileClick()"
+      aria-label="Ver perfil"
+    >
+      <div>
+        <h1 class="tutor-exams-list__greeting">Hola</h1>
+        <p class="tutor-exams-list__hint">Perfil no disponible. Contactá a tu administrador.</p>
+      </div>
+      <span class="material-symbols-outlined tutor-exams-list__greeting-chevron" aria-hidden="true">
+        chevron_right
+      </span>
+    </button>
   } @else {
-    <section class="profile-card" data-testid="profile-card">
+    <button
+      type="button"
+      class="tutor-exams-list__greeting-link"
+      data-testid="profile-card"
+      (click)="onProfileClick()"
+      aria-label="Ver perfil"
+    >
       <h1 class="tutor-exams-list__greeting">Hola, {{ vm.userName() }}</h1>
-      <ul class="user-info">
-        <li>
-          <span class="material-symbols-outlined" aria-hidden="true">mail</span>
-          <span>{{ vm.profileEmail() ?? vm.userEmail() }}</span>
-        </li>
-        <li>
-          <span class="material-symbols-outlined" aria-hidden="true">badge</span>
-          <span class="user-info__mono">{{ vm.userCode() }}</span>
-        </li>
-      </ul>
-    </section>
+      <span class="material-symbols-outlined tutor-exams-list__greeting-chevron" aria-hidden="true">
+        chevron_right
+      </span>
+    </button>
 
     <!-- Mis aulas: cards principales del home. Cada aula es la puerta de entrada
          a la jerarquía Aula → Curso → Examen. -->
@@ -131,20 +137,5 @@
     }
   </section>
 
-  <footer class="tutor-exams-list__footer">
-    <button
-      type="button"
-      data-testid="btn-logout"
-      [disabled]="vm.isSigningOut()"
-      (click)="onSignOut()"
-    >
-      @if (vm.isSigningOut()) {
-        Cerrando…
-      } @else {
-        Cerrar sesión
-      }
-    </button>
-  </footer>
-
-  <app-version-footer />
+  <app-version-footer class="tutor-exams-list__version-footer" />
 </main>

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter, Router } from '@angular/router';
+import { provideRouter } from '@angular/router';
 import { Component, signal } from '@angular/core';
 import { HomePage } from '../../../../../src/LR_render/pages/home/home.page';
 import { GetIdentityUseCase } from '../../../../../src/L2_application/use-cases/get-identity.use-case';
@@ -271,14 +271,18 @@ describe('HomePage', () => {
   });
 
   describe('saludo y sesión', () => {
-    it('muestra saludo con el email del usuario activo', async () => {
+    it('muestra saludo con el nombre del usuario activo (fallback a email si no hay perfil aún)', async () => {
       const fixture = TestBed.createComponent(HomePage);
       fixture.detectChanges();
       await flushPromises();
       await fixture.whenStable();
       fixture.detectChanges();
       const el = fixture.nativeElement as HTMLElement;
-      expect(el.querySelector('.greeting')?.textContent).toContain('fulano@panda.test');
+      // Con perfil resuelto (fake por default), userName = "Fulano Panda".
+      // Sin perfil, el template hace fallback a userEmail. Ambos son válidos
+      // como señal "el header tiene datos del user activo".
+      const greeting = el.querySelector('.home__greeting')?.textContent ?? '';
+      expect(greeting).toMatch(/Fulano Panda|fulano@panda\.test/);
     });
 
     it('NO muestra saludo si no hay sesión (estado raro: protegido por authGuard)', async () => {
@@ -289,27 +293,14 @@ describe('HomePage', () => {
       await fixture.whenStable();
       fixture.detectChanges();
       const el = fixture.nativeElement as HTMLElement;
-      expect(el.querySelector('.greeting')).toBeNull();
+      expect(el.querySelector('.home__greeting')).toBeNull();
     });
   });
 
-  describe('logout', () => {
-    it('click en "Cerrar sesión" invoca LogoutUseCase y navega a /login', async () => {
-      const fixture = TestBed.createComponent(HomePage);
-      fixture.detectChanges();
-      await flushPromises();
-      await fixture.whenStable();
-      fixture.detectChanges();
-
-      const router = TestBed.inject(Router);
-      const footerBtn = fixture.nativeElement.querySelector('footer button') as HTMLButtonElement;
-      footerBtn.click();
-      await fixture.whenStable();
-
-      expect(fakeLogout.callCount).toBe(1);
-      expect(router.url).toBe('/login');
-    });
-  });
+  // Nota: el logout ya no vive en /home (se movió a /profile como parte del
+  // hub de cuenta). El tap sobre `.home__greeting` navega a
+  // /profile y desde ahí el user cierra sesión — coverage vive en el spec
+  // de la ProfilePage.
 
   describe('lista de exámenes', () => {
     it('renderiza una card por examen cuando el use case devuelve lista', async () => {
@@ -427,13 +418,15 @@ describe('HomePage', () => {
   });
 
   describe('cita ambient', () => {
-    it('renderiza una entrada del set INSPIRATIONAL_QUOTES dentro de <blockquote class="quote">', async () => {
+    it('renderiza una entrada del set INSPIRATIONAL_QUOTES dentro de <blockquote class="home__quote">', async () => {
       const fixture = TestBed.createComponent(HomePage);
       fixture.detectChanges();
       await flushPromises();
       await fixture.whenStable();
       fixture.detectChanges();
-      const blockquote = (fixture.nativeElement as HTMLElement).querySelector('blockquote.quote');
+      const blockquote = (fixture.nativeElement as HTMLElement).querySelector(
+        'blockquote.home__quote',
+      );
       expect(blockquote).not.toBeNull();
       const { INSPIRATIONAL_QUOTES } =
         await import('../../../../../src/LR_render/pages/home/inspirational-quotes');

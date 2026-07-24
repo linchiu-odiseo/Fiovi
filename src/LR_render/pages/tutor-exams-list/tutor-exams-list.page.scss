@@ -1,13 +1,16 @@
-// Estilos de /tutor/home (lista de exámenes + perfil del tutor).
-// Estructura: :host → .tutor-exams-list (flex column) → profile-card →
-// stats-card (aulas) → exams-section → footer.
+// Estilos de /tutor/home. Estructura calmada:
+//   :host → .tutor-exams-list (flex column con gap generoso entre secciones)
+//     → greeting-link (saludo plano + chevron, sin card)
+//     → aulas-section
+//     → exams-in-progress-section
+//     → version footer anclado al fondo
 
 :host {
   display: block;
   min-height: 100dvh;
   background: var(--color-bg);
   color: var(--color-on-surface);
-  padding: var(--space-lg) var(--space-md);
+  padding: var(--space-md) var(--space-md) var(--space-lg);
   box-sizing: border-box;
   font-family: var(--font-body);
 }
@@ -15,28 +18,49 @@
 .tutor-exams-list {
   max-width: 28rem;
   margin: 0 auto;
-  padding-block: var(--space-lg) var(--space-md);
   display: flex;
   flex-direction: column;
-  gap: var(--space-lg);
+  gap: var(--space-2xl, 2.5rem);
   min-height: calc(100dvh - 3rem);
   box-sizing: border-box;
 
-  &__header {
+  // Saludo como <button> plano — sin borde de card. Un chevron a la derecha
+  // marca la afordancia "tap para abrir perfil". Whole area is a tap target
+  // grande sin cargar la vista.
+  &__greeting-link {
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-xs);
-  }
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.375rem 0.25rem;
+    background: transparent;
+    border: none;
+    color: var(--color-on-surface);
+    font-family: var(--font-body);
+    cursor: pointer;
+    text-align: left;
+    border-radius: var(--radius);
+    transition: background 120ms ease;
 
-  &__kicker {
-    margin: 0;
-    font-size: 0.75rem;
-    font-weight: 700;
-    line-height: 1rem;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--color-on-surface-variant);
+    &:hover,
+    &:focus-visible {
+      background: var(--color-surface-container-low);
+    }
+
+    // Variante degradada: perfil no disponible. Mismo tono que warning-container
+    // del sistema pero solo como leve tinte de fondo — el greeting sigue plano.
+    &--degraded {
+      background: var(--color-warning-container);
+      color: var(--color-on-warning-container);
+      padding: var(--space-md) var(--space-md);
+      border-radius: var(--radius-md);
+
+      &:hover,
+      &:focus-visible {
+        background: var(--color-warning-container);
+      }
+    }
   }
 
   &__greeting {
@@ -49,15 +73,19 @@
     letter-spacing: -0.01em;
   }
 
-  &__email {
-    margin: var(--space-xs) 0 0;
-    color: var(--color-on-surface-variant);
-    font-size: 0.9rem;
+  &__greeting-chevron {
+    color: var(--color-outline);
+    font-size: 1.5rem;
+    flex-shrink: 0;
+  }
+
+  &__greeting-skeleton {
+    padding: 0.375rem 0.25rem;
   }
 
   &__hint {
     margin: var(--space-xs) 0 0;
-    color: var(--color-on-surface-variant);
+    color: var(--color-on-warning-container);
     font-size: 0.85rem;
     line-height: 1.45;
   }
@@ -68,47 +96,11 @@
     font-size: 0.9rem;
   }
 
-  &__footer {
+  // Version footer anclado al fondo. Ausencia de "Cerrar sesión" en el home
+  // es intencional (se mueve a /profile). Ver home.page.scss para el mismo
+  // patrón en el alumno.
+  &__version-footer {
     margin-top: auto;
-
-    button {
-      width: 100%;
-      height: 2.75rem;
-      padding: 0 var(--space-md);
-      border: 1px solid var(--color-outline-variant);
-      border-radius: var(--radius);
-      background: transparent;
-      color: var(--color-on-surface-variant);
-      font-family: var(--font-body);
-      font-size: 0.875rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition:
-        background 120ms ease,
-        border-color 120ms ease;
-
-      &:hover:not(:disabled) {
-        background: var(--color-surface-container-low);
-        border-color: var(--color-primary);
-      }
-
-      &:disabled {
-        opacity: 0.55;
-        cursor: not-allowed;
-      }
-    }
-  }
-
-  &__loading,
-  &__error,
-  &__empty {
-    padding: var(--space-md);
-    text-align: center;
-    color: var(--color-on-surface-variant);
-  }
-
-  &__error {
-    color: var(--color-error);
   }
 
   &__list {
@@ -121,21 +113,6 @@
   }
 }
 
-// Pill "Tutor"
-.role-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.25rem 0.75rem;
-  border-radius: var(--radius-pill);
-  background: var(--color-primary);
-  color: var(--color-on-primary);
-  font-size: 0.75rem;
-  font-weight: 700;
-  line-height: 1rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
 .section-title {
   margin: 0 0 var(--space-xs);
   font-size: 0.75rem;
@@ -144,63 +121,6 @@
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--color-on-surface-variant);
-}
-
-.profile-card {
-  padding: var(--space-md) 1.1rem;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-outline-variant);
-  background: var(--color-surface-container-lowest);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-
-  &--skeleton {
-    opacity: 0.7;
-  }
-
-  &--degraded {
-    border-color: var(--color-warning);
-    background: var(--color-warning-container);
-    color: var(--color-on-warning-container);
-  }
-}
-
-// Fila ícono+texto dentro del profile-card. Espeja el patrón del home del
-// alumno (`home.page.scss .user-info`) para que la jerarquía visual sea
-// idéntica entre alumno y tutor. Encapsulada por Angular al scoparse desde
-// `.profile-card` — no colisiona con estilos globales.
-.profile-card {
-  .user-info {
-    list-style: none;
-    margin: var(--space-xs) 0 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    color: var(--color-on-surface-variant);
-    font-size: 0.875rem;
-
-    li {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
-
-    .material-symbols-outlined {
-      font-size: 1rem;
-      line-height: 1;
-      color: var(--color-on-surface-variant);
-    }
-
-    // Marca el DNI/código en mono para hacerlo visualmente identificable
-    // como dato técnico (mismo criterio que el home del alumno).
-    &__mono {
-      font-family: var(--font-mono);
-      font-size: 0.85rem;
-      letter-spacing: 0.02em;
-    }
-  }
 }
 
 // Sección "Mis aulas": cada aula es una card grande, clickable, con chevron —

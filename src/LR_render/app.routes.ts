@@ -81,6 +81,14 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./pages/tutor-exam-detail/tutor-exam-detail.page').then((m) => m.TutorExamDetailPage),
   },
+  // Perfil compartido entre student y tutor. No usa roleGuard porque ambos roles
+  // caen en la misma placeholder page (los datos del perfil aún no se muestran
+  // acá; ver `pages/profile/profile.page.ts`). Solo authGuard.
+  {
+    path: 'profile',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/profile/profile.page').then((m) => m.ProfilePage),
+  },
   // Ruta dev-only: cartilla mock 100% en memoria, sin back ni auth. La visibilidad
   // del atajo desde /home está gated por `environment.devTools`; la ruta en sí no
   // tiene guard porque también sirve como demo pública si se comparte el link.

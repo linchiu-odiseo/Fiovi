@@ -1,0 +1,92 @@
+<main class="profile">
+  <header class="profile__topbar">
+    <button type="button" class="profile__back" (click)="onBack()" aria-label="Volver">
+      <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
+      <span>Volver</span>
+    </button>
+    @if (roleLabel(); as label) {
+      <span class="role-badge">{{ label }}</span>
+    }
+  </header>
+
+  <section class="profile__identity">
+    <h1 class="profile__name">{{ fullName() }}</h1>
+    <p class="profile__email">{{ email() }}</p>
+    @if (code(); as c) {
+      <p class="profile__code">{{ c }}</p>
+    }
+  </section>
+
+  <!-- Grupo "Cuenta": historial + configuración. Placeholders — al tap
+       no navegan a ningún lado todavía (la vista se declara como follow-up),
+       pero quedan visibles para señalar que existen. Antes de hacer commit
+       de features nuevas, wire aquí. -->
+  <section class="menu-group">
+    <h2 class="menu-group__caption">Cuenta</h2>
+    <ul class="menu-list">
+      <li>
+        <button type="button" class="menu-item" (click)="onHistorialClick()">
+          <span class="material-symbols-outlined menu-item__icon" aria-hidden="true">history</span>
+          <span class="menu-item__label">Historial</span>
+          <span class="menu-item__hint">Próximamente</span>
+          <span class="material-symbols-outlined menu-item__chevron" aria-hidden="true">
+            chevron_right
+          </span>
+        </button>
+      </li>
+      <li>
+        <button type="button" class="menu-item" (click)="onConfigClick()">
+          <span class="material-symbols-outlined menu-item__icon" aria-hidden="true">
+            settings
+          </span>
+          <span class="menu-item__label">Configuración</span>
+          <span class="menu-item__hint">Próximamente</span>
+          <span class="material-symbols-outlined menu-item__chevron" aria-hidden="true">
+            chevron_right
+          </span>
+        </button>
+      </li>
+    </ul>
+  </section>
+
+  @if (isDevTools) {
+    <section class="menu-group">
+      <h2 class="menu-group__caption">Dev tools</h2>
+      <ul class="menu-list">
+        <li>
+          <button
+            type="button"
+            class="menu-item"
+            (click)="onDemoSheetClick()"
+            data-testid="demo-sheet-link"
+          >
+            <span class="material-symbols-outlined menu-item__icon" aria-hidden="true">
+              science
+            </span>
+            <span class="menu-item__label">Demo sheet</span>
+            <span class="material-symbols-outlined menu-item__chevron" aria-hidden="true">
+              chevron_right
+            </span>
+          </button>
+        </li>
+      </ul>
+    </section>
+  }
+
+  <footer class="profile__footer">
+    <button
+      type="button"
+      class="profile__logout"
+      data-testid="btn-logout"
+      [disabled]="isSigningOut()"
+      (click)="onSignOut()"
+    >
+      @if (isSigningOut()) {
+        Cerrando…
+      } @else {
+        Cerrar sesión
+      }
+    </button>
+    <app-version-footer />
+  </footer>
+</main>

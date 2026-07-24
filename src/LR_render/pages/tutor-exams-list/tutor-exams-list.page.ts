@@ -33,6 +33,10 @@ export class TutorExamsListPage {
     void this.router.navigate(['/tutor/aulas', classroomId, 'semanas']);
   }
 
+  protected onProfileClick(): void {
+    void this.router.navigate(['/profile']);
+  }
+
   /** Duración en minutos para display, coherente con TutorExam.durationInMinutes. */
   protected durationInMinutes(exam: ExamEnCurso): number {
     return Math.round(exam.duration / 60);
@@ -40,9 +44,5 @@ export class TutorExamsListPage {
 
   protected countDisplay(exam: ExamEnCurso): string {
     return exam.count === null ? '—' : String(exam.count);
-  }
-
-  protected onSignOut(): void {
-    void this.vm.signOut();
   }
 }

@@ -1,7 +1,5 @@
 import { Component, DestroyRef, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
-import { LogoutUseCase } from '../../../L2_application/use-cases/logout.use-case';
-import { environment } from '../../../environments/environment';
 import { VersionFooterComponent } from '../../components/version-footer/version-footer.component';
 import { HomePageViewModel, SimulacroCard } from '../../view-models/home.view-model';
 
@@ -19,16 +17,9 @@ const PULL_MAX_VISUAL_PX = 120;
   providers: [HomePageViewModel],
 })
 export class HomePage {
-  private readonly logout = inject(LogoutUseCase);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   protected readonly vm = inject(HomePageViewModel);
-
-  protected readonly isSigningOut = signal(false);
-  // Atajo a la ruta dev `/demo-sheet`. Gate por `environment.devTools` (flag
-  // `DEV_TOOLS` en `.env`). En un build de prod con `DEV_TOOLS=false` el
-  // template no lo renderiza.
-  protected readonly isDevTools = environment.devTools;
 
   // Estado del pull-to-refresh — todo visual; el dispatch del refresh ocurre
   // en touchend cuando se cruza el threshold.
@@ -45,25 +36,14 @@ export class HomePage {
     this.destroyRef.onDestroy(() => this.vm.stop());
   }
 
-  protected async signOut(): Promise<void> {
-    if (this.isSigningOut()) return;
-    this.isSigningOut.set(true);
-    try {
-      await this.logout.execute();
-      await this.router.navigate(['/login']);
-    } finally {
-      this.isSigningOut.set(false);
-    }
-  }
-
   protected onSimulacroClick(card: SimulacroCard): void {
     if (!card.clickable) return;
     if (this.vm.offlineStorageBlocked()) return;
     void this.router.navigate(['/simulacro', card.id]);
   }
 
-  protected onDemoSheetClick(): void {
-    void this.router.navigate(['/demo-sheet']);
+  protected onProfileClick(): void {
+    void this.router.navigate(['/profile']);
   }
 
   protected retry(): void {
