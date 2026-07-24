@@ -23,6 +23,7 @@ function buildDetail(overrides: Partial<TutorExamDetail> = {}): TutorExamDetail 
     enabledStudentIds: ['s-1'],
     startedAt: null,
     finishedAt: null,
+    openUntil: null,
     createdAt: new Date('2026-06-01T10:00:00Z'),
     ...overrides,
   };
@@ -50,16 +51,24 @@ class FakeTutorExamDetailViewModel {
   readonly enabledStudentIds: WritableSignal<readonly string[]> = signal([]);
   readonly isSaving: WritableSignal<boolean> = signal(false);
   readonly actionError: WritableSignal<string | null> = signal(null);
-  // Modal "editar duración antes de iniciar" con formato mm:ss.
+  // Modal "iniciar actividad": duración en minutos + deadline en días/horas.
+  // Los signals `editingDuration`/`editingDeadline` gobiernan el toggle
+  // tap-to-edit del display; los `pendingDeadline*` gobiernan el input de
+  // días/horas cuando el modo es "tarea".
   readonly iniciarModalOpen: WritableSignal<boolean> = signal(false);
   readonly pendingMinutes: WritableSignal<number | null> = signal(null);
-  readonly pendingSeconds: WritableSignal<number | null> = signal(null);
   readonly durationError: WritableSignal<string | null> = signal(null);
+  readonly editingDuration: WritableSignal<boolean> = signal(false);
+  readonly editingDeadline: WritableSignal<boolean> = signal(false);
+  readonly pendingMode: WritableSignal<'examen' | 'tarea'> = signal('examen');
+  readonly pendingDeadlineDays: WritableSignal<number | null> = signal(null);
+  readonly pendingDeadlineHours: WritableSignal<number | null> = signal(null);
+  readonly openUntilError: WritableSignal<string | null> = signal(null);
+  readonly pendingDeadlineDateLabel = () => '';
+  readonly pendingDeadlineTimeLabel = () => '';
   readonly pendingTotalSeconds = () => {
     const m = this.pendingMinutes();
-    const s = this.pendingSeconds();
-    if (m === null || s === null) return null;
-    return m * 60 + s;
+    return m === null ? null : m * 60;
   };
   // Modal "confirmar finalización antes de tiempo".
   readonly finalizarModalOpen: WritableSignal<boolean> = signal(false);
@@ -121,6 +130,7 @@ class FakeTutorExamDetailViewModel {
   readonly countdownRestante = () => '';
   readonly closeTimeText = () => '';
   readonly closeLabelPrefix = () => 'Cierra a las';
+  readonly esTarea = () => this.detail()?.openUntil !== undefined && this.detail()?.openUntil !== null;
 
   async load(): Promise<void> {
     /* no-op */

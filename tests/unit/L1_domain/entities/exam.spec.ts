@@ -21,6 +21,7 @@ describe('Exam', () => {
     scheduled: validScheduled,
     started: null,
     finished: null,
+    openUntil: null,
   } as const;
 
   describe('construcción válida', () => {

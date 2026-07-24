@@ -45,6 +45,19 @@
           data-testid="status-chip"
           >{{ sc.label }}</span
         >
+        <!-- Chip de tipo (examen | tarea). Solo aparece una vez que el
+             tipo está determinado por el back: para exámenes ya iniciados
+             (in_progress / finalized) el `esTarea()` es autoritativo; en
+             programado el tipo se define en el modal de iniciar, así que
+             mostrar acá "EXAMEN" por defecto sería mentir. -->
+        @if (detail.startedAt) {
+          <span
+            class="tutor-exam-detail__type-chip"
+            [class.tutor-exam-detail__type-chip--tarea]="vm.esTarea()"
+            data-testid="type-chip"
+            >{{ vm.esTarea() ? 'Tarea' : 'Examen' }}</span
+          >
+        }
       </div>
     </header>
 
@@ -88,6 +101,26 @@
           <div class="tutor-exam-detail__bp-cell">
             <p class="tutor-exam-detail__bp-label">Hora inicio</p>
             <p class="tutor-exam-detail__bp-value">{{ formatTime(detail.startedAt) }}</p>
+          </div>
+        </div>
+      }
+
+      <!-- Row de fecha/hora límite solo en tarea. En examen el cierre es
+           startedAt + duration (ya visible en el countdown), pero en tarea
+           el openUntil puede caer días después — el tutor necesita ver la
+           fecha absoluta, no solo "quedan 2 días". -->
+      @if (vm.esTarea() && detail.openUntil; as openUntil) {
+        <div
+          class="tutor-exam-detail__bp-row tutor-exam-detail__bp-row--2"
+          data-testid="deadline-row"
+        >
+          <div class="tutor-exam-detail__bp-cell">
+            <p class="tutor-exam-detail__bp-label">Fecha límite</p>
+            <p class="tutor-exam-detail__bp-value">{{ formatDate(openUntil) }}</p>
+          </div>
+          <div class="tutor-exam-detail__bp-cell">
+            <p class="tutor-exam-detail__bp-label">Hora límite</p>
+            <p class="tutor-exam-detail__bp-value">{{ formatTime(openUntil) }}</p>
           </div>
         </div>
       }
@@ -206,47 +239,128 @@
         data-testid="iniciar-modal"
       >
         <div class="tutor-exam-detail__modal tutor-exam-detail__modal--iniciar">
-          <h2 id="iniciar-modal-title" class="tutor-exam-detail__modal-title">Iniciar examen</h2>
-          <p class="tutor-exam-detail__modal-hint">
-            Confirmá o ajustá el tiempo antes de iniciar. Los alumnos verán esta duración.
-          </p>
+          <header class="tutor-exam-detail__iniciar-header">
+            <h2 id="iniciar-modal-title" class="tutor-exam-detail__modal-title">
+              Iniciar actividad
+            </h2>
+            <button
+              type="button"
+              class="tutor-exam-detail__modal-close"
+              data-testid="btn-cancel-iniciar"
+              [disabled]="vm.isSaving()"
+              (click)="onCancelIniciarModal()"
+              aria-label="Cerrar"
+            >
+              <span class="material-symbols-outlined" aria-hidden="true">close</span>
+            </button>
+          </header>
 
-          <div class="tutor-exam-detail__mmss">
-            <label class="tutor-exam-detail__mmss-field">
-              <span class="tutor-exam-detail__mmss-label">Minutos</span>
+          <!-- Segmented control "Examen | Tarea": radios ocultos absolutos,
+               highlight visual sobre el label. -->
+          <div
+            class="tutor-exam-detail__mode"
+            role="radiogroup"
+            aria-label="Modo del examen"
+            data-testid="mode-selector"
+          >
+            <label
+              class="tutor-exam-detail__mode-option"
+              [class.tutor-exam-detail__mode-option--active]="vm.pendingMode() === 'examen'"
+            >
               <input
-                type="number"
-                inputmode="numeric"
-                pattern="[0-9]*"
-                min="0"
-                max="120"
-                step="1"
-                data-testid="minutes-input"
-                [value]="vm.pendingMinutes()"
-                (input)="onMinutesInput($event)"
+                type="radio"
+                name="pending-mode"
+                value="examen"
+                data-testid="mode-examen"
+                [checked]="vm.pendingMode() === 'examen'"
+                (change)="onModeChange('examen')"
               />
+              <span>Examen</span>
             </label>
-            <span class="tutor-exam-detail__mmss-separator" aria-hidden="true">:</span>
-            <label class="tutor-exam-detail__mmss-field">
-              <span class="tutor-exam-detail__mmss-label">Segundos</span>
+            <label
+              class="tutor-exam-detail__mode-option"
+              [class.tutor-exam-detail__mode-option--active]="vm.pendingMode() === 'tarea'"
+            >
               <input
-                type="number"
-                inputmode="numeric"
-                pattern="[0-9]*"
-                min="0"
-                max="59"
-                step="1"
-                data-testid="seconds-input"
-                [value]="vm.pendingSeconds()"
-                (input)="onSecondsInput($event)"
+                type="radio"
+                name="pending-mode"
+                value="tarea"
+                data-testid="mode-tarea"
+                [checked]="vm.pendingMode() === 'tarea'"
+                (change)="onModeChange('tarea')"
               />
+              <span>Tarea</span>
             </label>
           </div>
 
-          <p class="tutor-exam-detail__mmss-total" data-testid="duration-total">
-            Total: <strong>{{ formatMmSs(vm.pendingTotalSeconds()) }}</strong>
-            <span class="tutor-exam-detail__mmss-hint">(mín. 1:00 · máx. 120:00)</span>
-          </p>
+          <!-- Cajetín técnico del modal: reusa las clases `__bp-*` del
+               blueprint del detalle (misma familia visual: borde outline,
+               celdas separadas por dividers, labels caps mono, valores mono
+               bold). Duración es una celda tap-to-edit; en tarea se agrega
+               un row con dos celdas (fecha límite + hora límite) que también
+               son tap-to-edit hacia el editor de días/horas. -->
+          <section class="tutor-exam-detail__blueprint tutor-exam-detail__iniciar-bp">
+            <div class="tutor-exam-detail__bp-cell">
+              <p class="tutor-exam-detail__bp-label">Duración</p>
+              @if (vm.editingDuration()) {
+                <div class="tutor-exam-detail__duration-edit">
+                  <input
+                    #minutesEditInput
+                    type="number"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    min="1"
+                    max="180"
+                    step="1"
+                    class="tutor-exam-detail__duration-edit-input"
+                    data-testid="minutes-input"
+                    [value]="vm.pendingMinutes()"
+                    (input)="onMinutesInput($event)"
+                    (blur)="stopEditDuration()"
+                    (keydown.enter)="stopEditDuration()"
+                  />
+                  <span class="tutor-exam-detail__duration-unit">min</span>
+                </div>
+              } @else {
+                <button
+                  type="button"
+                  class="tutor-exam-detail__duration-display"
+                  data-testid="duration-display"
+                  (click)="startEditDuration()"
+                  aria-label="Editar duración"
+                >
+                  <span
+                    class="material-symbols-outlined tutor-exam-detail__duration-edit-icon"
+                    aria-hidden="true"
+                    >edit</span
+                  >
+                  <span class="tutor-exam-detail__duration-value">
+                    {{ vm.pendingMinutes() ?? 0 }}:00
+                  </span>
+                  <span class="tutor-exam-detail__duration-unit">min</span>
+                </button>
+              }
+            </div>
+
+            @if (vm.pendingMode() === 'tarea') {
+              <div class="tutor-exam-detail__bp-cell" data-testid="deadline-day-field">
+                <p class="tutor-exam-detail__bp-label">Fecha límite</p>
+                <app-h-wheel
+                  [items]="dayChips()"
+                  [selectedId]="selectedDayId()"
+                  (selectedIdChange)="onDayIdChange($event)"
+                />
+              </div>
+              <div class="tutor-exam-detail__bp-cell" data-testid="deadline-hour-field">
+                <p class="tutor-exam-detail__bp-label">Hora límite</p>
+                <app-h-wheel
+                  [items]="hourChips()"
+                  [selectedId]="selectedHourId()"
+                  (selectedIdChange)="onHourIdChange($event)"
+                />
+              </div>
+            }
+          </section>
 
           @if (vm.durationError()) {
             <p class="tutor-exam-detail__modal-error" role="alert">
@@ -254,26 +368,21 @@
             </p>
           }
 
-          <div class="tutor-exam-detail__modal-actions tutor-exam-detail__modal-actions--stacked">
-            <button
-              type="button"
-              class="tutor-exam-detail__modal-confirm tutor-exam-detail__modal-confirm--large"
-              data-testid="btn-confirm-iniciar"
-              [disabled]="vm.isSaving()"
-              (click)="onConfirmIniciarModal()"
-            >
-              Iniciar examen
-            </button>
-            <button
-              type="button"
-              class="tutor-exam-detail__modal-cancel tutor-exam-detail__modal-cancel--large"
-              data-testid="btn-cancel-iniciar"
-              [disabled]="vm.isSaving()"
-              (click)="onCancelIniciarModal()"
-            >
-              Cancelar
-            </button>
-          </div>
+          @if (vm.openUntilError()) {
+            <p class="tutor-exam-detail__modal-error" role="alert" data-testid="open-until-error">
+              {{ vm.openUntilError() }}
+            </p>
+          }
+
+          <button
+            type="button"
+            class="tutor-exam-detail__modal-confirm tutor-exam-detail__modal-confirm--large"
+            data-testid="btn-confirm-iniciar"
+            [disabled]="vm.isSaving()"
+            (click)="onConfirmIniciarModal()"
+          >
+            Iniciar actividad
+          </button>
         </div>
       </div>
     }
@@ -304,10 +413,7 @@
                 [disabled]="isCheckboxDisabled(student)"
                 (change)="onToggleStudent(student.studentId)"
               />
-              <span
-                class="tutor-exam-detail__student-checkbox"
-                aria-hidden="true"
-              >
+              <span class="tutor-exam-detail__student-checkbox" aria-hidden="true">
                 <span class="material-symbols-outlined">check</span>
               </span>
               <span class="tutor-exam-detail__student-name">
@@ -388,8 +494,8 @@
           </h2>
           <p class="tutor-exam-detail__modal-hint">
             ¿Seguro que querés deshabilitar a
-            <strong>{{ pendingDesactivarStudentName() }}</strong>? El examen ya
-            está en curso — el alumno no aparecerá en las notas al finalizar.
+            <strong>{{ pendingDesactivarStudentName() }}</strong
+            >? El examen ya está en curso — el alumno no aparecerá en las notas al finalizar.
           </p>
           <div class="tutor-exam-detail__modal-actions tutor-exam-detail__modal-actions--stacked">
             <button
@@ -425,12 +531,10 @@
         data-testid="archivar-modal"
       >
         <div class="tutor-exam-detail__modal">
-          <h2 id="archivar-modal-title" class="tutor-exam-detail__modal-title">
-            Archivar examen
-          </h2>
+          <h2 id="archivar-modal-title" class="tutor-exam-detail__modal-title">Archivar examen</h2>
           <p class="tutor-exam-detail__modal-hint">
-            El examen se sacará de la lista. Las notas de los alumnos siguen
-            disponibles desde el histórico.
+            El examen se sacará de la lista. Las notas de los alumnos siguen disponibles desde el
+            histórico.
           </p>
           <div class="tutor-exam-detail__modal-actions tutor-exam-detail__modal-actions--stacked">
             <button

@@ -276,6 +276,38 @@ export class FakeExamsApi implements ExamsApi {
   async guardarDraft(_req: DraftRequest): Promise<void> {
     // no-op — los tests de EnviarSimulacroUseCase no tocan este método.
   }
+
+  // Stub para enviarHomework. Los tests que quieran verificar el endpoint
+  // homework definen su propio fake o extienden este. Sin uso por default
+  // en los use case tests históricos.
+  private enviarHomeworkScalar:
+    | { kind: 'resolve'; result: EnvioResult }
+    | { kind: 'reject'; error: Error }
+    | null = null;
+  private enviarHomeworkCalls: EnvioRequest[] = [];
+
+  willResolveEnviarHomework(result: EnvioResult): void {
+    this.enviarHomeworkScalar = { kind: 'resolve', result };
+  }
+
+  willRejectEnviarHomework(error: Error): void {
+    this.enviarHomeworkScalar = { kind: 'reject', error };
+  }
+
+  getEnviarHomeworkCalls(): readonly EnvioRequest[] {
+    return this.enviarHomeworkCalls;
+  }
+
+  async enviarHomework(req: EnvioRequest): Promise<EnvioResult> {
+    this.enviarHomeworkCalls.push(req);
+    if (this.enviarHomeworkScalar) {
+      if (this.enviarHomeworkScalar.kind === 'reject') throw this.enviarHomeworkScalar.error;
+      return this.enviarHomeworkScalar.result;
+    }
+    throw new Error(
+      'FakeExamsApi: configurar willResolveEnviarHomework / willRejectEnviarHomework antes de llamar enviarHomework()',
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -421,10 +453,10 @@ export class FakeTutorExamsApi implements TutorExamsApi {
   // --- iniciar ---
   private nextIniciar: { kind: 'resolve' } | { kind: 'reject'; error: Error } | null = null;
   // `iniciarCalls` conserva la firma histórica (solo recordId) para no romper
-  // los tests existentes; `iniciarCallsFull` registra también el duration para
-  // los tests nuevos del override al iniciar.
+  // los tests existentes; `iniciarCallsFull` registra también duration + openUntil
+  // para los tests nuevos del override al iniciar y modo tarea.
   private iniciarCalls: string[] = [];
-  private iniciarCallsFull: { recordId: string; duration?: number }[] = [];
+  private iniciarCallsFull: { recordId: string; duration?: number; openUntil?: Date }[] = [];
 
   willResolveIniciar(): void {
     this.nextIniciar = { kind: 'resolve' };
@@ -438,13 +470,21 @@ export class FakeTutorExamsApi implements TutorExamsApi {
     return this.iniciarCalls;
   }
 
-  getIniciarCallsFull(): readonly { recordId: string; duration?: number }[] {
+  getIniciarCallsFull(): readonly {
+    recordId: string;
+    duration?: number;
+    openUntil?: Date;
+  }[] {
     return this.iniciarCallsFull;
   }
 
-  async iniciar(recordId: string, duration?: number): Promise<void> {
+  async iniciar(recordId: string, opts?: { duration?: number; openUntil?: Date }): Promise<void> {
     this.iniciarCalls.push(recordId);
-    this.iniciarCallsFull.push({ recordId, duration });
+    this.iniciarCallsFull.push({
+      recordId,
+      duration: opts?.duration,
+      openUntil: opts?.openUntil,
+    });
     if (!this.nextIniciar) {
       throw new Error(
         'FakeTutorExamsApi: configurar willResolveIniciar o willRejectIniciar antes de llamar iniciar()',

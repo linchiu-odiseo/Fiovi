@@ -98,4 +98,24 @@ export interface ExamsApi {
   getTodaysExams(): Promise<ExamsListResult>;
   enviar(req: EnvioRequest): Promise<EnvioResult>;
   guardarDraft(req: DraftRequest): Promise<void>; // 204 No Content
+  /**
+   * Entrega en modo "tarea" — INSERT sincrono directo en back, sin queue.
+   * Body shape idéntico a `enviar()`. La única diferencia es la ruta y las
+   * guards del server (openUntil !== null AND now < openUntil).
+   *
+   * Mapeo de errores POST /student/exam-sessions/{id}/submit-homework:
+   *   - 400 → InvalidPayloadError
+   *   - 401 → interceptor (refresh + redirect)
+   *   - 403 con message "STUDENT_NOT_ENROLLED" → StudentNotEnrolledError
+   *   - 403 con otros                          → NetworkError (genérico)
+   *   - 404                                    → SimulacroNoAsignadoError
+   *   - 409 con message "SESSION_NOT_ACTIVE"   → SimulacroCerradoError
+   *   - 409 con message "NOT_HOMEWORK_MODE"    → SimulacroCerradoError
+   *     (misma UX que "sesión cerrada" — el alumno no debería llegar acá
+   *     nunca porque el enrutamiento por modo lo evita, pero por defensa).
+   *   - 409 con message "HOMEWORK_WINDOW_CLOSED" → SimulacroCerradoError
+   *   - 422 con message "CLOCK_SKEW_*"          → InvalidSubmissionTimeError
+   *   - 0 / 429 / 5xx / message fuera de enum   → NetworkError
+   */
+  enviarHomework(req: EnvioRequest): Promise<EnvioResult>;
 }

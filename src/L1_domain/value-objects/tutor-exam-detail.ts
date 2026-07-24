@@ -20,5 +20,11 @@ export interface TutorExamDetail {
   readonly enabledStudentIds: readonly string[];
   readonly startedAt: Date | null;
   readonly finishedAt: Date | null;
+  /**
+   * Fecha límite en modo "tarea". null = modo "examen" (heredado). El
+   * view-model del tutor lo consume para elegir entre countdown por duración
+   * (examen) y "Cierra el DD/MM HH:mm" (tarea).
+   */
+  readonly openUntil: Date | null;
   readonly createdAt: Date;
 }

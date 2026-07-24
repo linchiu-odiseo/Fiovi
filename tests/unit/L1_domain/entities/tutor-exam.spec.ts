@@ -25,6 +25,7 @@ function buildTutorExam(
     scheduled: new Date('2026-06-01T10:00:00Z'),
     startedAt: status === 'scheduled' ? null : new Date('2026-06-10T08:00:00Z'),
     finishedAt: status === 'finalized' ? new Date('2026-06-10T09:00:00Z') : null,
+    openUntil: null,
   });
 }
 

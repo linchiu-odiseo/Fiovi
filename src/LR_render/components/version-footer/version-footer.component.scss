@@ -9,4 +9,37 @@
   opacity: 0.6;
   padding: var(--space-xs) 0;
   letter-spacing: 0.02em;
+
+  // Link inline junto a la versión cuando hay update pendiente. Azul primary
+  // para que se distinga del texto tenue del footer sin gritar. Icono refresh
+  // pequeño refuerza la semántica sin ocupar espacio.
+  &__update-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: 0.15rem;
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--color-primary);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    opacity: 1;
+    transition: opacity 120ms ease;
+
+    &:hover {
+      text-decoration: underline;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+      border-radius: 2px;
+    }
+
+    .material-symbols-outlined {
+      font-size: 0.875rem;
+    }
+  }
 }

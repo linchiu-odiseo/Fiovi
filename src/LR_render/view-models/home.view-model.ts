@@ -15,6 +15,7 @@ import { OfflineStorageUnavailableError } from '../../L1_domain/errors/offline-s
 import { ExamsPermissionRevokedError } from '../../L1_domain/errors/exams-permission-revoked.error';
 import { StudentNotLinkedError } from '../../L1_domain/errors/student-not-linked.error';
 import { randomQuote } from '../pages/home/inspirational-quotes';
+import { randomGreeting } from '../pages/home/greetings';
 
 export type ServerErrorKind = 'network' | 'session-expired' | 'unknown';
 
@@ -86,6 +87,10 @@ export class HomePageViewModel {
   // No rota durante el polling de 120 s — distraería. Si el alumno recarga
   // la página, vuelve randomQuote() a sortear.
   readonly quote = signal(randomQuote());
+  // Saludo aleatorio (Hola / Bienvenido / Buen día / ...) que precede al
+  // nombre. Mismo mecanismo que `quote`: fijo por mount, resortea al
+  // recargar. Sin coma entre saludo y nombre (ver `greetings.ts`).
+  readonly greeting = signal(randomGreeting());
   // nowTick re-emite cada segundo desde el puerto Clock (server-anchored) para
   // que los countdowns derivados rerendericen sin que el template tenga lógica
   // de tiempo. NUNCA leer Date.now() directo desde la UI.

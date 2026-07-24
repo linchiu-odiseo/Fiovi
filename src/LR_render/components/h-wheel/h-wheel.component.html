@@ -1,0 +1,18 @@
+<div class="h-wheel" #viewport>
+  <ul class="h-wheel__list">
+    @for (item of items(); track item.id) {
+      <li
+        class="h-wheel__item"
+        [class.h-wheel__item--active]="item.id === selectedId()"
+        [attr.data-id]="item.id"
+      >
+        <button type="button" class="h-wheel__btn" (click)="onItemClick(item.id)">
+          @if (item.top) {
+            <span class="h-wheel__top">{{ item.top }}</span>
+          }
+          <span class="h-wheel__bottom">{{ item.bottom }}</span>
+        </button>
+      </li>
+    }
+  </ul>
+</div>

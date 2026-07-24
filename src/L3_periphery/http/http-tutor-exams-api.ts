@@ -31,6 +31,9 @@ interface TutorVirtualExamListItemDto {
   scheduled: string;
   startedAt: string | null;
   finishedAt: string | null;
+  // ISO datetime en modo "tarea"; null en modo "examen".
+  // Wire: `openUntil` en camelCase (learnex tutor endpoints).
+  openUntil: string | null;
 }
 
 interface TutorVirtualExamListResponseDto {
@@ -49,6 +52,8 @@ interface VirtualExamDetailDto {
   enabledStudentIds: string[];
   startedAt: string | null;
   finishedAt: string | null;
+  // ISO datetime en modo "tarea"; null en modo "examen".
+  openUntil: string | null;
   createdAt: string;
 }
 
@@ -151,10 +156,16 @@ export class HttpTutorExamsApi implements TutorExamsApi {
   }
 
   // POST /t/:slug/virtual-exams/:recordId/start
-  // Body opcional `{ duration }` en segundos cuando el tutor sobrescribió la
-  // duración desde el modal antes de iniciar. Respuesta: 204 void.
-  async iniciar(recordId: string, duration?: number): Promise<void> {
-    const body = duration !== undefined ? { duration } : null;
+  // Body opcional `{ duration?, openUntil? }`. Cuando `openUntil` viene, el
+  // examen arranca en modo "tarea" (ver TutorExamsApi.iniciar). Respuesta: 204.
+  async iniciar(recordId: string, opts?: { duration?: number; openUntil?: Date }): Promise<void> {
+    // Construimos el body dropeando keys undefined para no enviar `null`
+    // implícito ni `{ duration: undefined }` — el server-side zod distingue
+    // presencia con `.optional()`.
+    const payload: { duration?: number; openUntil?: string } = {};
+    if (opts?.duration !== undefined) payload.duration = opts.duration;
+    if (opts?.openUntil !== undefined) payload.openUntil = opts.openUntil.toISOString();
+    const body = Object.keys(payload).length > 0 ? payload : null;
     try {
       await firstValueFrom(
         this.http
@@ -248,6 +259,7 @@ export class HttpTutorExamsApi implements TutorExamsApi {
       scheduled: new Date(dto.scheduled),
       startedAt: this.parseNullableDate(dto.startedAt),
       finishedAt: this.parseNullableDate(dto.finishedAt),
+      openUntil: this.parseNullableDate(dto.openUntil),
     });
   }
 
@@ -264,6 +276,7 @@ export class HttpTutorExamsApi implements TutorExamsApi {
       enabledStudentIds: dto.enabledStudentIds,
       startedAt: this.parseNullableDate(dto.startedAt),
       finishedAt: this.parseNullableDate(dto.finishedAt),
+      openUntil: this.parseNullableDate(dto.openUntil),
       createdAt: new Date(dto.createdAt),
     };
   }

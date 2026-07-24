@@ -46,6 +46,11 @@ export const apiPath = {
   // Auto-save progresivo. Response 204 No Content; sin body.
   studentExamDraft: (slug: string, sessionId: string): string =>
     `${tenantBase(slug)}/student/exam-sessions/${encodeURIComponent(sessionId)}/draft`,
+  // Entrega en modo "tarea" (INSERT síncrono directo en back). Mismo body shape
+  // que /submit; el server valida `now < openUntil` en vez de startedAt+duration.
+  // Response 201 con { id, submission_hash, submitted_at } — igual que /submit.
+  studentExamSubmitHomework: (slug: string, sessionId: string): string =>
+    `${tenantBase(slug)}/student/exam-sessions/${encodeURIComponent(sessionId)}/submit-homework`,
 
   // ---- Tutor (virtual exams) -------------------------------------------
 

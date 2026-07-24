@@ -69,11 +69,7 @@ export class TutorAulaSemanaExamenesViewModel {
       this.startDate.set(result.week.startDate);
       this.endDate.set(result.week.endDate);
       this.cursos.set(result.cursos);
-
-      // Abre el primer curso como affordance UX — señala al tutor que las
-      // cards son accordions. Si prefiere colapsarlo, un tap lo cierra.
-      const first = result.cursos[0];
-      this.openCourseKey.set(first ? this.courseKey(first) : null);
+      this.openCourseKey.set(null);
 
       // Popular TutorExamsStore con los TutorExam de esta semana. Cuando el
       // tutor tape un examen y navegue a /tutor/exams/:recordId, el warm

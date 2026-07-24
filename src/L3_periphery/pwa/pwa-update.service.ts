@@ -74,6 +74,26 @@ export class PwaUpdateService {
     }
   }
 
+  // Chequeo manual bypasseando el throttle de visibilitychange. Devuelve
+  // `true` si el SW descubrió una nueva versión (VERSION_READY se emitirá
+  // de manera asincrónica y actualizará `pendingUpdate`), `false` si no
+  // hay update disponible o si el service worker no está habilitado
+  // (typical en dev, en pestañas insecure, o en navegadores sin soporte).
+  //
+  // Consumidores esperados: la fila "Actualizaciones" del /profile — el
+  // usuario tapea, la vista muestra feedback inline según el resultado.
+  async checkForUpdateNow(): Promise<boolean> {
+    if (!this.swUpdate.isEnabled) return false;
+    try {
+      const found = await this.swUpdate.checkForUpdate();
+      this.lastCheckTimestamp = Date.now();
+      return found;
+    } catch (error) {
+      console.warn('PwaUpdate: manual checkForUpdate failed', error);
+      return false;
+    }
+  }
+
   async applyUpdate(): Promise<void> {
     if (this.applying) return;
     this.applying = true;

@@ -19,42 +19,17 @@
   </div>
 
   @if (vm.userEmail(); as e) {
-    <header class="home__header">
-      <div class="home__welcome-row">
-        <p class="home__welcome">Bienvenido</p>
-        @if (isDevTools) {
-          <button
-            type="button"
-            class="demo-sheet-link"
-            (click)="onDemoSheetClick()"
-            aria-label="Ir a Demo sheet"
-          >
-            Demo sheet
-          </button>
-        }
-      </div>
-      <h1 class="home__title">Hola, {{ vm.userName() ?? e }}</h1>
-      <ul class="user-info">
-        <li class="user-info__row">
-          <span class="material-symbols-outlined user-info__icon" aria-hidden="true">mail</span>
-          <span class="greeting">{{ e }}</span>
-        </li>
-        @if (vm.userDni(); as d) {
-          <li class="user-info__row">
-            <span class="material-symbols-outlined user-info__icon" aria-hidden="true">badge</span>
-            <span class="user-info__mono">DNI {{ d }}</span>
-          </li>
-        }
-      </ul>
-
-      <figure class="quote-figure">
-        <blockquote class="quote">{{ vm.quote() }}</blockquote>
-        <img src="img/fiovi.png" alt="Fiovi" class="quote__img" />
-      </figure>
-    </header>
+    <button
+      type="button"
+      class="home__hero"
+      data-testid="profile-card"
+      (click)="onProfileClick()"
+      aria-label="Ver perfil"
+    >
+      <p class="home__hero-greeting">{{ vm.greeting() }} {{ vm.userName() ?? e }}</p>
+      <blockquote class="home__hero-quote">{{ vm.quote() }}</blockquote>
+    </button>
   }
-
-  <app-update-banner (tap)="onBannerTap()" />
 
   @if (vm.offlineStorageBlocked()) {
     <div class="banner banner--blocking" role="alert">
@@ -69,7 +44,7 @@
   }
 
   <section class="simulacros">
-    <h2 class="section-title">Simulacros de hoy</h2>
+    <h2 class="section-title">Exámenes de hoy</h2>
 
     @if (vm.serverError() === 'network') {
       <div class="banner banner--error" role="alert">
@@ -133,24 +108,5 @@
     }
   </section>
 
-  <footer class="home__footer">
-    <button type="button" (click)="signOut()" [disabled]="isSigningOut()">
-      @if (isSigningOut()) {
-        Cerrando…
-      } @else {
-        Cerrar sesión
-      }
-    </button>
-  </footer>
-
-  <app-version-footer />
+  <app-version-footer class="home__version-footer" />
 </main>
-
-@if (showConfirmModal()) {
-  <app-update-confirm-modal
-    [fromVersion]="pwa.pendingUpdate().fromVersion"
-    [toVersion]="pwa.pendingUpdate().toVersion"
-    (dismiss)="onModalCancel()"
-    (accept)="onModalConfirm()"
-  />
-}

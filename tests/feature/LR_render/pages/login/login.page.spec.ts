@@ -16,7 +16,10 @@ import {
   CaptchaWidgetId,
 } from '../../../../../src/L1_domain/ports/captcha-provider';
 import { CAPTCHA_PROVIDER } from '../../../../../src/L3_periphery/tokens';
+import { PwaUpdateService } from '../../../../../src/L3_periphery/pwa/pwa-update.service';
+import { EMPTY_PENDING_UPDATE } from '../../../../../src/L3_periphery/pwa/pwa-update.types';
 import { environment } from '../../../../../src/environments/environment';
+import { signal } from '@angular/core';
 
 // Doble del port CaptchaProvider. Por default queda `disabled` para que estos
 // tests (que se escribieron pre-captcha) sigan funcionando idénticos — el
@@ -30,6 +33,19 @@ class DisabledCaptchaProvider implements CaptchaProvider {
     throw new Error('should not be called when disabled');
   }
   reset(): void {
+    /* no-op */
+  }
+}
+
+// Fake mínimo del PwaUpdateService consumido indirectamente por
+// VersionFooterComponent (que ahora dueño del flujo de update). El login
+// no testea el flujo de update — solo necesita satisfacer el DI.
+class DisabledPwaUpdateService {
+  readonly pendingUpdate = signal(EMPTY_PENDING_UPDATE);
+  start(): void {
+    /* no-op */
+  }
+  async applyUpdate(): Promise<void> {
     /* no-op */
   }
 }
@@ -130,6 +146,7 @@ describe('LoginPage', () => {
         { provide: LoginUseCase, useValue: fakeUseCase },
         { provide: ListSsoProvidersUseCase, useValue: fakeSsoProviders },
         { provide: CAPTCHA_PROVIDER, useValue: new DisabledCaptchaProvider() },
+        { provide: PwaUpdateService, useValue: new DisabledPwaUpdateService() },
       ],
     }).compileComponents();
   });
@@ -396,6 +413,7 @@ describe('LoginPage', () => {
             { provide: LoginUseCase, useValue: fakeUseCase },
             { provide: ListSsoProvidersUseCase, useValue: fakeSsoProviders },
             { provide: CAPTCHA_PROVIDER, useValue: new DisabledCaptchaProvider() },
+            { provide: PwaUpdateService, useValue: new DisabledPwaUpdateService() },
             {
               provide: ActivatedRoute,
               useValue: { snapshot: { queryParams: { ssoError: code } } },
@@ -424,6 +442,7 @@ describe('LoginPage', () => {
           { provide: LoginUseCase, useValue: fakeUseCase },
           { provide: ListSsoProvidersUseCase, useValue: fakeSsoProviders },
           { provide: CAPTCHA_PROVIDER, useValue: new DisabledCaptchaProvider() },
+          { provide: PwaUpdateService, useValue: new DisabledPwaUpdateService() },
           {
             provide: ActivatedRoute,
             useValue: { snapshot: { queryParams: {} } },

@@ -23,6 +23,16 @@ export class Exam {
   public readonly scheduled: Date;
   public readonly started: Date | null;
   public readonly finished: Date | null;
+  /**
+   * Fecha límite en modo "tarea". null = modo "examen" (heredado).
+   *
+   * En modo "tarea" el alumno puede entrar en cualquier momento antes de
+   * `openUntil` y su countdown local corre por `duration` segundos desde el
+   * click "Iniciar mi tarea" (persistido en localStorage). El servidor solo
+   * valida que la entrega llegue con `now < openUntil` — el cap por alumno
+   * es responsabilidad del cliente.
+   */
+  public readonly openUntil: Date | null;
 
   constructor(params: {
     id: string;
@@ -36,6 +46,7 @@ export class Exam {
     scheduled: Date;
     started: Date | null;
     finished: Date | null;
+    openUntil: Date | null;
   }) {
     const id = (params.id ?? '').trim();
     if (id.length === 0) {
@@ -72,6 +83,12 @@ export class Exam {
     ) {
       throw new InvalidExamError('Exam finished debe ser Date válido o null.');
     }
+    if (
+      params.openUntil !== null &&
+      (!(params.openUntil instanceof Date) || Number.isNaN(params.openUntil.getTime()))
+    ) {
+      throw new InvalidExamError('Exam openUntil debe ser Date válido o null.');
+    }
     if (!(params.serverStatus instanceof ExamServerStatus)) {
       throw new InvalidExamError('Exam requiere un ExamServerStatus válido.');
     }
@@ -87,6 +104,7 @@ export class Exam {
     this.scheduled = params.scheduled;
     this.started = params.started;
     this.finished = params.finished;
+    this.openUntil = params.openUntil;
   }
 
   // Cierre efectivo de la vigencia. Prioridad:
@@ -107,10 +125,23 @@ export class Exam {
   // Factor ×1000 porque `duration` viene de learnex en SEGUNDOS.
   effectiveCloseAt(): Date | null {
     if (this.finished !== null) return this.finished;
+    // Modo "tarea": el cierre server-side es `openUntil` sin importar cuándo
+    // el tutor arrancó. La duración es cap per-alumno cliente-side y no
+    // participa del cierre del server.
+    if (this.openUntil !== null) return this.openUntil;
+    // Modo "examen" heredado: startedAt + duration.
     if (this.started !== null) {
       return new Date(this.started.getTime() + this.duration * 1000);
     }
     return null;
+  }
+
+  /**
+   * true = modo "tarea" (openUntil no-null → ventana global).
+   * false = modo "examen" (contador desde started).
+   */
+  esTarea(): boolean {
+    return this.openUntil !== null;
   }
 
   // Si la vigencia ya arrancó para el momento `now`. La puerta de entrada
