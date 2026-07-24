@@ -48,6 +48,16 @@
   --space-md: 16px;
   --space-lg: 24px;
   --space-xl: 32px;
+  --space-2xl: 40px;
+
+  /* Alto del "chrome superior" — reserva vertical debajo del safe area
+     para que las páginas empiecen abajo de la pastilla `.badge` fija
+     (connectivity-badge). El valor cubre la altura del pill + un poco
+     de aire. Las páginas lo usan como padding-top:
+       padding-top: calc(env(safe-area-inset-top) + var(--top-chrome));
+     Si algún día la pastilla crece o aparece un banner extra en el
+     shell, solo hay que subir este número. */
+  --top-chrome: 2.25rem;
 
   /* Radius — 8 px es el default; pill para bubbles OMR */
   --radius-sm: 4px;
