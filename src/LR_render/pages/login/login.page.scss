@@ -70,6 +70,13 @@
   // para que el challenge silencioso termine antes de que el usuario expanda.
   // `max-height: 40rem` es un techo holgado — cubre divider + 2 inputs +
   // captcha + submit + link collapse con margen.
+  //
+  // Truco padding + margin negativo (4px cada lado): da room DENTRO del
+  // `overflow: hidden` para que el focus ring de los inputs (box-shadow
+  // 3px) se dibuje completo. Sin esto, los lados izquierdo/derecho del
+  // halo quedan clippeados y aparecen como "franjitas" arriba/abajo del
+  // input focused. La suma padding+margin es 0 → alineación visual con
+  // los siblings queda intacta.
   &__email-collapse {
     display: flex;
     flex-direction: column;
@@ -77,6 +84,8 @@
     overflow: hidden;
     max-height: 0;
     opacity: 0;
+    padding: 4px;
+    margin: -4px;
     transition:
       max-height 320ms ease,
       opacity 200ms ease;
