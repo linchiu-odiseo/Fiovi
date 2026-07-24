@@ -12,7 +12,11 @@
     <p class="login__subtitle">Inicia sesión para continuar</p>
   </header>
 
-  @if (vm.ssoProviders().length > 0) {
+  <!-- Grupo SSO + toggle "Iniciar con email". Toda la sección se oculta
+       cuando el user expande el form de email — el toggle inverso "Volver
+       a Google" al pie del form devuelve la vista a este bloque. Evita
+       mostrar dos CTAs primarios (Google + Ingresar) compitiendo entre sí. -->
+  @if (vm.ssoProviders().length > 0 && !emailFormExpanded()) {
     @for (p of vm.ssoProviders(); track p.provider) {
       <button
         type="button"
@@ -51,17 +55,14 @@
       </button>
     }
 
-    @if (!emailFormExpanded()) {
-      <button
-        type="button"
-        class="login__toggle-email"
-        data-testid="btn-toggle-email"
-        (click)="expandEmailForm()"
-      >
-        Iniciar con email
-        <span class="material-symbols-outlined" aria-hidden="true">expand_more</span>
-      </button>
-    }
+    <button
+      type="button"
+      class="login__toggle-email"
+      data-testid="btn-toggle-email"
+      (click)="expandEmailForm()"
+    >
+      Iniciar con email
+    </button>
   }
 
   <!--
