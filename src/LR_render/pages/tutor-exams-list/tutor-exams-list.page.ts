@@ -37,6 +37,10 @@ export class TutorExamsListPage {
     void this.router.navigate(['/profile']);
   }
 
+  protected onTareasClick(): void {
+    void this.router.navigate(['/tutor/tareas']);
+  }
+
   /** Duración en minutos para display, coherente con TutorExam.durationInMinutes. */
   protected durationInMinutes(exam: ExamEnCurso): number {
     return Math.round(exam.duration / 60);

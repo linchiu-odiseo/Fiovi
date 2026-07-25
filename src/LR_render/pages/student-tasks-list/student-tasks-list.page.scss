@@ -1,0 +1,285 @@
+// Página de tareas del alumno. Layout mobile-first idéntico al home + otras
+// pages de listado; comparte tokens (--space-*, --color-*, --radius-*).
+// Las cards de tarea son visualmente distintas de las cards de examen del
+// home: borde izquierdo azul (primary) en vez de verde (success), chip
+// "TAREA" outline arriba-derecha, deadline absoluto explícito.
+
+:host {
+  display: block;
+  min-height: 100dvh;
+  background: var(--color-bg);
+  color: var(--color-on-surface);
+  padding: calc(env(safe-area-inset-top) + var(--top-chrome)) var(--space-md)
+    env(safe-area-inset-bottom);
+  box-sizing: border-box;
+  font-family: var(--font-body);
+}
+
+.tasks {
+  max-width: 28rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-height: calc(100dvh - var(--top-chrome) - env(safe-area-inset-top));
+  box-sizing: border-box;
+
+  &__nav {
+    display: flex;
+    align-items: center;
+  }
+
+  &__back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-height: 44px;
+    padding: var(--space-xs) var(--space-xs) var(--space-xs) 0;
+    border: none;
+    background: transparent;
+    color: var(--color-primary);
+    font-family: var(--font-body);
+    font-size: 0.9375rem;
+    font-weight: 500;
+    cursor: pointer;
+    letter-spacing: -0.01em;
+
+    .material-symbols-outlined {
+      font-size: 1.25rem;
+      margin-left: -4px;
+      line-height: 1;
+    }
+  }
+
+  &__header {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-sm);
+  }
+
+  &__title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.625rem;
+    line-height: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--color-on-surface);
+  }
+
+  &__count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.75rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: var(--radius-pill);
+    background: var(--color-surface-container-high);
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-mono, monospace);
+    font-size: 0.85rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__banner {
+    padding: var(--space-md);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-container-low);
+  }
+
+  &__banner--error {
+    background: var(--color-error-container, #ffdad6);
+    color: var(--color-on-error-container, #93000a);
+
+    p {
+      margin: 0 0 var(--space-sm);
+    }
+  }
+
+  &__banner--blocking {
+    background: var(--color-surface-container-high);
+    color: var(--color-on-surface);
+  }
+
+  &__retry {
+    appearance: none;
+    background: var(--color-primary);
+    color: var(--color-on-primary, white);
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 600;
+  }
+
+  &__empty {
+    margin: 0;
+    color: var(--color-on-surface-variant);
+    line-height: 1.5;
+  }
+
+  &__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+}
+
+// Card de tarea. El strip lateral azul (primary) marca "esto es una tarea".
+// Layout: header (nombre + chip TIPO) → meta → deadline row → status (si aplica).
+.task-card {
+  position: relative;
+  padding: var(--space-md) 1.1rem var(--space-md) 1.25rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-outline-variant);
+  background: var(--color-surface-container-lowest);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+  overflow: hidden;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    transform 80ms ease;
+
+  &__strip {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--color-primary);
+  }
+
+  &--pendiente,
+  &--cerrado,
+  &--enviado {
+    // Estados "no accionables": strip degradado, contenido tenue.
+    opacity: 0.7;
+
+    .task-card__strip {
+      background: var(--color-outline);
+    }
+  }
+
+  &--clickable {
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      background: var(--color-surface-container-low);
+      border-color: var(--color-primary);
+      transform: translateY(-1px);
+    }
+
+    &:active {
+      transform: translateY(0);
+    }
+  }
+
+  &__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-sm);
+  }
+
+  &__name {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    line-height: 1.3;
+    font-weight: 600;
+    color: var(--color-on-surface);
+  }
+
+  // Chip TIPO "TAREA": outline azul primary. Mismo diseño que el del detalle
+  // del tutor (`__type-chip--tarea` en tutor-exam-detail.page.scss) para que
+  // el user asocie el marcador visual entre pantallas.
+  &__type-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem 0.5rem;
+    border-radius: var(--radius-pill);
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    background: transparent;
+    color: var(--color-primary);
+    border: 1px solid var(--color-primary);
+    flex-shrink: 0;
+  }
+
+  &__meta {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--color-on-surface-variant);
+  }
+
+  &__deadline {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    color: var(--color-on-surface);
+  }
+
+  &__deadline-icon {
+    font-size: 1.1rem;
+    line-height: 1;
+    color: var(--color-primary);
+  }
+
+  &__countdown {
+    font-family: var(--font-mono, monospace);
+    font-weight: 700;
+    color: var(--color-primary);
+  }
+
+  &__deadline-sep {
+    color: var(--color-on-surface-variant);
+  }
+
+  &__deadline-abs {
+    color: var(--color-on-surface-variant);
+    font-size: 0.8rem;
+  }
+
+  &__status {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-on-surface-variant);
+
+    .material-symbols-outlined {
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+  }
+
+  &__status--enviado {
+    color: var(--color-success);
+  }
+
+  &__chevron {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.5rem;
+    color: var(--color-on-surface-variant);
+    pointer-events: none;
+  }
+}

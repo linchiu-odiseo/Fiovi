@@ -231,6 +231,7 @@ const buildExam = (
     scheduled: Date;
     started: Date | null;
     finished: Date | null;
+    openUntil: Date | null;
   }> = {},
 ): Exam => {
   const inProgress = serverStatusValue === 'in_progress';
@@ -256,7 +257,7 @@ const buildExam = (
         : finalized
           ? new Date('2026-06-11T12:00:00Z')
           : null,
-    openUntil: null,
+    openUntil: 'openUntil' in overrides ? (overrides.openUntil ?? null) : null,
     serverStatus: new ExamServerStatus(serverStatusValue),
   });
 };
@@ -655,6 +656,54 @@ describe('HomePageViewModel', () => {
       await vm.start();
 
       expect(warnSpy).not.toHaveBeenCalled();
+      vm.stop();
+    });
+  });
+
+  describe('split cards() vs tareasPendientesCount()', () => {
+    const openUntil = new Date('2026-06-15T00:00:00Z');
+
+    it('cards() excluye las tareas (openUntil !== null)', async () => {
+      fakeGetTodaysExams.willResolve([
+        buildExam('exam-1', 'in_progress'),
+        buildExam('tarea-1', 'in_progress', { openUntil }),
+        buildExam('exam-2', 'scheduled'),
+        buildExam('tarea-2', 'in_progress', { openUntil }),
+      ]);
+
+      const vm = createVm();
+      await vm.start();
+
+      expect(vm.cards().map((c) => c.id)).toEqual(['exam-1', 'exam-2']);
+      vm.stop();
+    });
+
+    it('tareasPendientesCount() cuenta solo las tareas con estado "abierto" (in_progress sin ack)', async () => {
+      fakeGetTodaysExams.willResolve([
+        buildExam('tarea-abierta-1', 'in_progress', { openUntil }),
+        buildExam('tarea-abierta-2', 'in_progress', { openUntil }),
+        buildExam('tarea-scheduled', 'scheduled', { openUntil }),
+        buildExam('tarea-cerrada', 'finalized', { openUntil }),
+      ]);
+
+      const vm = createVm();
+      await vm.start();
+
+      // solo las 2 in_progress sin ack cuentan como pendientes de acción
+      expect(vm.tareasPendientesCount()).toBe(2);
+      vm.stop();
+    });
+
+    it('tareasPendientesCount() = 0 cuando no hay tareas (solo exámenes)', async () => {
+      fakeGetTodaysExams.willResolve([
+        buildExam('exam-1', 'in_progress'),
+        buildExam('exam-2', 'scheduled'),
+      ]);
+
+      const vm = createVm();
+      await vm.start();
+
+      expect(vm.tareasPendientesCount()).toBe(0);
       vm.stop();
     });
   });

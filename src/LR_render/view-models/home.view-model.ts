@@ -98,10 +98,30 @@ export class HomePageViewModel {
 
   // Cards derivadas: estado, copy y countdown. Recomputa cuando cambia la lista
   // o cada tick del reloj.
+  //
+  // Se separan las tareas de los exámenes: el home muestra SOLO exámenes en la
+  // lista principal (el countdown en minutos crudos no tiene sentido para una
+  // tarea de 3 días), y las tareas viven en la página dedicada `/student/tareas`
+  // accesible via el CTA `tareasPendientesCount`. Ver ADR en README de la página.
   readonly cards = computed(() => {
     const acks = this.ackByExamId();
     const now = this.nowTick();
-    return this.exams().map((exam) => this.buildCard(exam, acks.get(exam.id) ?? null, now));
+    return this.exams()
+      .filter((exam) => !exam.esTarea())
+      .map((exam) => this.buildCard(exam, acks.get(exam.id) ?? null, now));
+  });
+
+  // Contador para el CTA del home: solo tareas donde el alumno tiene algo por
+  // hacer (`abierto`). Las enviadas / cerradas siguen apareciendo en la página
+  // dedicada pero no inflan el badge del CTA — el número debe reflejar acción
+  // pendiente, no historia.
+  readonly tareasPendientesCount = computed<number>(() => {
+    const acks = this.ackByExamId();
+    return this.exams().filter((exam) => {
+      if (!exam.esTarea()) return false;
+      const estado = this.composeEstado(exam, acks.get(exam.id) ?? null);
+      return estado === 'abierto';
+    }).length;
   });
 
   private pollTimer: ReturnType<typeof setInterval> | null = null;
