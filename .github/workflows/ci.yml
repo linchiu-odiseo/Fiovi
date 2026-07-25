@@ -1,0 +1,62 @@
+# ============================================================================
+# CI de Fiovi — gate mínimo antes de mergear a testing/main
+# ============================================================================
+# Corre en hosted runners de GitHub (NO en el self-hosted del server). Es el
+# GATE de calidad: el ruleset de `testing` / `main` puede exigir que este job
+# pase antes de permitir el merge. El deploy (deploy-testing.yml / deploy-main.yml,
+# solo-CD) corre DESPUÉS del merge, ya con el CI en verde.
+#
+# Empezamos con un solo job "check" en cadena (format:check → lint → test →
+# build) para dar al jefe algo estable a lo que apuntar el ruleset. En PRs
+# sucesivos se puede partir en matriz (como learnex) sin romper la config del
+# ruleset — mientras siga existiendo un job llamado "check" con el mismo name.
+# ============================================================================
+name: CI
+
+on:
+  pull_request:
+    branches: [testing, main]
+  push:
+    branches: [testing, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-fiovi-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # scripts/build-env.mjs (invocado por predev/prebuild/pretest) requiere
+      # .env con al menos API_BASE_URL. En CI horneamos un valor dummy — el
+      # bundle no se ejecuta, solo se buildea/testea, así que la URL nunca se
+      # golpea. Sin esto, `npm ci` no rompe, pero cualquier `npm run *` (test,
+      # build) falla por el hook pre*.
+      - name: Seed .env for CI
+        run: echo "API_BASE_URL=http://localhost:2001" > .env
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: format:check
+        run: npm run format:check
+
+      - name: lint
+        run: npm run lint
+
+      - name: test
+        run: npm test
+
+      - name: build
+        run: npm run build
