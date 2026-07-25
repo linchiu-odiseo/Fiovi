@@ -1,0 +1,38 @@
+# ============================================================================
+# CD de Fiovi — rebuild + redeploy en learnex-dev al mergear a testing
+# ============================================================================
+# SOLO-CD: el gate es el ci.yml (format:check → lint → test → build).
+# Corre en el self-hosted runner del server (labels [self-hosted, learnex-dev])
+# — el mismo runner que usan grader / OMR / learnex para su deploy de testing.
+# La lógica vive en learnex-docs/scripts/deploy/deploy-fiovi.sh (no acá).
+#
+# ⚠️ El .env local del repo (env horneadas, no versionado) DEBE existir en la VM
+#    de dev (/srv/learnex-prod/src/Fiovi/.env) con las envs de testing.
+#    deploy-fiovi.sh lo verifica y aborta si falta.
+# ⚠️ El repo learnex-docs debe tener rama `testing` (los demás proyectos hacen
+#    `fetch/reset origin/testing` sobre learnex-docs — mismo patrón acá).
+# ============================================================================
+name: deploy-testing
+
+on:
+  push:
+    branches: [testing]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cd-fiovi-testing
+  cancel-in-progress: false
+
+jobs:
+  cd:
+    runs-on: [self-hosted, learnex-dev]
+    steps:
+      - name: Actualizar learnex-docs y desplegar (testing → :testing)
+        run: |
+          set -euo pipefail
+          DOCS=/srv/learnex-prod/src/learnex-docs
+          git -C "$DOCS" fetch --prune origin testing
+          git -C "$DOCS" reset --hard origin/testing
+          BRANCH=testing TAG=testing bash "$DOCS/scripts/deploy/deploy-fiovi.sh"
