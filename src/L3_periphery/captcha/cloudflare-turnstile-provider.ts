@@ -38,10 +38,7 @@ export class CloudflareTurnstileProvider implements CaptchaProvider {
     return this.provider === 'turnstile' && this.siteKey.length > 0;
   }
 
-  async render(
-    container: CaptchaContainer,
-    callbacks: CaptchaCallbacks,
-  ): Promise<CaptchaWidgetId> {
+  async render(container: CaptchaContainer, callbacks: CaptchaCallbacks): Promise<CaptchaWidgetId> {
     if (!this.isEnabled()) {
       throw new Error('CaptchaProvider.render() called while disabled');
     }

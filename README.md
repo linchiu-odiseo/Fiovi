@@ -91,11 +91,11 @@ Hexagonal estricta en 4 capas. Las reglas de import están enforzadas por ESLint
 
 Todas las variables las consume `scripts/build-env.mjs` y termina en `src/environments/environment.ts`. Si falta alguna requerida, el hook `predev`/`prebuild` falla con mensaje claro.
 
-| Variable        | Requerida | Origen         | Ejemplo dev             | Notas                                                                                                                                                                    |
-| --------------- | --------- | -------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `API_BASE_URL`  | sí        | `.env`         | `http://localhost:2001` | URL del backend learnex. En prod tiene que ser **HTTPS** (cookies HttpOnly + `SameSite=None` lo exigen).                                                                 |
-| `DRAFT_ENABLED` | no        | `.env`         | `true`                  | Si `false` o ausente, el dispatcher de draft auto-save usa la implementación `Noop` (no llama al backend).                                                               |
-| `DEV_TOOLS`     | no        | `.env`         | `true`                  | Habilita atajos de UI de desarrollo (botón dado, cartilla prueba). Dejar `false` en release.                                                                             |
+| Variable        | Requerida | Origen         | Ejemplo dev             | Notas                                                                                                                                                                       |
+| --------------- | --------- | -------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `API_BASE_URL`  | sí        | `.env`         | `http://localhost:2001` | URL del backend learnex. En prod tiene que ser **HTTPS** (cookies HttpOnly + `SameSite=None` lo exigen).                                                                    |
+| `DRAFT_ENABLED` | no        | `.env`         | `true`                  | Si `false` o ausente, el dispatcher de draft auto-save usa la implementación `Noop` (no llama al backend).                                                                  |
+| `DEV_TOOLS`     | no        | `.env`         | `true`                  | Habilita atajos de UI de desarrollo (botón dado, cartilla prueba). Dejar `false` en release.                                                                                |
 | `version`       | sí        | `package.json` | `1.2.1`                 | SemVer humana. Se inyecta en `environment.appVersion` y en `ngsw.json` post-build; dispara el modal "hay versión nueva". **Bumpear con `npm version patch\|minor\|major`.** |
 
 `.env` está en `.gitignore`. Documentación viva de las variables en `.env.example`.
