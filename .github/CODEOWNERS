@@ -1,0 +1,3 @@
+# CODEOWNERS de Fiovi — review obligatorio de estos paths (ruleset production-protect).
+# Protege la config de CI/CD para que un cambio en los workflows exija review de estos owners.
+/.github/    @ezequiel-ares1 @arojas-odiseo @Jhuchar @rsantos-png
