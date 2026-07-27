@@ -84,8 +84,9 @@
     </section>
   }
 
-  <!-- Exámenes en curso — solo los in_progress para acceso rápido; los
-       scheduled y finalized se ven adentro de cada aula/curso. -->
+  <!-- Exámenes en curso — solo los in_progress clásicos (openUntil === null).
+       Las tareas activas viven en el CTA de abajo → /tutor/tareas para no
+       mezclar countdowns de "3 días" con countdowns de "15 min". -->
   <section class="exams-in-progress-section" data-testid="exams-in-progress-section">
     <h2 class="section-title">Exámenes en curso</h2>
 
@@ -96,35 +97,66 @@
         <p>Sin conexión. Revisá tu red y reintentá.</p>
         <button type="button" (click)="vm.refresh()">Reintentar</button>
       </div>
-    } @else if (!vm.hasExamsEnCurso()) {
-      <p class="exams-in-progress-section__empty">No hay exámenes en curso ahora.</p>
+    } @else if (vm.examenesEnCurso().length === 0 && vm.tareasAbiertasCount() === 0) {
+      <p class="exams-in-progress-section__empty">No hay exámenes ni tareas activas ahora.</p>
     } @else {
-      <ul class="tutor-exams-list__list" data-testid="exams-list">
-        @for (exam of vm.examsEnCurso(); track exam.recordId) {
-          <li
-            class="exam-card exam-card--in-progress"
-            data-testid="exam-card"
-            (click)="onExamCardClick(exam)"
-            (keydown.enter)="onExamCardClick(exam)"
-            role="button"
-            tabindex="0"
-          >
-            <span class="exam-card__strip" aria-hidden="true"></span>
-            <div class="exam-card__header">
-              <h3 class="exam-card__name">{{ exam.name }}</h3>
-              <span class="exam-card__status-badge" data-testid="status-badge"> En curso </span>
-            </div>
-            <div class="exam-card__meta">
-              <span class="exam-card__classroom">{{ exam.classroomName }}</span>
-              @if (exam.course) {
-                <span class="exam-card__course">{{ exam.course }}</span>
-              }
-              <span class="exam-card__count">{{ countDisplay(exam) }} preguntas</span>
-              <span class="exam-card__duration">{{ durationInMinutes(exam) }} min</span>
-            </div>
-          </li>
-        }
-      </ul>
+      @if (vm.examenesEnCurso().length > 0) {
+        <ul class="tutor-exams-list__list" data-testid="exams-list">
+          @for (exam of vm.examenesEnCurso(); track exam.recordId) {
+            <li
+              class="exam-card exam-card--in-progress"
+              data-testid="exam-card"
+              (click)="onExamCardClick(exam)"
+              (keydown.enter)="onExamCardClick(exam)"
+              role="button"
+              tabindex="0"
+            >
+              <span class="exam-card__strip" aria-hidden="true"></span>
+              <div class="exam-card__header">
+                <h3 class="exam-card__name">{{ exam.name }}</h3>
+                <span class="exam-card__status-badge" data-testid="status-badge"> En curso </span>
+              </div>
+              <div class="exam-card__meta">
+                <span class="exam-card__classroom">{{ exam.classroomName }}</span>
+                @if (exam.course) {
+                  <span class="exam-card__course">{{ exam.course }}</span>
+                }
+                <span class="exam-card__count">{{ countDisplay(exam) }} preguntas</span>
+                <span class="exam-card__duration">{{ durationInMinutes(exam) }} min</span>
+              </div>
+            </li>
+          }
+        </ul>
+      } @else if (vm.tareasAbiertasCount() > 0) {
+        <!-- Solo tareas activas, sin exámenes: mostramos hint corto en lugar
+             del empty state para no confundir con "no hay nada" -->
+        <p class="exams-in-progress-section__empty">
+          No hay exámenes en curso. Tenés tareas abiertas debajo.
+        </p>
+      }
+
+      <!-- CTA de tareas abiertas: aparece cuando hay ≥1 tarea in_progress
+           (openUntil !== null). Diseño outline azul primary para
+           diferenciarlo visualmente de las cards de examen (fill success).
+           Cuenta TODAS las tareas activas — el tutor sabe cuántas hay antes
+           de tocar el CTA. -->
+      @if (vm.tareasAbiertasCount(); as tareasCount) {
+        <button
+          type="button"
+          class="tareas-cta"
+          data-testid="cta-tareas-abiertas"
+          (click)="onTareasClick()"
+          aria-label="Ver tareas abiertas"
+        >
+          <span class="material-symbols-outlined tareas-cta__icon" aria-hidden="true">task</span>
+          <span class="tareas-cta__label">
+            {{ tareasCount === 1 ? '1 tarea abierta' : tareasCount + ' tareas abiertas' }}
+          </span>
+          <span class="material-symbols-outlined tareas-cta__chevron" aria-hidden="true">
+            chevron_right
+          </span>
+        </button>
+      }
     }
   </section>
 

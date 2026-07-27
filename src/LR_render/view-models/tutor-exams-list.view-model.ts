@@ -27,8 +27,8 @@ export class TutorExamsListViewModel {
   private readonly getProfile = inject(GetProfileUseCase);
   private readonly getIdentity = inject(GetIdentityUseCase);
 
-  // Exámenes actualmente in_progress a través de TODAS las aulas del tutor.
-  // Alimenta la sección "Exámenes en curso" y los badges por card de aula.
+  // Lista cruda de exámenes in_progress (incluye tanto exámenes clásicos como
+  // tareas). Los splits derivados de abajo separan uno del otro para el home.
   readonly examsEnCurso = signal<readonly ExamEnCurso[]>([]);
   readonly loading = signal(true);
   readonly error = signal(false);
@@ -49,6 +49,19 @@ export class TutorExamsListViewModel {
   readonly hasClassrooms = computed(() => this.classrooms().length > 0);
 
   readonly hasExamsEnCurso = computed(() => this.examsEnCurso().length > 0);
+
+  // Split para el home: la lista visible muestra SOLO exámenes clásicos
+  // (openUntil === null). Las tareas viven en la página dedicada
+  // `/tutor/tareas` accesible via `tareasAbiertasCount`. Esto evita que el
+  // tutor vea tareas con countdown de "3 días" mezcladas con exámenes que
+  // están corriendo ahora mismo.
+  readonly examenesEnCurso = computed<readonly ExamEnCurso[]>(() =>
+    this.examsEnCurso().filter((e) => !e.esTarea()),
+  );
+
+  readonly tareasAbiertasCount = computed<number>(
+    () => this.examsEnCurso().filter((e) => e.esTarea()).length,
+  );
 
   // Hero ambient del /tutor/home: saludo aleatorio + frase motivadora. Se
   // fijan al montar la VM y no rotan durante el fetch (mismo criterio que

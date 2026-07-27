@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { ExamEnCurso } from '../../../../src/L1_domain/entities/exam-en-curso';
 
-function build(overrides: Partial<{ duration: number; startedAt: Date }> = {}) {
+function build(
+  overrides: Partial<{ duration: number; startedAt: Date; openUntil: Date | null }> = {},
+) {
   return new ExamEnCurso({
     id: 'ex-1',
     recordId: 'rec-1',
@@ -14,6 +16,7 @@ function build(overrides: Partial<{ duration: number; startedAt: Date }> = {}) {
     count: 4,
     duration: overrides.duration ?? 900, // 15 min
     startedAt: overrides.startedAt ?? new Date('2026-07-21T14:00:00Z'),
+    openUntil: overrides.openUntil ?? null,
   });
 }
 
@@ -66,6 +69,18 @@ describe('ExamEnCurso', () => {
 
     it('es false cuando nowServer > expectedEndAt', () => {
       expect(e.estaEnTiempo(new Date('2026-07-21T14:30:00Z'))).toBe(false);
+    });
+  });
+
+  describe('esTarea()', () => {
+    it('es true cuando openUntil !== null (tarea)', () => {
+      const e = build({ openUntil: new Date('2026-07-28T00:00:00Z') });
+      expect(e.esTarea()).toBe(true);
+    });
+
+    it('es false cuando openUntil === null (examen clásico)', () => {
+      const e = build({ openUntil: null });
+      expect(e.esTarea()).toBe(false);
     });
   });
 });

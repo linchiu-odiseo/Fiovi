@@ -46,6 +46,10 @@ export class HomePage {
     void this.router.navigate(['/profile']);
   }
 
+  protected onTareasClick(): void {
+    void this.router.navigate(['/student/tareas']);
+  }
+
   protected retry(): void {
     void this.vm.refresh();
   }

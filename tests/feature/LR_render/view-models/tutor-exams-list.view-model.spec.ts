@@ -15,7 +15,7 @@ import type { ExamsEnCursoResult } from '../../../../src/L1_domain/ports/tutor-n
 // postergó a un cambio futuro — este VM hace un fetch único en start().
 
 function buildExam(
-  overrides: Partial<{ recordId: string; classroomId: string }> = {},
+  overrides: Partial<{ recordId: string; classroomId: string; openUntil: Date | null }> = {},
 ): ExamEnCurso {
   return new ExamEnCurso({
     id: `id-${overrides.recordId ?? 'r1'}`,
@@ -29,6 +29,7 @@ function buildExam(
     count: 4,
     duration: 900,
     startedAt: new Date('2026-07-21T14:00:00Z'),
+    openUntil: overrides.openUntil ?? null,
   });
 }
 
@@ -151,6 +152,49 @@ describe('TutorExamsListViewModel (home tutor)', () => {
       await vm.start();
 
       expect(vm.inProgressCountFor('any-classroom')).toBe(0);
+    });
+  });
+
+  describe('split examenesEnCurso() vs tareasAbiertasCount()', () => {
+    const tarea = (): Partial<{
+      recordId: string;
+      classroomId: string;
+      openUntil: Date | null;
+    }> => ({ openUntil: new Date('2026-07-28T00:00:00Z') });
+
+    it('separa examen (openUntil=null) de tarea (openUntil!=null)', async () => {
+      getExams.willResolve([
+        buildExam({ recordId: 'exam-1' }),
+        buildExam({ recordId: 'tarea-1', ...tarea() }),
+        buildExam({ recordId: 'exam-2' }),
+        buildExam({ recordId: 'tarea-2', ...tarea() }),
+      ]);
+      const vm = createVm();
+      await vm.start();
+
+      expect(vm.examenesEnCurso().map((e) => e.recordId)).toEqual(['exam-1', 'exam-2']);
+      expect(vm.tareasAbiertasCount()).toBe(2);
+    });
+
+    it('solo tareas → examenesEnCurso() vacío + tareasAbiertasCount>0', async () => {
+      getExams.willResolve([
+        buildExam({ recordId: 't1', ...tarea() }),
+        buildExam({ recordId: 't2', ...tarea() }),
+      ]);
+      const vm = createVm();
+      await vm.start();
+
+      expect(vm.examenesEnCurso()).toEqual([]);
+      expect(vm.tareasAbiertasCount()).toBe(2);
+    });
+
+    it('solo exámenes → tareasAbiertasCount=0', async () => {
+      getExams.willResolve([buildExam({ recordId: 'e1' })]);
+      const vm = createVm();
+      await vm.start();
+
+      expect(vm.tareasAbiertasCount()).toBe(0);
+      expect(vm.examenesEnCurso()).toHaveLength(1);
     });
   });
 });
