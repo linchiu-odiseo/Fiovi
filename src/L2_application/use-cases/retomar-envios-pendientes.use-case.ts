@@ -36,6 +36,12 @@ export class RetomarEnviosPendientesUseCase {
           clientFinishedAt: envio.clientFinishedAt,
         });
         await this.storage.setSubmissionAck(envio.examId, result.ack);
+        // Snapshot con las respuestas + área originalmente encoladas — el
+        // historial las lee del snapshot, no de las marcaciones activas.
+        await this.storage.saveSubmissionSnapshot(envio.examId, {
+          answers: envio.answers,
+          admissionArea: envio.admissionArea ?? DEFAULT_ADMISSION_AREA,
+        });
         await this.storage.dequeueEnvio(envio.examId);
         await this.storage.clearMarcaciones(envio.examId);
       } catch (err) {

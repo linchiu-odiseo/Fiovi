@@ -716,6 +716,75 @@ describe('TutorExamDetailViewModel', () => {
     });
   });
 
+  describe('Actividad tutor: registrar cuando detail queda finalized (manual + auto)', () => {
+    it('load inicial con status=finalized → registra actividad (caso: exam ya cerrado al abrir)', async () => {
+      const { vm, store, fakeGetDetail, fakeListStudents, fakeRegistrarActividad } = setup('rec-1');
+      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1' })]);
+      fakeGetDetail.willResolve(buildDetail({ status: new ExamServerStatus('finalized') }));
+      fakeListStudents.willResolve([]);
+
+      await vm.load();
+
+      expect(fakeRegistrarActividad.callCount).toBe(1);
+      expect(fakeRegistrarActividad.lastEvent?.recordId).toBe('rec-1');
+    });
+
+    it('load inicial con status=in_progress → NO registra (aún no finalizado)', async () => {
+      const { vm, store, fakeGetDetail, fakeListStudents, fakeRegistrarActividad } = setup('rec-1');
+      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1' })]);
+      fakeGetDetail.willResolve(buildDetail({ status: new ExamServerStatus('in_progress') }));
+      fakeListStudents.willResolve([]);
+
+      await vm.load();
+
+      expect(fakeRegistrarActividad.callCount).toBe(0);
+    });
+
+    it('finalizar manual → reloadDetail trae finalized → registra actividad', async () => {
+      const { vm, store, fakeGetDetail, fakeListStudents, fakeFinalizar, fakeRegistrarActividad } =
+        setup('rec-1');
+      store.setExams([
+        buildTutorExam({
+          recordId: 'rec-1',
+          classroomId: 'cls-1',
+          serverStatus: new ExamServerStatus('in_progress'),
+        }),
+      ]);
+      fakeGetDetail.willResolve(buildDetail({ status: new ExamServerStatus('in_progress') }));
+      fakeListStudents.willResolve([]);
+      fakeFinalizar.willResolve({ transitioned: true });
+
+      await vm.load();
+      expect(fakeRegistrarActividad.callCount).toBe(0);
+
+      // El reload post-finalizar trae el nuevo status.
+      fakeGetDetail.willResolve(buildDetail({ status: new ExamServerStatus('finalized') }));
+      await vm.finalizar();
+
+      expect(fakeRegistrarActividad.callCount).toBe(1);
+    });
+
+    it('idempotente por id: doble reload con finalized no crea dos entries distintos', async () => {
+      // El use case interno usa `finalize.{recordId}` como id — el adapter IDB
+      // sobreescribe con la misma key. Cada llamada del VM invoca al use case,
+      // pero la escritura en IDB queda como una sola fila. Verificamos que el
+      // callCount refleja las invocaciones (idempotencia real vive en el adapter).
+      const { vm, store, fakeGetDetail, fakeListStudents, fakeRegistrarActividad } = setup('rec-1');
+      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1' })]);
+      fakeGetDetail.willResolve(buildDetail({ status: new ExamServerStatus('finalized') }));
+      fakeListStudents.willResolve([]);
+
+      await vm.load();
+      // Reload manual: mismo estado finalized.
+      fakeGetDetail.willResolve(buildDetail({ status: new ExamServerStatus('finalized') }));
+      await vm.load();
+
+      // Ambos loads dispararon el registro — mismo id, el adapter maneja idempotencia.
+      expect(fakeRegistrarActividad.callCount).toBe(2);
+      expect(fakeRegistrarActividad.lastEvent?.recordId).toBe('rec-1');
+    });
+  });
+
   // ── Checkbox logic ──────────────────────────────────────────────────────────
 
   describe('Scenario: Checkbox de alumno con hasSubmitted deshabilitado (D5)', () => {

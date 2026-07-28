@@ -41,6 +41,16 @@
   --color-error-container: #ffdad6;
   --color-on-error-container: #93000a;
 
+  /* Alternativas A–E — paleta de 5 puros para pastillas del historial
+     (visualmente análogos a los del panel de learnex). Se usan como
+     background de la pill; el on-* es el color del texto. */
+  --color-alt-a: #16a34a;
+  --color-alt-b: #2563eb;
+  --color-alt-c: #7c3aed;
+  --color-alt-d: #ea580c;
+  --color-alt-e: #dc2626;
+  --color-on-alt: #ffffff;
+
   /* Spacing — baseline 4 px */
   --space-base: 4px;
   --space-xs: 8px;

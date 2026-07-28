@@ -5,6 +5,7 @@ import {
 } from '../../L2_application/use-cases/get-historial-entry.use-case';
 import { GetTodaysExamsUseCase } from '../../L2_application/use-cases/get-todays-exams.use-case';
 import { AlternativaValue } from '../../L1_domain/ports/markings-storage';
+import { AdmissionArea } from '../../L1_domain/value-objects/admission-area';
 import { Exam } from '../../L1_domain/entities/exam';
 
 // Fila de la grilla del detalle: número de pregunta + alternativa elegida
@@ -44,6 +45,10 @@ export class StudentHistorialDetailViewModel {
     }
     return rows;
   });
+
+  // Área de POSTULACIÓN persistida en el snapshot. null cuando no hay
+  // snapshot (envío legacy) o cuando la entrada es "no-envío".
+  readonly admissionArea = computed<AdmissionArea | null>(() => this.detalle()?.admissionArea ?? null);
 
   async start(examId: string): Promise<void> {
     this.examId.set(examId);

@@ -49,6 +49,7 @@ export class InMemoryMarkingsStorage implements MarkingsStorage {
   // "el alumno nunca eligió expresamente"; el use case resuelve el default
   // sin persistir (design.md D3 de `add-admission-area`).
   private admissionAreas = new Map<string, AdmissionArea>();
+  private snapshots = new Map<string, { answers: AnswersMap; admissionArea: AdmissionArea }>();
   private wipeShouldFail = false;
   private wipeCalls = 0;
   private opsLog: string[] = [];
@@ -98,7 +99,8 @@ export class InMemoryMarkingsStorage implements MarkingsStorage {
       this.marcaciones.size > 0 ||
       this.queue.size > 0 ||
       this.acks.size > 0 ||
-      this.admissionAreas.size > 0
+      this.admissionAreas.size > 0 ||
+      this.snapshots.size > 0
     );
   }
 
@@ -163,6 +165,22 @@ export class InMemoryMarkingsStorage implements MarkingsStorage {
     return new Map(this.acks);
   }
 
+  async saveSubmissionSnapshot(
+    examId: string,
+    snapshot: { answers: AnswersMap; admissionArea: AdmissionArea },
+  ): Promise<void> {
+    this.opsLog.push('markings.saveSubmissionSnapshot');
+    this.snapshots.set(examId, { answers: { ...snapshot.answers }, admissionArea: snapshot.admissionArea });
+  }
+
+  async getSubmissionSnapshot(
+    examId: string,
+  ): Promise<{ answers: AnswersMap; admissionArea: AdmissionArea } | null> {
+    const s = this.snapshots.get(examId);
+    if (!s) return null;
+    return { answers: { ...s.answers }, admissionArea: s.admissionArea };
+  }
+
   async setAdmissionArea(examId: string, area: AdmissionArea): Promise<void> {
     this.opsLog.push('markings.setAdmissionArea');
     this.admissionAreas.set(examId, area);
@@ -182,6 +200,7 @@ export class InMemoryMarkingsStorage implements MarkingsStorage {
     this.queue.clear();
     this.acks.clear();
     this.admissionAreas.clear();
+    this.snapshots.clear();
   }
 }
 

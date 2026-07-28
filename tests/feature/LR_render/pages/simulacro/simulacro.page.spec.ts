@@ -151,6 +151,12 @@ class FakeMarkingsStorage implements MarkingsStorage {
   async setAdmissionArea(_examId: string, _area: unknown): Promise<void> {
     /* no-op */
   }
+  async saveSubmissionSnapshot(_examId: string, _snapshot: unknown): Promise<void> {
+    /* no-op */
+  }
+  async getSubmissionSnapshot(_examId: string): Promise<null> {
+    return null;
+  }
   async wipeUserScope(): Promise<void> {
     /* no-op */
   }

@@ -397,6 +397,66 @@ describe('IndexedDbMarkingsStorage', () => {
     });
   });
 
+  describe('SubmissionSnapshot — saveSubmissionSnapshot / getSubmissionSnapshot round-trip', () => {
+    it('saveSubmissionSnapshot persiste answers + admissionArea y getSubmissionSnapshot los reconstruye', async () => {
+      await adapter.saveSubmissionSnapshot('exam-42', {
+        answers: { '1': 'A', '2': 'C', '3': 'E' },
+        admissionArea: 'B',
+      });
+
+      const snapshot = await adapter.getSubmissionSnapshot('exam-42');
+
+      expect(snapshot).not.toBeNull();
+      expect(snapshot?.answers).toEqual({ '1': 'A', '2': 'C', '3': 'E' });
+      expect(snapshot?.admissionArea).toBe('B');
+    });
+
+    it('getSubmissionSnapshot retorna null cuando no hay snapshot persistido', async () => {
+      expect(await adapter.getSubmissionSnapshot('exam-no-existe')).toBeNull();
+    });
+
+    it('saveSubmissionSnapshot sobreescribe el snapshot anterior (última gana)', async () => {
+      await adapter.saveSubmissionSnapshot('exam-42', {
+        answers: { '1': 'A' },
+        admissionArea: 'A',
+      });
+      await adapter.saveSubmissionSnapshot('exam-42', {
+        answers: { '1': 'B', '2': 'D' },
+        admissionArea: 'B',
+      });
+
+      const snapshot = await adapter.getSubmissionSnapshot('exam-42');
+      expect(snapshot?.answers).toEqual({ '1': 'B', '2': 'D' });
+      expect(snapshot?.admissionArea).toBe('B');
+    });
+
+    it('snapshot sobrevive a clearMarcaciones (el clear NO lo borra)', async () => {
+      await adapter.setMarcacion('exam-42', 1, 'A');
+      await adapter.saveSubmissionSnapshot('exam-42', {
+        answers: { '1': 'A' },
+        admissionArea: 'GENERAL',
+      });
+
+      await adapter.clearMarcaciones('exam-42');
+
+      // Marcaciones activas se borraron, snapshot persiste (regla clave para
+      // que el historial muestre las respuestas post-envío).
+      expect(await adapter.getMarcaciones('exam-42')).toEqual({});
+      expect(await adapter.getSubmissionSnapshot('exam-42')).not.toBeNull();
+    });
+
+    it('snapshot se borra en wipeUserScope (junto con acks + marcaciones)', async () => {
+      await adapter.saveSubmissionSnapshot('exam-42', {
+        answers: { '1': 'A' },
+        admissionArea: 'GENERAL',
+      });
+
+      await adapter.wipeUserScope();
+
+      expect(await adapter.getSubmissionSnapshot('exam-42')).toBeNull();
+    });
+  });
+
   describe('SubmissionAck — getAllSubmissionAcks (scan por prefijo)', () => {
     it('retorna Map vacío cuando no hay acks persistidos', async () => {
       const all = await adapter.getAllSubmissionAcks();

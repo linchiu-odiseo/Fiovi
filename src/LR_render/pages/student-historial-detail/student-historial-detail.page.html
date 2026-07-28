@@ -23,9 +23,14 @@
       <h1 class="detalle__title">
         {{ d.exam?.name ?? 'Envío del ' + (d.ack ? formatFecha(d.ack.submittedAt) : '—') }}
       </h1>
-      @if (d.exam?.course; as course) {
-        <p class="detalle__course">{{ course }}</p>
-      }
+      <div class="detalle__meta">
+        @if (d.exam?.course; as course) {
+          <span class="detalle__course">{{ course }}</span>
+        }
+        @if (vm.admissionArea(); as area) {
+          <span class="detalle__area" data-testid="admission-area">Área {{ area }}</span>
+        }
+      </div>
     </header>
 
     @if (d.ack) {
@@ -82,7 +87,14 @@
           @for (row of vm.rows(); track row.pregunta) {
             <li class="grilla__row" [class.grilla__row--vacio]="row.alternativa === null">
               <span class="grilla__n">{{ row.pregunta }}</span>
-              <span class="grilla__alt">{{ row.alternativa ?? '—' }}</span>
+              @if (row.alternativa) {
+                <span
+                  class="grilla__alt grilla__alt--pill"
+                  [class]="'grilla__alt--' + row.alternativa"
+                >{{ row.alternativa }}</span>
+              } @else {
+                <span class="grilla__alt grilla__alt--empty" aria-label="Sin marcar">—</span>
+              }
             </li>
           }
         </ul>
