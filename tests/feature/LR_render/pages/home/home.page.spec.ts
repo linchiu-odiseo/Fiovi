@@ -320,7 +320,7 @@ describe('HomePage', () => {
       expect(cards.length).toBe(2);
     });
 
-    it('muestra "No tienes simulacros asignados para hoy" cuando la lista está vacía y no hay error', async () => {
+    it('muestra "No hay exámenes ni tareas activas ahora" cuando la lista está vacía y no hay error', async () => {
       fakeGetTodaysExams.willResolve([]);
 
       const fixture = TestBed.createComponent(HomePage);
@@ -331,7 +331,7 @@ describe('HomePage', () => {
 
       const el = fixture.nativeElement as HTMLElement;
       expect(el.querySelector('.empty-state')?.textContent).toContain(
-        'No tienes simulacros asignados para hoy',
+        'No hay exámenes ni tareas activas ahora',
       );
     });
   });

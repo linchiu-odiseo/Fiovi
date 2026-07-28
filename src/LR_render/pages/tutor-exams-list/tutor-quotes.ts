@@ -13,6 +13,7 @@ export const TUTOR_QUOTES: readonly string[] = [
   'la paciencia es la mejor herramienta pedagógica',
   'el que enseña aprende dos veces',
   'cada pregunta bien respondida es un examen aprobado más adelante',
+  'pulsa aquí y te encontrarás a ti mismo',
 ];
 
 export function randomTutorQuote(): string {

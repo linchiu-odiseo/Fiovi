@@ -160,8 +160,13 @@
 
   .empty-state {
     margin: 0;
+    padding: var(--space-md);
+    text-align: center;
+    font-size: 0.9rem;
     color: var(--color-on-surface-variant);
     line-height: 1.5;
+    border-radius: var(--radius-md);
+    border: 1px dashed var(--color-outline-variant);
   }
 
   .card-list {
