@@ -56,6 +56,21 @@
           </div>
         </dl>
       </section>
+    } @else {
+      <!-- Estado "no-envio": el examen cerró sin ack local. Puede ser porque
+           el alumno no envió, o envió desde otra device y este browser no
+           tiene el ack. La app no puede distinguir hoy — se comunica sin
+           acusar. Auto-envío server-side queda como TODO cuando el back
+           marque el flag. -->
+      <section class="no-envio" data-testid="no-envio">
+        <p class="no-envio__title">
+          <span class="material-symbols-outlined" aria-hidden="true">do_not_disturb_on</span>
+          No enviaste este examen
+        </p>
+        <p class="no-envio__hint">
+          La sesión cerró sin registrar tu envío en esta device.
+        </p>
+      </section>
     }
 
     <section class="respuestas">

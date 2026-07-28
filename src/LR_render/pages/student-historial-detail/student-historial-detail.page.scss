@@ -178,6 +178,39 @@
   }
 }
 
+.no-envio {
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-outline-variant);
+  background: var(--color-surface-container-lowest);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+
+  &__title {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--color-on-surface);
+
+    .material-symbols-outlined {
+      font-size: 1.2rem;
+      line-height: 1;
+      color: var(--color-on-surface-variant);
+    }
+  }
+
+  &__hint {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--color-on-surface-variant);
+    line-height: 1.4;
+  }
+}
+
 .respuestas {
   display: flex;
   flex-direction: column;

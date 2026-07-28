@@ -32,6 +32,8 @@
       @for (entry of vm.entries(); track entry.examId) {
         <li
           class="historial-card"
+          [class.historial-card--no-envio]="entry.estado === 'no-envio'"
+          [attr.data-estado]="entry.estado"
           data-testid="historial-card"
           (click)="onEntryClick(entry)"
           (keydown.enter)="onEntryClick(entry)"
@@ -46,14 +48,21 @@
             @if (entry.courseName) {
               <p class="historial-card__course">{{ entry.courseName }}</p>
             }
-            <p class="historial-card__meta">
-              @if (entry.submittedAt) {
+            @if (entry.estado === 'envio' && entry.submittedAt) {
+              <p class="historial-card__meta">
                 <span class="material-symbols-outlined historial-card__meta-icon" aria-hidden="true">
                   check_circle
                 </span>
                 <span>Envío registrado · {{ formatFecha(entry.submittedAt) }}</span>
-              }
-            </p>
+              </p>
+            } @else if (entry.estado === 'no-envio') {
+              <p class="historial-card__meta historial-card__meta--no-envio">
+                <span class="material-symbols-outlined historial-card__meta-icon" aria-hidden="true">
+                  do_not_disturb_on
+                </span>
+                <span>No enviaste · cerrado</span>
+              </p>
+            }
             @if (entry.submissionHash) {
               <p class="historial-card__hash" data-testid="hash-preview">
                 #{{ shortHash(entry.submissionHash) }}

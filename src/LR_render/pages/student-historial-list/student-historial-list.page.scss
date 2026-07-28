@@ -133,6 +133,16 @@
     background: var(--color-success);
   }
 
+  // Variante "no envió": strip gris + opacidad reducida. Diferencia visual
+  // clara respecto al envío exitoso (verde), sin ruido extra.
+  &--no-envio {
+    opacity: 0.75;
+
+    .historial-card__strip {
+      background: var(--color-outline);
+    }
+  }
+
   &__body {
     display: flex;
     flex-direction: column;
@@ -165,6 +175,10 @@
     .material-symbols-outlined {
       font-size: 1.05rem;
       line-height: 1;
+    }
+
+    &--no-envio {
+      color: var(--color-on-surface-variant);
     }
   }
 
