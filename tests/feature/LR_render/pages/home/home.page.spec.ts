@@ -307,10 +307,12 @@ describe('HomePage', () => {
   // de la ProfilePage.
 
   describe('lista de exámenes', () => {
-    it('renderiza una card por examen cuando el use case devuelve lista', async () => {
+    it('renderiza una card por examen in_progress (scheduled/finalized filtrados por ítem 1 del refine)', async () => {
       fakeGetTodaysExams.willResolve([
         buildExam('exam-1', 'in_progress'),
-        buildExam('exam-2', 'scheduled'),
+        buildExam('exam-2', 'in_progress'),
+        buildExam('exam-3', 'scheduled'), // no aparece
+        buildExam('exam-4', 'finalized'), // no aparece
       ]);
 
       const fixture = TestBed.createComponent(HomePage);
