@@ -24,6 +24,7 @@ import { ProfileStorage } from './L1_domain/ports/profile-storage';
 import { OutboxStoragePort } from './L1_domain/ports/outbox-storage.port';
 import { RouterPort } from './L1_domain/ports/router-port';
 import { TenantSlugCache } from './L1_domain/ports/tenant-slug-cache';
+import { TutorActivityStorage } from './L1_domain/ports/tutor-activity-storage';
 
 // L2 use cases — clases TS puras sin @Injectable, instanciadas por factory.
 import { LoginUseCase } from './L2_application/use-cases/login.use-case';
@@ -42,6 +43,11 @@ import { RetomarEnviosPendientesUseCase } from './L2_application/use-cases/retom
 import { ProgramarAutoEnvioUseCase } from './L2_application/use-cases/programar-auto-envio.use-case';
 import { GuardarDraftUseCase } from './L2_application/use-cases/guardar-draft.use-case';
 import { SeleccionarAdmissionAreaUseCase } from './L2_application/use-cases/seleccionar-admission-area.use-case';
+import { GetHistorialUseCase } from './L2_application/use-cases/get-historial.use-case';
+import { GetHistorialEntryUseCase } from './L2_application/use-cases/get-historial-entry.use-case';
+import { RegistrarActividadTutorUseCase } from './L2_application/use-cases/registrar-actividad-tutor.use-case';
+import { GetActividadTutorUseCase } from './L2_application/use-cases/get-actividad-tutor.use-case';
+import { ArchivarActividadTutorUseCase } from './L2_application/use-cases/archivar-actividad-tutor.use-case';
 
 // L3 implementaciones de los puertos.
 import { CloudflareTurnstileProvider } from './L3_periphery/captcha/cloudflare-turnstile-provider';
@@ -52,6 +58,7 @@ import { HttpTutorNavigationApi } from './L3_periphery/http/http-tutor-navigatio
 import { LocalStorageIdentityStorage } from './L3_periphery/storage/local-storage-identity-storage';
 import { IndexedDbProfileStorage } from './L3_periphery/storage/indexed-db-profile-storage';
 import { IndexedDbMarkingsStorage } from './L3_periphery/storage/indexed-db-markings-storage';
+import { IndexedDbTutorActivityStorage } from './L3_periphery/storage/indexed-db-tutor-activity-storage';
 import { ServerAnchoredClock } from './L3_periphery/clock/server-anchored-clock';
 import { BrowserConnectivity } from './L3_periphery/connectivity/browser-connectivity';
 import { EnvioRetryDispatcher } from './L3_periphery/envio/envio-retry-dispatcher.service';
@@ -96,6 +103,7 @@ export const MARKINGS_STORAGE = new InjectionToken<MarkingsStorage>('MARKINGS_ST
 export const EXAMS_API = new InjectionToken<ExamsApi>('EXAMS_API');
 export const ROUTER_PORT = new InjectionToken<RouterPort>('ROUTER_PORT');
 export const TENANT_SLUG_CACHE = new InjectionToken<TenantSlugCache>('TENANT_SLUG_CACHE');
+export const TUTOR_ACTIVITY_STORAGE = new InjectionToken<TutorActivityStorage>('TUTOR_ACTIVITY_STORAGE');
 
 // Adapter Angular `Router` → `RouterPort` (L1). Inline factory; sin nuevo archivo
 // porque es un wrapper trivial usado solo desde el wiring.
@@ -126,6 +134,7 @@ export const appConfig: ApplicationConfig = {
     // IndexedDbMarkingsStorage implementa MarkingsStorage Y OutboxStoragePort.
     { provide: MARKINGS_STORAGE, useExisting: IndexedDbMarkingsStorage },
     { provide: OUTBOX_STORAGE, useExisting: IndexedDbMarkingsStorage },
+    { provide: TUTOR_ACTIVITY_STORAGE, useExisting: IndexedDbTutorActivityStorage },
     { provide: CLOCK, useExisting: ServerAnchoredClock },
     { provide: CONNECTIVITY, useExisting: BrowserConnectivity },
     { provide: EXAMS_API, useExisting: HttpExamsApi },
@@ -188,6 +197,7 @@ export const appConfig: ApplicationConfig = {
         markings: MarkingsStorage,
         outbox: OutboxStoragePort,
         routerPort: RouterPort,
+        tutorActivity: TutorActivityStorage,
       ) =>
         new LogoutUseCase(
           repo,
@@ -197,6 +207,7 @@ export const appConfig: ApplicationConfig = {
           markings,
           outbox,
           routerPort,
+          tutorActivity,
         ),
       deps: [
         AUTH_REPOSITORY,
@@ -206,6 +217,7 @@ export const appConfig: ApplicationConfig = {
         MARKINGS_STORAGE,
         OUTBOX_STORAGE,
         ROUTER_PORT,
+        TUTOR_ACTIVITY_STORAGE,
       ],
     },
     {
@@ -285,6 +297,31 @@ export const appConfig: ApplicationConfig = {
       provide: SeleccionarAdmissionAreaUseCase,
       useFactory: (markings: MarkingsStorage) => new SeleccionarAdmissionAreaUseCase(markings),
       deps: [MARKINGS_STORAGE],
+    },
+    {
+      provide: GetHistorialUseCase,
+      useFactory: (markings: MarkingsStorage) => new GetHistorialUseCase(markings),
+      deps: [MARKINGS_STORAGE],
+    },
+    {
+      provide: GetHistorialEntryUseCase,
+      useFactory: (markings: MarkingsStorage) => new GetHistorialEntryUseCase(markings),
+      deps: [MARKINGS_STORAGE],
+    },
+    {
+      provide: RegistrarActividadTutorUseCase,
+      useFactory: (storage: TutorActivityStorage) => new RegistrarActividadTutorUseCase(storage),
+      deps: [TUTOR_ACTIVITY_STORAGE],
+    },
+    {
+      provide: GetActividadTutorUseCase,
+      useFactory: (storage: TutorActivityStorage) => new GetActividadTutorUseCase(storage),
+      deps: [TUTOR_ACTIVITY_STORAGE],
+    },
+    {
+      provide: ArchivarActividadTutorUseCase,
+      useFactory: (storage: TutorActivityStorage) => new ArchivarActividadTutorUseCase(storage),
+      deps: [TUTOR_ACTIVITY_STORAGE],
     },
     // Use-cases del tutor: fábricas puras que inyectan el puerto via TUTOR_EXAMS_API.
     // PR1 los registra aquí pero ninguna VM los inyecta todavía (compila, runtime-inert).

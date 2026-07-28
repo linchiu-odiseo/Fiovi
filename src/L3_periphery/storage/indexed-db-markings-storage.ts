@@ -4,6 +4,7 @@ import {
   AlternativaValue,
   EnvioPendiente,
   MarkingsStorage,
+  SubmissionSnapshot,
 } from '../../L1_domain/ports/markings-storage';
 import { OutboxStoragePort } from '../../L1_domain/ports/outbox-storage.port';
 import { AdmissionArea, isAdmissionArea } from '../../L1_domain/value-objects/admission-area';
@@ -17,11 +18,12 @@ const STORE = 'data';
 
 // Patrón de keys planas en un único object store. La key encapsula el
 // scope por usuario (`userEmail`) y la entidad (marcacion vs queue vs
-// ack vs admission-area).
+// ack vs admission-area vs submission-snapshot).
 //   marcacion:      cartilla.<email>.simulacro.<examId>.<pregunta>
 //   queue:          cartilla.<email>.queue.<examId>
 //   ack:            cartilla.<email>.ack.<examId>
 //   admission-area: cartilla.<email>.admission-area.<examId>
+//   snapshot:       cartilla.<email>.submission-snapshot.<examId>
 // El prefijo `cartilla.<email>.` permite que `wipeUserScope()` use un
 // rango de IDBKeyRange.bound(...) sin tocar datos de otros usuarios.
 //
@@ -117,6 +119,35 @@ export class IndexedDbMarkingsStorage implements MarkingsStorage, OutboxStorageP
     return new SubmissionAck(stored.id, stored.submissionHash, new Date(stored.submittedAt));
   }
 
+  // Scan de todos los acks del usuario actual (prefijo `cartilla.<email>.ack.`).
+  // Cada entry es tolerante a shape stale: si el VO no puede reconstruirse
+  // (datos corruptos de versiones previas), se omite silenciosamente en vez
+  // de romper la lista entera.
+  async getAllSubmissionAcks(): Promise<ReadonlyMap<string, SubmissionAck>> {
+    const email = await this.requireUserEmail();
+    const db = await this.db();
+    const prefix = `${KEY_ROOT}.${email}.ack.`;
+    const entries = await this.getRange(db, prefix);
+    const out = new Map<string, SubmissionAck>();
+    for (const { key, value } of entries) {
+      const examId = key.slice(prefix.length);
+      const stored = value as { id?: unknown; submissionHash?: unknown; submittedAt?: unknown };
+      if (
+        typeof stored.id !== 'string' ||
+        typeof stored.submissionHash !== 'string' ||
+        typeof stored.submittedAt !== 'string'
+      ) {
+        continue;
+      }
+      try {
+        out.set(examId, new SubmissionAck(stored.id, stored.submissionHash, new Date(stored.submittedAt)));
+      } catch {
+        // shape válido pero VO rechaza (hash mal, date inválido): skip.
+      }
+    }
+    return out;
+  }
+
   // Persistencia del área de POSTULACIÓN del alumno (ver AdmissionArea VO).
   // Idempotente (última llamada gana). NO confundir con Exam.area (curso).
   async setAdmissionArea(examId: string, area: AdmissionArea): Promise<void> {
@@ -135,6 +166,32 @@ export class IndexedDbMarkingsStorage implements MarkingsStorage, OutboxStorageP
     if (raw === undefined) return null;
     const stored = raw as { area?: unknown };
     return isAdmissionArea(stored.area) ? stored.area : null;
+  }
+
+  // Snapshot congelado del envío. El use case de envío lo llama antes de
+  // borrar marcaciones activas para que el historial pueda mostrar las
+  // respuestas que se mandaron.
+  async saveSubmissionSnapshot(examId: string, snapshot: SubmissionSnapshot): Promise<void> {
+    const email = await this.requireUserEmail();
+    const db = await this.db();
+    await this.put(db, snapshotKey(email, examId), {
+      answers: snapshot.answers,
+      admissionArea: snapshot.admissionArea,
+    });
+  }
+
+  async getSubmissionSnapshot(examId: string): Promise<SubmissionSnapshot | null> {
+    const email = await this.requireUserEmail();
+    const db = await this.db();
+    const raw = await this.get(db, snapshotKey(email, examId));
+    if (raw === undefined) return null;
+    const stored = raw as { answers?: unknown; admissionArea?: unknown };
+    if (typeof stored.answers !== 'object' || stored.answers === null) return null;
+    if (!isAdmissionArea(stored.admissionArea)) return null;
+    return {
+      answers: stored.answers as AnswersMap,
+      admissionArea: stored.admissionArea,
+    };
   }
 
   // Sin identity → no-op (caso normal durante logout cuando el storage ya
@@ -283,6 +340,10 @@ function ackKey(email: string, examId: string): string {
 
 function admissionAreaKey(email: string, examId: string): string {
   return `${KEY_ROOT}.${email}.admission-area.${examId}`;
+}
+
+function snapshotKey(email: string, examId: string): string {
+  return `${KEY_ROOT}.${email}.submission-snapshot.${examId}`;
 }
 
 // Rango "key starts with prefix" — IndexedDB ordena keys lexicográficamente,

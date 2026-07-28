@@ -1,0 +1,79 @@
+<main class="historial">
+  <nav class="historial__nav">
+    <button
+      type="button"
+      class="historial__back"
+      data-testid="btn-volver"
+      (click)="onBack()"
+      aria-label="Volver"
+    >
+      <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+      Volver
+    </button>
+  </nav>
+
+  <header class="historial__header">
+    <h1 class="historial__title">Historial</h1>
+    <p class="historial__hint">Envíos guardados en esta device. Se borran al cerrar sesión.</p>
+  </header>
+
+  @if (vm.isLoading() && vm.entries().length === 0) {
+    <p class="historial__empty">Cargando…</p>
+  } @else if (vm.storageError()) {
+    <div class="historial__banner" role="alert">
+      No se pudo leer el almacenamiento local.
+    </div>
+  } @else if (vm.entries().length === 0) {
+    <p class="historial__empty" data-testid="empty-state">
+      Todavía no hay envíos en esta sesión.
+    </p>
+  } @else {
+    <ul class="historial__list">
+      @for (entry of vm.entries(); track entry.examId) {
+        <li
+          class="historial-card"
+          [class.historial-card--no-envio]="entry.estado === 'no-envio'"
+          [attr.data-estado]="entry.estado"
+          data-testid="historial-card"
+          (click)="onEntryClick(entry)"
+          (keydown.enter)="onEntryClick(entry)"
+          role="button"
+          tabindex="0"
+        >
+          <span class="historial-card__strip" aria-hidden="true"></span>
+          <div class="historial-card__body">
+            <h2 class="historial-card__name">
+              {{ entry.examName ?? 'Examen del ' + (entry.submittedAt ? formatFecha(entry.submittedAt) : '—') }}
+            </h2>
+            @if (entry.courseName) {
+              <p class="historial-card__course">{{ entry.courseName }}</p>
+            }
+            @if (entry.estado === 'envio' && entry.submittedAt) {
+              <p class="historial-card__meta">
+                <span class="material-symbols-outlined historial-card__meta-icon" aria-hidden="true">
+                  check_circle
+                </span>
+                <span>Envío registrado · {{ formatFecha(entry.submittedAt) }}</span>
+              </p>
+            } @else if (entry.estado === 'no-envio') {
+              <p class="historial-card__meta historial-card__meta--no-envio">
+                <span class="material-symbols-outlined historial-card__meta-icon" aria-hidden="true">
+                  do_not_disturb_on
+                </span>
+                <span>No enviaste · cerrado</span>
+              </p>
+            }
+            @if (entry.submissionHash) {
+              <p class="historial-card__hash" data-testid="hash-preview">
+                #{{ shortHash(entry.submissionHash) }}
+              </p>
+            }
+          </div>
+          <span class="material-symbols-outlined historial-card__chevron" aria-hidden="true">
+            chevron_right
+          </span>
+        </li>
+      }
+    </ul>
+  }
+</main>

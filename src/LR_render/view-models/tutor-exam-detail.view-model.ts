@@ -7,6 +7,7 @@ import { IniciarExamenUseCase } from '../../L2_application/use-cases/iniciar-exa
 import { FinalizarExamenUseCase } from '../../L2_application/use-cases/finalizar-examen.use-case';
 import { ArchivarExamenUseCase } from '../../L2_application/use-cases/archivar-examen.use-case';
 import { ActualizarAlumnosHabilitadosUseCase } from '../../L2_application/use-cases/actualizar-alumnos-habilitados.use-case';
+import { RegistrarActividadTutorUseCase } from '../../L2_application/use-cases/registrar-actividad-tutor.use-case';
 import { TutorExamsStore } from '../state/tutor-exams.store';
 import { TutorExamDetail } from '../../L1_domain/value-objects/tutor-exam-detail';
 import { ClassroomStudent } from '../../L1_domain/value-objects/classroom-student';
@@ -59,6 +60,7 @@ export class TutorExamDetailViewModel {
   private readonly finalizarExamen = inject(FinalizarExamenUseCase);
   private readonly archivarExamen = inject(ArchivarExamenUseCase);
   private readonly actualizarAlumnos = inject(ActualizarAlumnosHabilitadosUseCase);
+  private readonly registrarActividad = inject(RegistrarActividadTutorUseCase);
   private readonly store = inject(TutorExamsStore);
   private readonly clock = inject(CLOCK);
 
@@ -520,11 +522,40 @@ export class TutorExamDetailViewModel {
     try {
       await this.finalizarExamen.execute({ recordId });
       // Ambos transitioned:true y transitioned:false son éxito → reload + upsert (R4).
+      // El registro en historial del tutor lo dispara `reloadDetail` cuando el
+      // detail vuelve con status=finalized (helper `registerIfFinalized`).
       await this.reloadDetail(recordId);
     } catch (err) {
       this.actionError.set(this.copyForAction('finalizar', err));
     } finally {
       this.isSaving.set(false);
+    }
+  }
+
+  // Registra el evento de actividad del tutor si el detail actual está
+  // finalized. Best-effort: errores se logean y no rompen flujo. Idempotente
+  // por `id = "finalize.{recordId}"` — múltiples llamadas con el mismo id
+  // sobrescriben la misma fila en IDB (double-tap del botón, mismo reload
+  // detectado por caminos distintos, etc.).
+  //
+  // Se dispara desde TODOS los reloads del detail (initial load + tras cada
+  // acción + post-cierre refresh) — la política del back de archivar los
+  // finalized a las 00 hs implica que cualquier finalized que Fiovi todavía
+  // pueda ver es "de hoy", así que no hace falta filtrar por ventana temporal.
+  private async registerIfFinalized(recordId: string): Promise<void> {
+    const d = this.detail();
+    if (!d || !d.status.is('finalized')) return;
+    try {
+      await this.registrarActividad.execute({
+        id: `finalize.${recordId}`,
+        recordId,
+        examName: d.name,
+        courseName: d.course,
+        finalizedAt: d.finishedAt ?? this.clock.now(),
+        archived: false,
+      });
+    } catch (err) {
+      console.warn('tutor activity register failed', err);
     }
   }
 
@@ -653,6 +684,9 @@ export class TutorExamDetailViewModel {
       this.enabledStudentIds.set(detail.enabledStudentIds);
       this.error.set(null);
       this.syncCountdownTicker();
+      // Registra actividad si ya está finalized al abrir el detalle (caso:
+      // tutor entra a un examen que auto-cerró mientras no lo miraba).
+      void this.registerIfFinalized(recordId);
     } catch (err) {
       this.error.set(this.classifyLoadError(err));
     }
@@ -689,6 +723,11 @@ export class TutorExamDetailViewModel {
       });
       this.store.upsert(updatedExam);
     }
+
+    // Registra actividad si el reload trajo status=finalized (post-manual,
+    // post-cierre auto, o cualquier acción que dispare reload y el back
+    // haya cerrado el examen entretanto).
+    void this.registerIfFinalized(recordId);
   }
 
   // Clasifica errores de carga (initial load / retry) al error signal.
@@ -816,6 +855,9 @@ export class TutorExamDetailViewModel {
           // para permitir un segundo intento en el próximo tick.
           this.postCierreRefreshDone.delete(recordId);
         }
+        // Nota: el registro de actividad tutor por auto-cierre lo dispara
+        // `reloadDetail` internamente vía `registerIfFinalized` — no hace
+        // falta llamarlo acá.
       } catch {
         // Error de red / timeout: liberamos el guard para permitir reintento.
         // No mostramos actionError — el poll normal / navegación posterior

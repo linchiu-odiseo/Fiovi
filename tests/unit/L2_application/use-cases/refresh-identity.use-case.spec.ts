@@ -11,6 +11,8 @@ import { LogoutUseCase } from '../../../../src/L2_application/use-cases/logout.u
 import { RouterPort } from '../../../../src/L1_domain/ports/router-port';
 import { OutboxStoragePort } from '../../../../src/L1_domain/ports/outbox-storage.port';
 import { MarkingsStorage } from '../../../../src/L1_domain/ports/markings-storage';
+import { SubmissionAck } from '../../../../src/L1_domain/value-objects/submission-ack';
+import { TutorActivityStorage } from '../../../../src/L1_domain/ports/tutor-activity-storage';
 import { GetProfileUseCase } from '../../../../src/L2_application/use-cases/get-profile.use-case';
 
 const NOW = 1_700_000_000_000;
@@ -38,6 +40,21 @@ class FakeOutbox implements OutboxStoragePort {
   }
 }
 
+class FakeTutorActivity implements TutorActivityStorage {
+  async append(): Promise<void> {
+    return Promise.resolve();
+  }
+  async list(): Promise<never[]> {
+    return [];
+  }
+  async archive(): Promise<void> {
+    return Promise.resolve();
+  }
+  async wipeUserScope(): Promise<void> {
+    return Promise.resolve();
+  }
+}
+
 class FakeMarkings implements MarkingsStorage {
   async setMarcacion(): Promise<void> {
     return Promise.resolve();
@@ -60,6 +77,9 @@ class FakeMarkings implements MarkingsStorage {
   async getSubmissionAck(): Promise<null> {
     return null;
   }
+  async getAllSubmissionAcks(): Promise<ReadonlyMap<string, SubmissionAck>> {
+    return new Map();
+  }
   async setSubmissionAck(): Promise<void> {
     return Promise.resolve();
   }
@@ -68,6 +88,12 @@ class FakeMarkings implements MarkingsStorage {
   }
   async setAdmissionArea(): Promise<void> {
     return Promise.resolve();
+  }
+  async saveSubmissionSnapshot(): Promise<void> {
+    return Promise.resolve();
+  }
+  async getSubmissionSnapshot(): Promise<null> {
+    return null;
   }
   async wipeUserScope(): Promise<void> {
     return Promise.resolve();
@@ -97,6 +123,7 @@ describe('RefreshIdentityUseCase', () => {
       new FakeMarkings(),
       new FakeOutbox(),
       new FakeRouter(),
+      new FakeTutorActivity(),
     );
     logoutExecuteCalls = 0;
     const originalLogoutExecute = logout.execute.bind(logout);

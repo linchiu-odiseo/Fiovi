@@ -53,6 +53,22 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'student/historial',
+    canActivate: [authGuard, roleGuard('student')],
+    loadComponent: () =>
+      import('./pages/student-historial-list/student-historial-list.page').then(
+        (m) => m.StudentHistorialListPage,
+      ),
+  },
+  {
+    path: 'student/historial/:examId',
+    canActivate: [authGuard, roleGuard('student')],
+    loadComponent: () =>
+      import('./pages/student-historial-detail/student-historial-detail.page').then(
+        (m) => m.StudentHistorialDetailPage,
+      ),
+  },
+  {
     path: 'tutor/home',
     canActivate: [authGuard, roleGuard('tutor')],
     loadComponent: () =>
@@ -64,6 +80,14 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./pages/tutor-tasks-list/tutor-tasks-list.page').then(
         (m) => m.TutorTasksListPage,
+      ),
+  },
+  {
+    path: 'tutor/actividad',
+    canActivate: [authGuard, roleGuard('tutor')],
+    loadComponent: () =>
+      import('./pages/tutor-actividad-list/tutor-actividad-list.page').then(
+        (m) => m.TutorActividadListPage,
       ),
   },
   // Nav mobile AULA → SEMANA → CURSO → EXÁMENES (change tutor-aulas-semanas-view).

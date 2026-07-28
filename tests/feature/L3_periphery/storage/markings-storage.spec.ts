@@ -397,6 +397,106 @@ describe('IndexedDbMarkingsStorage', () => {
     });
   });
 
+  describe('SubmissionSnapshot — saveSubmissionSnapshot / getSubmissionSnapshot round-trip', () => {
+    it('saveSubmissionSnapshot persiste answers + admissionArea y getSubmissionSnapshot los reconstruye', async () => {
+      await adapter.saveSubmissionSnapshot('exam-42', {
+        answers: { '1': 'A', '2': 'C', '3': 'E' },
+        admissionArea: 'B',
+      });
+
+      const snapshot = await adapter.getSubmissionSnapshot('exam-42');
+
+      expect(snapshot).not.toBeNull();
+      expect(snapshot?.answers).toEqual({ '1': 'A', '2': 'C', '3': 'E' });
+      expect(snapshot?.admissionArea).toBe('B');
+    });
+
+    it('getSubmissionSnapshot retorna null cuando no hay snapshot persistido', async () => {
+      expect(await adapter.getSubmissionSnapshot('exam-no-existe')).toBeNull();
+    });
+
+    it('saveSubmissionSnapshot sobreescribe el snapshot anterior (última gana)', async () => {
+      await adapter.saveSubmissionSnapshot('exam-42', {
+        answers: { '1': 'A' },
+        admissionArea: 'A',
+      });
+      await adapter.saveSubmissionSnapshot('exam-42', {
+        answers: { '1': 'B', '2': 'D' },
+        admissionArea: 'B',
+      });
+
+      const snapshot = await adapter.getSubmissionSnapshot('exam-42');
+      expect(snapshot?.answers).toEqual({ '1': 'B', '2': 'D' });
+      expect(snapshot?.admissionArea).toBe('B');
+    });
+
+    it('snapshot sobrevive a clearMarcaciones (el clear NO lo borra)', async () => {
+      await adapter.setMarcacion('exam-42', 1, 'A');
+      await adapter.saveSubmissionSnapshot('exam-42', {
+        answers: { '1': 'A' },
+        admissionArea: 'GENERAL',
+      });
+
+      await adapter.clearMarcaciones('exam-42');
+
+      // Marcaciones activas se borraron, snapshot persiste (regla clave para
+      // que el historial muestre las respuestas post-envío).
+      expect(await adapter.getMarcaciones('exam-42')).toEqual({});
+      expect(await adapter.getSubmissionSnapshot('exam-42')).not.toBeNull();
+    });
+
+    it('snapshot se borra en wipeUserScope (junto con acks + marcaciones)', async () => {
+      await adapter.saveSubmissionSnapshot('exam-42', {
+        answers: { '1': 'A' },
+        admissionArea: 'GENERAL',
+      });
+
+      await adapter.wipeUserScope();
+
+      expect(await adapter.getSubmissionSnapshot('exam-42')).toBeNull();
+    });
+  });
+
+  describe('SubmissionAck — getAllSubmissionAcks (scan por prefijo)', () => {
+    it('retorna Map vacío cuando no hay acks persistidos', async () => {
+      const all = await adapter.getAllSubmissionAcks();
+      expect(all.size).toBe(0);
+    });
+
+    it('retorna todos los acks del usuario actual indexados por examId', async () => {
+      const ackA = new SubmissionAck('ack-A', VALID_HASH, new Date('2026-06-17T10:00:00.000Z'));
+      const ackB = new SubmissionAck('ack-B', ALT_HASH, new Date('2026-06-18T11:00:00.000Z'));
+      await adapter.setSubmissionAck('exam-1', ackA);
+      await adapter.setSubmissionAck('exam-2', ackB);
+
+      const all = await adapter.getAllSubmissionAcks();
+      expect(all.size).toBe(2);
+      expect(all.get('exam-1')?.id).toBe('ack-A');
+      expect(all.get('exam-2')?.id).toBe('ack-B');
+      expect(all.get('exam-1')).toBeInstanceOf(SubmissionAck);
+    });
+
+    it('scope por usuario: no incluye acks de otro alumno bajo el mismo IDB', async () => {
+      const ackA = new SubmissionAck('ack-A', VALID_HASH, new Date('2026-06-17T10:00:00.000Z'));
+      await adapter.setSubmissionAck('exam-1', ackA);
+
+      TestBed.resetTestingModule();
+      const otroIdentity = new StubIdentityStorage();
+      otroIdentity.setIdentity(makeIdentity('alumno-b@vonex.edu.pe'));
+      TestBed.configureTestingModule({
+        providers: [
+          IndexedDbMarkingsStorage,
+          { provide: IDENTITY_STORAGE, useValue: otroIdentity },
+        ],
+      });
+      const otroAdapter = TestBed.inject(IndexedDbMarkingsStorage);
+
+      // Otro alumno arranca sin acks propios y no ve los del alumno anterior.
+      const otrosAcks = await otroAdapter.getAllSubmissionAcks();
+      expect(otrosAcks.size).toBe(0);
+    });
+  });
+
   describe('AdmissionArea — get/set/clear + guard defensivo contra stale', () => {
     // Área de POSTULACIÓN (NO Exam.area). Persiste en la misma DB con key
     // `cartilla.<email>.admission-area.<examId>`. clearMarcaciones borra

@@ -6,6 +6,7 @@ import { MarkingsStorage } from '../../L1_domain/ports/markings-storage';
 import { OutboxStoragePort } from '../../L1_domain/ports/outbox-storage.port';
 import { RouterPort } from '../../L1_domain/ports/router-port';
 import { SwMessengerPort } from '../../L1_domain/ports/sw-messenger.port';
+import { TutorActivityStorage } from '../../L1_domain/ports/tutor-activity-storage';
 
 // Use case de logout con 8 pasos ordenados estrictamente.
 //
@@ -26,6 +27,7 @@ export class LogoutUseCase {
     private readonly markingsStorage: MarkingsStorage,
     private readonly outboxStorage: OutboxStoragePort,
     private readonly router: RouterPort,
+    private readonly tutorActivityStorage: TutorActivityStorage,
     private readonly swMessenger?: SwMessengerPort,
   ) {}
 
@@ -58,6 +60,15 @@ export class LogoutUseCase {
       await this.outboxStorage.clear();
     } catch (err) {
       console.warn('outbox clear failed during logout', err);
+    }
+
+    // Paso 4.5: limpiar historial de actividad del tutor (Item 4 del refine).
+    // Mismo criterio que markings: se llama ANTES de identityStorage.clear()
+    // porque el adapter lee IdentityStorage internamente.
+    try {
+      await this.tutorActivityStorage.wipeUserScope();
+    } catch (err) {
+      console.warn('tutor activity wipe failed during logout', err);
     }
 
     // Paso 5: limpiar caché de perfil.

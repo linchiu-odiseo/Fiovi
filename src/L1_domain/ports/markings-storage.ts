@@ -62,7 +62,24 @@ export interface MarkingsStorage {
   dequeueEnvio(examId: string): Promise<void>;
   setSubmissionAck(examId: string, ack: SubmissionAck): Promise<void>;
   getSubmissionAck(examId: string): Promise<SubmissionAck | null>;
+  // Lista todos los acks del usuario actual. Usado por el historial local
+  // del alumno. Retorna un `Map` para que el caller resuelva por `examId`
+  // sin re-scanear. Orden no garantizado; el use case ordena.
+  getAllSubmissionAcks(): Promise<ReadonlyMap<string, SubmissionAck>>;
   setAdmissionArea(examId: string, area: AdmissionArea): Promise<void>;
   getAdmissionArea(examId: string): Promise<AdmissionArea | null>;
+  // Snapshot congelado del envío (answers + admissionArea que efectivamente
+  // fueron enviados). Se persiste en el momento del submit exitoso, ANTES de
+  // `clearMarcaciones`, porque las marcaciones activas se borran tras enviar.
+  // El historial del alumno lo lee para poder mostrar las respuestas y el
+  // área usadas. Independiente de `SubmissionAck` — el ack certifica el
+  // envío, el snapshot preserva el contenido.
+  saveSubmissionSnapshot(examId: string, snapshot: SubmissionSnapshot): Promise<void>;
+  getSubmissionSnapshot(examId: string): Promise<SubmissionSnapshot | null>;
   wipeUserScope(): Promise<void>; // sin argumento — el adapter lee IdentityStorage internamente
+}
+
+export interface SubmissionSnapshot {
+  readonly answers: AnswersMap;
+  readonly admissionArea: AdmissionArea;
 }

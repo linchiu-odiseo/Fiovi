@@ -156,6 +156,9 @@ class FakeMarkingsStorage implements MarkingsStorage {
   async getSubmissionAck(_examId: string): Promise<SubmissionAck | null> {
     return null;
   }
+  async getAllSubmissionAcks(): Promise<ReadonlyMap<string, SubmissionAck>> {
+    return new Map();
+  }
   async setSubmissionAck(_examId: string, _ack: SubmissionAck): Promise<void> {
     /* no-op */
   }
@@ -177,6 +180,12 @@ class FakeMarkingsStorage implements MarkingsStorage {
   }
   async setAdmissionArea(examId: string, area: AdmissionArea): Promise<void> {
     this.admissionAreaStore.set(examId, area);
+  }
+  async saveSubmissionSnapshot(_examId: string, _snapshot: unknown): Promise<void> {
+    /* no-op */
+  }
+  async getSubmissionSnapshot(_examId: string): Promise<null> {
+    return null;
   }
   async wipeUserScope(): Promise<void> {
     /* no-op */

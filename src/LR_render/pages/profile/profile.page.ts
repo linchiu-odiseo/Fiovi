@@ -111,8 +111,12 @@ export class ProfilePage {
   }
 
   protected onHistorialClick(): void {
-    // Placeholder: la vista de historial es follow-up declarado. Por ahora
-    // ignoramos el click para no navegar a una ruta rota.
+    const r = this.role();
+    if (r === 'student') {
+      void this.router.navigate(['/student/historial']);
+    } else if (r === 'tutor') {
+      void this.router.navigate(['/tutor/actividad']);
+    }
   }
 
   protected onConfigClick(): void {

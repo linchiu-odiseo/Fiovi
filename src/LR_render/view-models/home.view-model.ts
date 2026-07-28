@@ -103,11 +103,19 @@ export class HomePageViewModel {
   // lista principal (el countdown en minutos crudos no tiene sentido para una
   // tarea de 3 días), y las tareas viven en la página dedicada `/student/tareas`
   // accesible via el CTA `tareasPendientesCount`. Ver ADR en README de la página.
+  //
+  // Filtro por `in_progress`: el home muestra SOLO exámenes activos ahora
+  // mismo. `scheduled` no aparece (el alumno no puede hacer nada con un
+  // examen aún no arrancado por el tutor). `finalized` tampoco (el envío o
+  // no-envío vive en `/student/historial`). El caso `in_progress + ack`
+  // (enviado con el examen aún abierto) SÍ aparece — sirve como acuse
+  // inmediato y es clickable al historial.
   readonly cards = computed(() => {
     const acks = this.ackByExamId();
     const now = this.nowTick();
     return this.exams()
       .filter((exam) => !exam.esTarea())
+      .filter((exam) => exam.serverStatus.is('in_progress'))
       .map((exam) => this.buildCard(exam, acks.get(exam.id) ?? null, now));
   });
 
@@ -391,7 +399,10 @@ export class HomePageViewModel {
 
   private buildCard(exam: Exam, ack: SubmissionAck | null, now: Date): SimulacroCard {
     const estado = this.composeEstado(exam, ack);
-    const clickable = estado === 'abierto';
+    // Ambos estados con destino navegable: `abierto` va al simulacro para
+    // rendir; `enviado` va al historial para ver acuse + marcaciones. La
+    // page decide el destino según `estado`.
+    const clickable = estado === 'abierto' || estado === 'enviado';
     const tone: CardTone = clickable ? 'verde' : 'gris';
 
     return {
@@ -481,7 +492,7 @@ export class HomePageViewModel {
   }
 
   private secondaryText(exam: Exam, estado: CardEstado): string {
-    if (estado === 'enviado') return 'Pendiente de calificación';
+    if (estado === 'enviado') return 'Envío registrado · toca para ver el detalle';
     const label = exam.course ?? exam.area ?? '—';
     return `${label} · ${exam.count} preguntas`;
   }

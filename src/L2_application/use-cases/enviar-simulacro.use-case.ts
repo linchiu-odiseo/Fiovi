@@ -86,6 +86,14 @@ export class EnviarSimulacroUseCase {
         clientFinishedAt,
       });
       await this.storage.setSubmissionAck(input.examId, result.ack);
+      // Snapshot congelado ANTES del clear — el historial lee esto para
+      // mostrar las respuestas y el área que efectivamente fueron enviadas.
+      // Debe ir antes de `clearMarcaciones` porque el clear borra las claves
+      // de marcaciones y admission-area activas.
+      await this.storage.saveSubmissionSnapshot(input.examId, {
+        answers,
+        admissionArea,
+      });
       await this.storage.clearMarcaciones(input.examId);
       return { status: 'enviado', ack: result.ack };
     } catch (err) {

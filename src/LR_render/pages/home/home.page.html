@@ -44,7 +44,7 @@
   }
 
   <section class="simulacros">
-    <h2 class="section-title">Exámenes de hoy</h2>
+    <h2 class="section-title">Actividades de hoy</h2>
 
     @if (vm.serverError() === 'network') {
       <div class="banner banner--error" role="alert">
@@ -54,7 +54,7 @@
     } @else if (vm.isLoading() && vm.exams().length === 0) {
       <p class="empty-state">Cargando simulacros…</p>
     } @else if (vm.cards().length === 0 && vm.tareasPendientesCount() === 0) {
-      <p class="empty-state">No tienes simulacros asignados para hoy.</p>
+      <p class="empty-state">No hay exámenes ni tareas activas ahora.</p>
     } @else {
       @if (vm.cards().length > 0) {
         <ul class="card-list">
