@@ -159,6 +159,10 @@ export class InMemoryMarkingsStorage implements MarkingsStorage {
     return this.acks.get(examId) ?? null;
   }
 
+  async getAllSubmissionAcks(): Promise<ReadonlyMap<string, SubmissionAck>> {
+    return new Map(this.acks);
+  }
+
   async setAdmissionArea(examId: string, area: AdmissionArea): Promise<void> {
     this.opsLog.push('markings.setAdmissionArea');
     this.admissionAreas.set(examId, area);

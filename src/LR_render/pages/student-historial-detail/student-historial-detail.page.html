@@ -1,0 +1,77 @@
+<main class="detalle">
+  <nav class="detalle__nav">
+    <button
+      type="button"
+      class="detalle__back"
+      data-testid="btn-volver"
+      (click)="onBack()"
+      aria-label="Volver"
+    >
+      <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+      Volver
+    </button>
+  </nav>
+
+  @if (vm.isLoading()) {
+    <p class="detalle__loading">Cargando…</p>
+  } @else if (vm.storageError() || !vm.detalle()) {
+    <p class="detalle__empty" data-testid="empty-state">
+      No se encontró el envío en esta device.
+    </p>
+  } @else if (vm.detalle(); as d) {
+    <header class="detalle__header">
+      <h1 class="detalle__title">
+        {{ d.exam?.name ?? 'Envío del ' + (d.ack ? formatFecha(d.ack.submittedAt) : '—') }}
+      </h1>
+      @if (d.exam?.course; as course) {
+        <p class="detalle__course">{{ course }}</p>
+      }
+    </header>
+
+    @if (d.ack) {
+      <section class="acuse" data-testid="acuse">
+        <p class="acuse__title">
+          <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+          Envío registrado
+        </p>
+        <dl class="acuse__list">
+          <div>
+            <dt>Fecha</dt>
+            <dd>{{ formatFecha(d.ack.submittedAt) }}</dd>
+          </div>
+          <div>
+            <dt>Hash del envío</dt>
+            <dd class="acuse__hash">
+              <code data-testid="hash-full">{{ d.ack.submissionHash }}</code>
+              <button
+                type="button"
+                class="acuse__copy"
+                data-testid="btn-copy-hash"
+                (click)="onCopyHash()"
+                aria-label="Copiar hash"
+              >
+                <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
+              </button>
+            </dd>
+          </div>
+        </dl>
+      </section>
+    }
+
+    <section class="respuestas">
+      <h2 class="respuestas__title">Respuestas marcadas</h2>
+      @if (vm.rows().length === 0) {
+        <p class="respuestas__empty">Sin marcaciones guardadas en esta device.</p>
+      } @else {
+        <ul class="grilla" data-testid="grilla">
+          @for (row of vm.rows(); track row.pregunta) {
+            <li class="grilla__row" [class.grilla__row--vacio]="row.alternativa === null">
+              <span class="grilla__n">{{ row.pregunta }}</span>
+              <span class="grilla__alt">{{ row.alternativa ?? '—' }}</span>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  }
+</main>

@@ -19,6 +19,7 @@ import { ExamServerStatus } from '../../../../../src/L1_domain/value-objects/exa
 import { ServerTime } from '../../../../../src/L1_domain/value-objects/server-time';
 import { NetworkError } from '../../../../../src/L1_domain/errors/network.error';
 import { OfflineStorageUnavailableError } from '../../../../../src/L1_domain/errors/offline-storage-unavailable.error';
+import { SubmissionAck } from '../../../../../src/L1_domain/value-objects/submission-ack';
 import { StudentNotLinkedError } from '../../../../../src/L1_domain/errors/student-not-linked.error';
 import { Clock } from '../../../../../src/L1_domain/ports/clock';
 import {
@@ -146,6 +147,9 @@ class FakeMarkingsStorage implements MarkingsStorage {
   }
   async getSubmissionAck(_examId: string): Promise<null> {
     return null;
+  }
+  async getAllSubmissionAcks(): Promise<ReadonlyMap<string, SubmissionAck>> {
+    return new Map();
   }
   async setSubmissionAck(_examId: string, _ack: unknown): Promise<void> {
     /* no-op */

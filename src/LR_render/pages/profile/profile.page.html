@@ -23,13 +23,19 @@
        en las que no navegan a nada. `Ayuda` apunta al demo sheet como
        stub temporal hasta que exista una vista de ayuda real. -->
   <ul class="menu-list">
-    <li>
-      <button type="button" class="menu-item" (click)="onHistorialClick()">
-        <span class="material-symbols-outlined menu-item__icon" aria-hidden="true">history</span>
-        <span class="menu-item__label">Historial</span>
-        <span class="menu-item__hint">Próximamente</span>
-      </button>
-    </li>
+    @if (role() === 'student') {
+      <li>
+        <button
+          type="button"
+          class="menu-item"
+          data-testid="historial-link"
+          (click)="onHistorialClick()"
+        >
+          <span class="material-symbols-outlined menu-item__icon" aria-hidden="true">history</span>
+          <span class="menu-item__label">Historial</span>
+        </button>
+      </li>
+    }
     <li>
       <button type="button" class="menu-item" (click)="onConfigClick()">
         <span class="material-symbols-outlined menu-item__icon" aria-hidden="true">settings</span>

@@ -117,6 +117,35 @@ export class IndexedDbMarkingsStorage implements MarkingsStorage, OutboxStorageP
     return new SubmissionAck(stored.id, stored.submissionHash, new Date(stored.submittedAt));
   }
 
+  // Scan de todos los acks del usuario actual (prefijo `cartilla.<email>.ack.`).
+  // Cada entry es tolerante a shape stale: si el VO no puede reconstruirse
+  // (datos corruptos de versiones previas), se omite silenciosamente en vez
+  // de romper la lista entera.
+  async getAllSubmissionAcks(): Promise<ReadonlyMap<string, SubmissionAck>> {
+    const email = await this.requireUserEmail();
+    const db = await this.db();
+    const prefix = `${KEY_ROOT}.${email}.ack.`;
+    const entries = await this.getRange(db, prefix);
+    const out = new Map<string, SubmissionAck>();
+    for (const { key, value } of entries) {
+      const examId = key.slice(prefix.length);
+      const stored = value as { id?: unknown; submissionHash?: unknown; submittedAt?: unknown };
+      if (
+        typeof stored.id !== 'string' ||
+        typeof stored.submissionHash !== 'string' ||
+        typeof stored.submittedAt !== 'string'
+      ) {
+        continue;
+      }
+      try {
+        out.set(examId, new SubmissionAck(stored.id, stored.submissionHash, new Date(stored.submittedAt)));
+      } catch {
+        // shape válido pero VO rechaza (hash mal, date inválido): skip.
+      }
+    }
+    return out;
+  }
+
   // Persistencia del área de POSTULACIÓN del alumno (ver AdmissionArea VO).
   // Idempotente (última llamada gana). NO confundir con Exam.area (curso).
   async setAdmissionArea(examId: string, area: AdmissionArea): Promise<void> {

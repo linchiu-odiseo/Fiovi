@@ -391,7 +391,10 @@ export class HomePageViewModel {
 
   private buildCard(exam: Exam, ack: SubmissionAck | null, now: Date): SimulacroCard {
     const estado = this.composeEstado(exam, ack);
-    const clickable = estado === 'abierto';
+    // Ambos estados con destino navegable: `abierto` va al simulacro para
+    // rendir; `enviado` va al historial para ver acuse + marcaciones. La
+    // page decide el destino según `estado`.
+    const clickable = estado === 'abierto' || estado === 'enviado';
     const tone: CardTone = clickable ? 'verde' : 'gris';
 
     return {
@@ -481,7 +484,7 @@ export class HomePageViewModel {
   }
 
   private secondaryText(exam: Exam, estado: CardEstado): string {
-    if (estado === 'enviado') return 'Pendiente de calificación';
+    if (estado === 'enviado') return 'Envío registrado · toca para ver el detalle';
     const label = exam.course ?? exam.area ?? '—';
     return `${label} · ${exam.count} preguntas`;
   }

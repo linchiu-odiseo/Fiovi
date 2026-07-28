@@ -11,6 +11,7 @@ import { LogoutUseCase } from '../../../../src/L2_application/use-cases/logout.u
 import { RouterPort } from '../../../../src/L1_domain/ports/router-port';
 import { OutboxStoragePort } from '../../../../src/L1_domain/ports/outbox-storage.port';
 import { MarkingsStorage } from '../../../../src/L1_domain/ports/markings-storage';
+import { SubmissionAck } from '../../../../src/L1_domain/value-objects/submission-ack';
 import { GetProfileUseCase } from '../../../../src/L2_application/use-cases/get-profile.use-case';
 
 const NOW = 1_700_000_000_000;
@@ -59,6 +60,9 @@ class FakeMarkings implements MarkingsStorage {
   }
   async getSubmissionAck(): Promise<null> {
     return null;
+  }
+  async getAllSubmissionAcks(): Promise<ReadonlyMap<string, SubmissionAck>> {
+    return new Map();
   }
   async setSubmissionAck(): Promise<void> {
     return Promise.resolve();

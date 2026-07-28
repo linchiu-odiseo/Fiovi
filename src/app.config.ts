@@ -42,6 +42,8 @@ import { RetomarEnviosPendientesUseCase } from './L2_application/use-cases/retom
 import { ProgramarAutoEnvioUseCase } from './L2_application/use-cases/programar-auto-envio.use-case';
 import { GuardarDraftUseCase } from './L2_application/use-cases/guardar-draft.use-case';
 import { SeleccionarAdmissionAreaUseCase } from './L2_application/use-cases/seleccionar-admission-area.use-case';
+import { GetHistorialUseCase } from './L2_application/use-cases/get-historial.use-case';
+import { GetHistorialEntryUseCase } from './L2_application/use-cases/get-historial-entry.use-case';
 
 // L3 implementaciones de los puertos.
 import { CloudflareTurnstileProvider } from './L3_periphery/captcha/cloudflare-turnstile-provider';
@@ -284,6 +286,16 @@ export const appConfig: ApplicationConfig = {
     {
       provide: SeleccionarAdmissionAreaUseCase,
       useFactory: (markings: MarkingsStorage) => new SeleccionarAdmissionAreaUseCase(markings),
+      deps: [MARKINGS_STORAGE],
+    },
+    {
+      provide: GetHistorialUseCase,
+      useFactory: (markings: MarkingsStorage) => new GetHistorialUseCase(markings),
+      deps: [MARKINGS_STORAGE],
+    },
+    {
+      provide: GetHistorialEntryUseCase,
+      useFactory: (markings: MarkingsStorage) => new GetHistorialEntryUseCase(markings),
       deps: [MARKINGS_STORAGE],
     },
     // Use-cases del tutor: fábricas puras que inyectan el puerto via TUTOR_EXAMS_API.

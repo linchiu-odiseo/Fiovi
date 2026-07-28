@@ -182,6 +182,9 @@ class FakeMarkingsStorage implements MarkingsStorage {
   async getSubmissionAck(examId: string): Promise<SubmissionAck | null> {
     return this.acks.get(examId) ?? null;
   }
+  async getAllSubmissionAcks(): Promise<ReadonlyMap<string, SubmissionAck>> {
+    return new Map(this.acks);
+  }
   async setSubmissionAck(examId: string, ack: SubmissionAck): Promise<void> {
     this.acks.set(examId, ack);
   }
@@ -515,7 +518,8 @@ describe('HomePageViewModel', () => {
 
       const card = vm.cards()[0];
       expect(card.estado).toBe('enviado');
-      expect(card.clickable).toBe(false);
+      // Enviado es clickable — navega al historial (no al simulacro).
+      expect(card.clickable).toBe(true);
       // primaryText usa ack.submittedAt — NO exam.effectiveCloseAt.
       const submittedAt = new Date('2026-06-11T11:30:00.000Z');
       const hh = String(submittedAt.getHours()).padStart(2, '0');
@@ -533,7 +537,8 @@ describe('HomePageViewModel', () => {
 
       const card = vm.cards()[0];
       expect(card.estado).toBe('enviado');
-      expect(card.clickable).toBe(false);
+      // Enviado es clickable — navega al historial.
+      expect(card.clickable).toBe(true);
       vm.stop();
     });
 
@@ -549,13 +554,17 @@ describe('HomePageViewModel', () => {
     });
 
     // Scenario "secondaryText en estado enviado" del spec exam-marking.
-    it('estado=enviado → secondaryText = "Pendiente de calificación" (reemplaza fallback area/course)', async () => {
+    // Copy cambió de "Pendiente de calificación" (mentira operativa — no hay
+    // proceso de calificación en learnex) a acuse honesto + hint navegable.
+    it('estado=enviado → secondaryText apunta al historial en vez de prometer calificación', async () => {
       fakeMarkings.seedAck('exam-ip-ack', buildAck('ack-1'));
       fakeGetTodaysExams.willResolve([buildExam('exam-ip-ack', 'in_progress')]);
       const vm = createVm();
       await vm.start();
 
-      expect(vm.cards()[0].secondaryText).toBe('Pendiente de calificación');
+      expect(vm.cards()[0].secondaryText).toBe(
+        'Envío registrado · toca para ver el detalle',
+      );
       vm.stop();
     });
   });

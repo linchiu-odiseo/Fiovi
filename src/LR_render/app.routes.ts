@@ -53,6 +53,22 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'student/historial',
+    canActivate: [authGuard, roleGuard('student')],
+    loadComponent: () =>
+      import('./pages/student-historial-list/student-historial-list.page').then(
+        (m) => m.StudentHistorialListPage,
+      ),
+  },
+  {
+    path: 'student/historial/:examId',
+    canActivate: [authGuard, roleGuard('student')],
+    loadComponent: () =>
+      import('./pages/student-historial-detail/student-historial-detail.page').then(
+        (m) => m.StudentHistorialDetailPage,
+      ),
+  },
+  {
     path: 'tutor/home',
     canActivate: [authGuard, roleGuard('tutor')],
     loadComponent: () =>

@@ -6,6 +6,7 @@ import { FakeIdentityStorage } from '../../fixtures/identity-storage.fake';
 import { FakeProfileStorage } from '../../fixtures/profile-storage.fake';
 import { FakeTenantSlugCache } from '../../fixtures/tenant-slug-cache.fake';
 import { MarkingsStorage } from '../../../../src/L1_domain/ports/markings-storage';
+import { SubmissionAck } from '../../../../src/L1_domain/value-objects/submission-ack';
 import { OutboxStoragePort } from '../../../../src/L1_domain/ports/outbox-storage.port';
 import { RouterPort } from '../../../../src/L1_domain/ports/router-port';
 import { SwMessengerPort } from '../../../../src/L1_domain/ports/sw-messenger.port';
@@ -59,6 +60,9 @@ class FakeMarkingsStorage implements MarkingsStorage {
   }
   async getSubmissionAck(): Promise<null> {
     return null;
+  }
+  async getAllSubmissionAcks(): Promise<ReadonlyMap<string, SubmissionAck>> {
+    return new Map();
   }
   async setSubmissionAck(): Promise<void> {
     return Promise.resolve();

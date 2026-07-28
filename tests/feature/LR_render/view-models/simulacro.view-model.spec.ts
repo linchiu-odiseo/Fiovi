@@ -156,6 +156,9 @@ class FakeMarkingsStorage implements MarkingsStorage {
   async getSubmissionAck(_examId: string): Promise<SubmissionAck | null> {
     return null;
   }
+  async getAllSubmissionAcks(): Promise<ReadonlyMap<string, SubmissionAck>> {
+    return new Map();
+  }
   async setSubmissionAck(_examId: string, _ack: SubmissionAck): Promise<void> {
     /* no-op */
   }
