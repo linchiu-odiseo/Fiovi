@@ -23,7 +23,7 @@
        en las que no navegan a nada. `Ayuda` apunta al demo sheet como
        stub temporal hasta que exista una vista de ayuda real. -->
   <ul class="menu-list">
-    @if (role() === 'student') {
+    @if (role() === 'student' || role() === 'tutor') {
       <li>
         <button
           type="button"

@@ -7,6 +7,7 @@ import { GetTutorExamsUseCase } from '../../../../src/L2_application/use-cases/g
 import { GetTutorExamDetailUseCase } from '../../../../src/L2_application/use-cases/get-tutor-exam-detail.use-case';
 import { ListClassroomStudentsUseCase } from '../../../../src/L2_application/use-cases/list-classroom-students.use-case';
 import { IniciarExamenUseCase } from '../../../../src/L2_application/use-cases/iniciar-examen.use-case';
+import { RegistrarActividadTutorUseCase } from '../../../../src/L2_application/use-cases/registrar-actividad-tutor.use-case';
 import { FinalizarExamenUseCase } from '../../../../src/L2_application/use-cases/finalizar-examen.use-case';
 import { ArchivarExamenUseCase } from '../../../../src/L2_application/use-cases/archivar-examen.use-case';
 import { ActualizarAlumnosHabilitadosUseCase } from '../../../../src/L2_application/use-cases/actualizar-alumnos-habilitados.use-case';
@@ -231,6 +232,15 @@ class FakeActualizarAlumnosHabilitadosUseCase {
   }
 }
 
+class FakeRegistrarActividadTutorUseCase {
+  callCount = 0;
+  lastEvent: { recordId: string; examName: string } | null = null;
+  async execute(event: { recordId: string; examName: string }): Promise<void> {
+    this.callCount++;
+    this.lastEvent = event;
+  }
+}
+
 // ─── test setup ──────────────────────────────────────────────────────────────
 
 function setup(recordId = 'rec-1') {
@@ -241,6 +251,7 @@ function setup(recordId = 'rec-1') {
   const fakeFinalizar = new FakeFinalizarExamenUseCase();
   const fakeArchivar = new FakeArchivarExamenUseCase();
   const fakeActualizar = new FakeActualizarAlumnosHabilitadosUseCase();
+  const fakeRegistrarActividad = new FakeRegistrarActividadTutorUseCase();
 
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
@@ -253,6 +264,7 @@ function setup(recordId = 'rec-1') {
       { provide: FinalizarExamenUseCase, useValue: fakeFinalizar },
       { provide: ArchivarExamenUseCase, useValue: fakeArchivar },
       { provide: ActualizarAlumnosHabilitadosUseCase, useValue: fakeActualizar },
+      { provide: RegistrarActividadTutorUseCase, useValue: fakeRegistrarActividad },
       { provide: CLOCK, useValue: new FakeClock() },
       {
         provide: ActivatedRoute,
@@ -274,6 +286,7 @@ function setup(recordId = 'rec-1') {
     fakeFinalizar,
     fakeArchivar,
     fakeActualizar,
+    fakeRegistrarActividad,
   };
 }
 

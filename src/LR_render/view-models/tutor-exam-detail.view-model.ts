@@ -7,6 +7,7 @@ import { IniciarExamenUseCase } from '../../L2_application/use-cases/iniciar-exa
 import { FinalizarExamenUseCase } from '../../L2_application/use-cases/finalizar-examen.use-case';
 import { ArchivarExamenUseCase } from '../../L2_application/use-cases/archivar-examen.use-case';
 import { ActualizarAlumnosHabilitadosUseCase } from '../../L2_application/use-cases/actualizar-alumnos-habilitados.use-case';
+import { RegistrarActividadTutorUseCase } from '../../L2_application/use-cases/registrar-actividad-tutor.use-case';
 import { TutorExamsStore } from '../state/tutor-exams.store';
 import { TutorExamDetail } from '../../L1_domain/value-objects/tutor-exam-detail';
 import { ClassroomStudent } from '../../L1_domain/value-objects/classroom-student';
@@ -59,6 +60,7 @@ export class TutorExamDetailViewModel {
   private readonly finalizarExamen = inject(FinalizarExamenUseCase);
   private readonly archivarExamen = inject(ArchivarExamenUseCase);
   private readonly actualizarAlumnos = inject(ActualizarAlumnosHabilitadosUseCase);
+  private readonly registrarActividad = inject(RegistrarActividadTutorUseCase);
   private readonly store = inject(TutorExamsStore);
   private readonly clock = inject(CLOCK);
 
@@ -521,10 +523,36 @@ export class TutorExamDetailViewModel {
       await this.finalizarExamen.execute({ recordId });
       // Ambos transitioned:true y transitioned:false son éxito → reload + upsert (R4).
       await this.reloadDetail(recordId);
+      // Registro local best-effort del evento de actividad del tutor
+      // (Item 4 del refine). Se corre TRAS el reload para tener el nombre
+      // actualizado del detalle; si falla, no bloqueamos ni mostramos error
+      // — es solo para el listado de "Actividad" en /profile del tutor.
+      void this.registerActivityAfterFinalize(recordId);
     } catch (err) {
       this.actionError.set(this.copyForAction('finalizar', err));
     } finally {
       this.isSaving.set(false);
+    }
+  }
+
+  // Escribe el evento en IDB del tutor tras finalizar exitosamente. Best-effort:
+  // errores se logean y no rompen el flujo. La `id` del evento usa el
+  // `recordId` como base para hacer al `append` idempotente (double-tap del
+  // botón no crea duplicados).
+  private async registerActivityAfterFinalize(recordId: string): Promise<void> {
+    const d = this.detail();
+    if (!d) return;
+    try {
+      await this.registrarActividad.execute({
+        id: `finalize.${recordId}`,
+        recordId,
+        examName: d.name,
+        courseName: d.course,
+        finalizedAt: d.finishedAt ?? this.clock.now(),
+        archived: false,
+      });
+    } catch (err) {
+      console.warn('tutor activity register failed', err);
     }
   }
 

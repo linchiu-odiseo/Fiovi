@@ -82,6 +82,14 @@ export const routes: Routes = [
         (m) => m.TutorTasksListPage,
       ),
   },
+  {
+    path: 'tutor/actividad',
+    canActivate: [authGuard, roleGuard('tutor')],
+    loadComponent: () =>
+      import('./pages/tutor-actividad-list/tutor-actividad-list.page').then(
+        (m) => m.TutorActividadListPage,
+      ),
+  },
   // Nav mobile AULA → SEMANA → CURSO → EXÁMENES (change tutor-aulas-semanas-view).
   // La ruta legacy `/tutor/aulas/:classroomId` (que apuntaba a la lista plana de
   // cursos) redirige a la nueva vista de semanas — deep-links viejos siguen

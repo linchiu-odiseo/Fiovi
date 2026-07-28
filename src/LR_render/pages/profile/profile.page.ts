@@ -114,9 +114,9 @@ export class ProfilePage {
     const r = this.role();
     if (r === 'student') {
       void this.router.navigate(['/student/historial']);
+    } else if (r === 'tutor') {
+      void this.router.navigate(['/tutor/actividad']);
     }
-    // Tutor: historial es follow-up (Item 4). Por ahora ignoramos el click
-    // para el rol tutor — la fila está oculta en el template.
   }
 
   protected onConfigClick(): void {

@@ -1,0 +1,75 @@
+<main class="actividad">
+  <nav class="actividad__nav">
+    <button
+      type="button"
+      class="actividad__back"
+      data-testid="btn-volver"
+      (click)="onBack()"
+      aria-label="Volver"
+    >
+      <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+      Volver
+    </button>
+  </nav>
+
+  <header class="actividad__header">
+    <h1 class="actividad__title">Actividad</h1>
+    <p class="actividad__hint">
+      Exámenes que finalizaste desde esta device. Se borran al cerrar sesión.
+    </p>
+  </header>
+
+  @if (vm.isLoading() && vm.events().length === 0) {
+    <p class="actividad__empty">Cargando…</p>
+  } @else if (vm.storageError()) {
+    <div class="actividad__banner" role="alert">
+      No se pudo leer el almacenamiento local.
+    </div>
+  } @else if (vm.events().length === 0) {
+    <p class="actividad__empty" data-testid="empty-state">
+      Todavía no finalizaste exámenes en esta sesión.
+    </p>
+  } @else {
+    <ul class="actividad__list">
+      @for (event of vm.events(); track event.id) {
+        <li
+          class="actividad-card"
+          data-testid="actividad-card"
+          (click)="onCardClick(event)"
+          (keydown.enter)="onCardClick(event)"
+          role="button"
+          tabindex="0"
+        >
+          <span class="actividad-card__strip" aria-hidden="true"></span>
+          <div class="actividad-card__body">
+            <h2 class="actividad-card__name">{{ event.examName }}</h2>
+            @if (event.courseName) {
+              <p class="actividad-card__course">{{ event.courseName }}</p>
+            }
+            <p class="actividad-card__meta">
+              <span class="material-symbols-outlined actividad-card__meta-icon" aria-hidden="true">
+                stop_circle
+              </span>
+              Finalizado · {{ formatFecha(event.finalizedAt) }}
+            </p>
+          </div>
+          <button
+            type="button"
+            class="actividad-card__archive"
+            data-testid="btn-archivar"
+            (click)="onArchive(event, $event)"
+            [attr.aria-label]="'Archivar ' + event.examName"
+          >
+            <span class="material-symbols-outlined" aria-hidden="true">archive</span>
+          </button>
+        </li>
+      }
+    </ul>
+  }
+
+  @if (vm.lastArchivedName(); as name) {
+    <div class="actividad__toast" role="status" data-testid="archive-toast">
+      Archivado · <strong>{{ name }}</strong>
+    </div>
+  }
+</main>
