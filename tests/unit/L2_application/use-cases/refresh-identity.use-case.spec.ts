@@ -12,7 +12,6 @@ import { RouterPort } from '../../../../src/L1_domain/ports/router-port';
 import { OutboxStoragePort } from '../../../../src/L1_domain/ports/outbox-storage.port';
 import { MarkingsStorage } from '../../../../src/L1_domain/ports/markings-storage';
 import { SubmissionAck } from '../../../../src/L1_domain/value-objects/submission-ack';
-import { TutorActivityStorage } from '../../../../src/L1_domain/ports/tutor-activity-storage';
 import { GetProfileUseCase } from '../../../../src/L2_application/use-cases/get-profile.use-case';
 
 const NOW = 1_700_000_000_000;
@@ -36,21 +35,6 @@ class FakeRouter implements RouterPort {
 
 class FakeOutbox implements OutboxStoragePort {
   async clear(): Promise<void> {
-    return Promise.resolve();
-  }
-}
-
-class FakeTutorActivity implements TutorActivityStorage {
-  async append(): Promise<void> {
-    return Promise.resolve();
-  }
-  async list(): Promise<never[]> {
-    return [];
-  }
-  async archive(): Promise<void> {
-    return Promise.resolve();
-  }
-  async wipeUserScope(): Promise<void> {
     return Promise.resolve();
   }
 }
@@ -123,7 +107,6 @@ describe('RefreshIdentityUseCase', () => {
       new FakeMarkings(),
       new FakeOutbox(),
       new FakeRouter(),
-      new FakeTutorActivity(),
     );
     logoutExecuteCalls = 0;
     const originalLogoutExecute = logout.execute.bind(logout);

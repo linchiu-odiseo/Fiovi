@@ -69,16 +69,16 @@ describe('GetHistorialUseCase', () => {
     expect(entries[0].courseName).toBe('Anatomía');
   });
 
-  it('deja name/course en null cuando el ack no coincide con ningún examen de hoy', async () => {
+  it('omite acks huérfanos cuando el examen ya no está en todaysExams', async () => {
+    // El back archivó el examen a las 00 hs → deja de venir en getExamSessions.
+    // Sin el examen en la lista, no podemos completar name/curso, así que
+    // la entrada NO se emite. El ack queda en IDB pero es invisible.
     const ack = new SubmissionAck('ack-old', HASH, new Date('2026-06-15T15:30:00.000Z'));
     await markings.setSubmissionAck('exam-old', ack);
 
     const entries = await useCase.execute([]);
 
-    expect(entries[0].examName).toBeNull();
-    expect(entries[0].courseName).toBeNull();
-    expect(entries[0].submittedAt).not.toBeNull();
-    expect(entries[0].submissionHash).toBe(HASH);
+    expect(entries).toEqual([]);
   });
 
   it('ordena por submittedAt descendente (más reciente primero)', async () => {
@@ -87,7 +87,10 @@ describe('GetHistorialUseCase', () => {
     await markings.setSubmissionAck('exam-old', older);
     await markings.setSubmissionAck('exam-new', newer);
 
-    const entries = await useCase.execute([]);
+    const entries = await useCase.execute([
+      buildExam('exam-old', 'Anatomía sem1', 'Anatomía'),
+      buildExam('exam-new', 'Anatomía sem2', 'Anatomía'),
+    ]);
 
     expect(entries[0].examId).toBe('exam-new');
     expect(entries[1].examId).toBe('exam-old');

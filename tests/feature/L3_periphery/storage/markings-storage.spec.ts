@@ -215,7 +215,7 @@ describe('IndexedDbMarkingsStorage', () => {
       expect(mapA).toEqual({ '1': 'A', '2': 'B' });
     });
 
-    it('wipeUserScope de B no afecta los datos de A (incluyendo acks)', async () => {
+    it('wipeUserScope de B no afecta los datos de A', async () => {
       identityStorage.setIdentity(makeIdentity('alumno-a@vonex.edu.pe'));
       await adapter.setMarcacion('sim-1', 1, 'A');
       await adapter.enqueueEnvio({
@@ -233,10 +233,11 @@ describe('IndexedDbMarkingsStorage', () => {
       await adapter.setSubmissionAck('sim-9', ackB);
       await adapter.wipeUserScope();
 
-      // B quedó vacío.
+      // B: marcaciones y cola borradas; el ack persiste para el historial.
       expect(await adapter.getMarcaciones('sim-9')).toEqual({});
       expect(await adapter.getEnviosPendientes()).toEqual([]);
-      expect(await adapter.getSubmissionAck('sim-9')).toBeNull();
+      const persistedAckB = await adapter.getSubmissionAck('sim-9');
+      expect(persistedAckB?.id).toBe('ack-B');
 
       // A intacto (marcaciones, queue y ack).
       identityStorage.setIdentity(makeIdentity('alumno-a@vonex.edu.pe'));
@@ -254,7 +255,7 @@ describe('IndexedDbMarkingsStorage', () => {
       expect(persistedAckA?.submissionHash).toBe(VALID_HASH);
     });
 
-    it('wipeUserScope borra marcaciones, cola Y acks del usuario actual', async () => {
+    it('wipeUserScope borra marcaciones + cola; conserva acks y snapshots', async () => {
       await adapter.setMarcacion('sim-1', 1, 'A');
       await adapter.setMarcacion('sim-2', 1, 'B');
       await adapter.enqueueEnvio({
@@ -265,13 +266,19 @@ describe('IndexedDbMarkingsStorage', () => {
       });
       const ack = new SubmissionAck('ack-1', VALID_HASH, new Date('2026-06-11T12:05:00.000Z'));
       await adapter.setSubmissionAck('sim-1', ack);
+      await adapter.saveSubmissionSnapshot('sim-1', {
+        answers: { '1': 'A' },
+        admissionArea: 'GENERAL',
+      });
 
       await adapter.wipeUserScope();
 
       expect(await adapter.getMarcaciones('sim-1')).toEqual({});
       expect(await adapter.getMarcaciones('sim-2')).toEqual({});
       expect(await adapter.getEnviosPendientes()).toEqual([]);
-      expect(await adapter.getSubmissionAck('sim-1')).toBeNull();
+      // Historial sobrevive el logout: ack + snapshot persisten scope por email.
+      expect(await adapter.getSubmissionAck('sim-1')).not.toBeNull();
+      expect(await adapter.getSubmissionSnapshot('sim-1')).not.toBeNull();
     });
   });
 
@@ -445,7 +452,7 @@ describe('IndexedDbMarkingsStorage', () => {
       expect(await adapter.getSubmissionSnapshot('exam-42')).not.toBeNull();
     });
 
-    it('snapshot se borra en wipeUserScope (junto con acks + marcaciones)', async () => {
+    it('snapshot PERSISTE tras wipeUserScope (historial sobrevive logout)', async () => {
       await adapter.saveSubmissionSnapshot('exam-42', {
         answers: { '1': 'A' },
         admissionArea: 'GENERAL',
@@ -453,7 +460,7 @@ describe('IndexedDbMarkingsStorage', () => {
 
       await adapter.wipeUserScope();
 
-      expect(await adapter.getSubmissionSnapshot('exam-42')).toBeNull();
+      expect(await adapter.getSubmissionSnapshot('exam-42')).not.toBeNull();
     });
   });
 
@@ -739,7 +746,7 @@ describe('IndexedDbMarkingsStorage', () => {
       // …pero las marcaciones siguen ahí (las borra wipeUserScope, no clear).
       expect(await adapter.getMarcaciones('sim-1')).toEqual({ '1': 'A' });
       expect(await adapter.getMarcaciones('sim-2')).toEqual({ '1': 'B' });
-      // El ack tampoco se borra con clear() — solo wipeUserScope hace eso.
+      // clear() no toca acks; wipeUserScope tampoco (los conserva para historial).
       expect(await adapter.getSubmissionAck('sim-1')).not.toBeNull();
     });
 
