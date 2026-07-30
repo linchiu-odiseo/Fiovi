@@ -21,7 +21,6 @@ import { MarkingsStorage } from './L1_domain/ports/markings-storage';
 import { ExamsApi } from './L1_domain/ports/exams-api';
 import { IdentityStorage } from './L1_domain/ports/identity-storage';
 import { ProfileStorage } from './L1_domain/ports/profile-storage';
-import { OutboxStoragePort } from './L1_domain/ports/outbox-storage.port';
 import { RouterPort } from './L1_domain/ports/router-port';
 import { TenantSlugCache } from './L1_domain/ports/tenant-slug-cache';
 
@@ -189,8 +188,7 @@ export const appConfig: ApplicationConfig = {
         identityStorage: IdentityStorage,
         slugCache: TenantSlugCache,
         profileStorage: ProfileStorage,
-        markings: MarkingsStorage,
-        outbox: OutboxStoragePort,
+        draftDispatcher: DraftAutoSaveDispatcher,
         routerPort: RouterPort,
       ) =>
         new LogoutUseCase(
@@ -198,8 +196,7 @@ export const appConfig: ApplicationConfig = {
           identityStorage,
           slugCache,
           profileStorage,
-          markings,
-          outbox,
+          draftDispatcher,
           routerPort,
         ),
       deps: [
@@ -207,8 +204,7 @@ export const appConfig: ApplicationConfig = {
         IDENTITY_STORAGE,
         TENANT_SLUG_CACHE,
         PROFILE_STORAGE,
-        MARKINGS_STORAGE,
-        OUTBOX_STORAGE,
+        DraftAutoSaveDispatcher,
         ROUTER_PORT,
       ],
     },

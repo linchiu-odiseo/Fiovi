@@ -9,9 +9,7 @@ import { FakeProfileStorage } from '../../fixtures/profile-storage.fake';
 import { FakeTenantSlugCache } from '../../fixtures/tenant-slug-cache.fake';
 import { LogoutUseCase } from '../../../../src/L2_application/use-cases/logout.use-case';
 import { RouterPort } from '../../../../src/L1_domain/ports/router-port';
-import { OutboxStoragePort } from '../../../../src/L1_domain/ports/outbox-storage.port';
-import { MarkingsStorage } from '../../../../src/L1_domain/ports/markings-storage';
-import { SubmissionAck } from '../../../../src/L1_domain/value-objects/submission-ack';
+import { DraftDispatcher } from '../../../../src/L1_domain/ports/draft-dispatcher';
 import { GetProfileUseCase } from '../../../../src/L2_application/use-cases/get-profile.use-case';
 
 const NOW = 1_700_000_000_000;
@@ -33,54 +31,9 @@ class FakeRouter implements RouterPort {
   }
 }
 
-class FakeOutbox implements OutboxStoragePort {
-  async clear(): Promise<void> {
-    return Promise.resolve();
-  }
-}
-
-class FakeMarkings implements MarkingsStorage {
-  async setMarcacion(): Promise<void> {
-    return Promise.resolve();
-  }
-  async getMarcaciones(): Promise<Record<string, null>> {
-    return {};
-  }
-  async clearMarcaciones(): Promise<void> {
-    return Promise.resolve();
-  }
-  async enqueueEnvio(): Promise<void> {
-    return Promise.resolve();
-  }
-  async getEnviosPendientes(): Promise<never[]> {
-    return [];
-  }
-  async dequeueEnvio(): Promise<void> {
-    return Promise.resolve();
-  }
-  async getSubmissionAck(): Promise<null> {
-    return null;
-  }
-  async getAllSubmissionAcks(): Promise<ReadonlyMap<string, SubmissionAck>> {
-    return new Map();
-  }
-  async setSubmissionAck(): Promise<void> {
-    return Promise.resolve();
-  }
-  async getAdmissionArea(): Promise<null> {
-    return null;
-  }
-  async setAdmissionArea(): Promise<void> {
-    return Promise.resolve();
-  }
-  async saveSubmissionSnapshot(): Promise<void> {
-    return Promise.resolve();
-  }
-  async getSubmissionSnapshot(): Promise<null> {
-    return null;
-  }
-  async wipeUserScope(): Promise<void> {
-    return Promise.resolve();
+class FakeDraftDispatcher implements DraftDispatcher {
+  wipeAll(): void {
+    /* no-op */
   }
 }
 
@@ -104,8 +57,7 @@ describe('RefreshIdentityUseCase', () => {
       identityStorage,
       slugCache,
       profileStorage,
-      new FakeMarkings(),
-      new FakeOutbox(),
+      new FakeDraftDispatcher(),
       new FakeRouter(),
     );
     logoutExecuteCalls = 0;

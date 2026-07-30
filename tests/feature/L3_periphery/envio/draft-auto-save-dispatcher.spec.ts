@@ -7,6 +7,7 @@ import { GuardarDraftUseCase } from '../../../../src/L2_application/use-cases/gu
 import { NetworkError } from '../../../../src/L1_domain/errors/network.error';
 import { SimulacroCerradoError } from '../../../../src/L1_domain/errors/simulacro-cerrado.error';
 import { InvalidPayloadError } from '../../../../src/L1_domain/errors/invalid-payload.error';
+import { SessionExpiredError } from '../../../../src/L1_domain/errors/session-expired.error';
 
 // Fixture razonable para `count` en la mayoría de los specs — irrelevante al
 // comportamiento del dispatcher (debounce/throttle/backoff/heartbeat), solo
@@ -531,6 +532,54 @@ describe('DraftAutoSaveDispatcher', () => {
       dispatcher.notificarCambio('S1', DEFAULT_COUNT);
       await advanceAndDrain(10_000);
       expect(uc.calls).toHaveLength(0);
+    });
+  });
+
+  describe('wipeAll — reset del singleton en logout', () => {
+    it('cancela debounces pendientes y borra el state Map', async () => {
+      uc.willResolve();
+      dispatcher.notificarCambio('S1', DEFAULT_COUNT);
+      dispatcher.notificarCambio('S2', DEFAULT_COUNT);
+
+      dispatcher.wipeAll();
+
+      // El debounce pendiente no dispara.
+      await advanceAndDrain(3_000);
+      expect(uc.calls).toHaveLength(0);
+    });
+
+    it('post-wipe, notificarCambio en la misma sesión SÍ dispara (limpia el stopped=true que dejó un error duro)', async () => {
+      // Reproduce el bug original: draft del alumno A falla con
+      // SessionExpiredError durante logout → deja S1 con stopped=true. Sin
+      // wipeAll, el próximo alumno queda bloqueado. Con wipeAll, el state
+      // se borra y el próximo alumno arranca limpio.
+      uc.willDoSequence([
+        { kind: 'reject', error: new SessionExpiredError() },
+        { kind: 'resolve' },
+      ]);
+      dispatcher.notificarCambio('S1', DEFAULT_COUNT);
+      await advanceAndDrain(3_000);
+      await drainMicrotasks(10);
+      const callsAfterFail = uc.calls.length;
+      // Sanity: el use case tiró error duro → S1 quedó stopped
+      expect(callsAfterFail).toBe(1);
+
+      // Sin wipeAll, un nuevo notificarCambio NO dispara.
+      dispatcher.notificarCambio('S1', DEFAULT_COUNT);
+      await advanceAndDrain(3_000);
+      expect(uc.calls.length).toBe(callsAfterFail);
+
+      dispatcher.wipeAll();
+
+      // Post-wipe: el próximo alumno marca y SÍ dispara.
+      dispatcher.notificarCambio('S1', DEFAULT_COUNT);
+      await advanceAndDrain(3_000);
+      expect(uc.calls.length).toBe(callsAfterFail + 1);
+    });
+
+    it('wipeAll sobre un state vacío es no-op (idempotente)', async () => {
+      expect(() => dispatcher.wipeAll()).not.toThrow();
+      expect(() => dispatcher.wipeAll()).not.toThrow();
     });
 
     it('cancelarDraftsPendientes NO aborta inflight — el POST en vuelo completa', async () => {

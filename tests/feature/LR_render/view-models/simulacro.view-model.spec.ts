@@ -301,6 +301,10 @@ class FakeDraftDispatcher implements IDraftAutoSaveDispatcher {
     this.cancelarCalls.push(sessionId);
   }
 
+  wipeAll(): void {
+    /* no-op — el spec del view-model no ejercita logout */
+  }
+
   // Helper de test: emite un sessionId como cerrado para disparar el effect.
   emitClosed(sessionId: string): void {
     this._closedSessions.update((prev) => [...prev, sessionId]);
