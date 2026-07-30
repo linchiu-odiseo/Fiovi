@@ -4,6 +4,7 @@ import { provideRouter, Router } from '@angular/router';
 import { Component } from '@angular/core';
 import { SimulacroPageViewModel } from '../../../../src/LR_render/view-models/simulacro.view-model';
 import { GetTodaysExamsUseCase } from '../../../../src/L2_application/use-cases/get-todays-exams.use-case';
+import { GetMySubmissionUseCase } from '../../../../src/L2_application/use-cases/get-my-submission.use-case';
 import { MarcarRespuestaUseCase } from '../../../../src/L2_application/use-cases/marcar-respuesta.use-case';
 import {
   EnviarSimulacroInput,
@@ -300,6 +301,10 @@ class FakeDraftDispatcher implements IDraftAutoSaveDispatcher {
     this.cancelarCalls.push(sessionId);
   }
 
+  wipeAll(): void {
+    /* no-op — el spec del view-model no ejercita logout */
+  }
+
   // Helper de test: emite un sessionId como cerrado para disparar el effect.
   emitClosed(sessionId: string): void {
     this._closedSessions.update((prev) => [...prev, sessionId]);
@@ -371,6 +376,7 @@ describe('SimulacroPageViewModel', () => {
           { path: 'login', component: LoginStub },
         ]),
         { provide: GetTodaysExamsUseCase, useValue: fakeGetTodaysExams },
+        { provide: GetMySubmissionUseCase, useValue: { execute: async () => null } },
         { provide: MarcarRespuestaUseCase, useValue: fakeMarcar },
         { provide: EnviarSimulacroUseCase, useValue: fakeEnviar },
         // Reusa fakeEnviar para EnviarTareaUseCase — los tests históricos usan
@@ -1093,6 +1099,7 @@ describe('SimulacroPageViewModel', () => {
             { path: 'login', component: LoginStub },
           ]),
           { provide: GetTodaysExamsUseCase, useValue: fakeGetTodaysExams },
+          { provide: GetMySubmissionUseCase, useValue: { execute: async () => null } },
           { provide: MarcarRespuestaUseCase, useValue: fakeMarcar },
           { provide: EnviarSimulacroUseCase, useValue: fakeEnviar },
           // Reusa fakeEnviar para EnviarTareaUseCase — los tests históricos usan

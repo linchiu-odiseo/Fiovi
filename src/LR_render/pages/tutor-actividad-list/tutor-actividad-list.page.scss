@@ -156,6 +156,20 @@
     margin: 0;
     font-size: 0.85rem;
     color: var(--color-on-surface-variant);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    line-height: 1.2;
+  }
+
+  &__sep {
+    opacity: 0.55;
+  }
+
+  &__aula {
+    // Diferencia visual sutil sin engordar la card.
+    color: var(--color-on-surface-variant);
+    opacity: 0.85;
   }
 
   &__meta {

@@ -545,7 +545,9 @@ export class TutorExamDetailViewModel {
   }
 
   // Archiva el examen (finalized → archived). Tras éxito, quita el exam del
-  // store local (deja de aparecer en la lista) y redirige a /tutor/home.
+  // store local (deja de aparecer en la lista) y redirige al padre lógico
+  // (parentRoute()) — que respeta `?from=` para volver a /tutor/actividad
+  // cuando ese fue el punto de entrada, o a /tutor/home por default.
   async archivar(): Promise<void> {
     if (!this.canArchivar()) return;
 
@@ -558,12 +560,24 @@ export class TutorExamDetailViewModel {
       // El back ya no lo va a devolver en la lista — sacamos del store local
       // para que /tutor/home no muestre el card obsoleto.
       this.store.remove(recordId);
-      void this.router.navigate(['/tutor/home']);
+      void this.router.navigate([this.parentRoute()]);
     } catch (err) {
       this.actionError.set(this.copyForAction('archivar', err));
     } finally {
       this.isSaving.set(false);
     }
+  }
+
+  // Ruta a la que "Volver" y "Archivar" navegan al salir del detail. Se lee
+  // del queryParam `?from=` (seteado por el caller cuando venís de una
+  // pantalla específica como /tutor/actividad) o cae al default /tutor/home.
+  // Whitelist de destinos permitidos: los paths conocidos donde tiene sentido
+  // volver. Cualquier otro valor cae al default para evitar open redirect.
+  parentRoute(): string {
+    const from = this.route.snapshot.queryParamMap.get('from');
+    const allowed = new Set(['/tutor/home', '/tutor/actividad']);
+    if (from !== null && allowed.has(from)) return from;
+    return '/tutor/home';
   }
 
   /**

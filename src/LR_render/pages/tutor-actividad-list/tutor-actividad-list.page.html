@@ -43,8 +43,18 @@
           <span class="actividad-card__strip" aria-hidden="true"></span>
           <div class="actividad-card__body">
             <h2 class="actividad-card__name">{{ event.name }}</h2>
-            @if (event.course) {
-              <p class="actividad-card__course">{{ event.course }}</p>
+            @if (event.course || event.classroomName) {
+              <p class="actividad-card__course">
+                @if (event.course) {
+                  <span>{{ event.course }}</span>
+                }
+                @if (event.course && event.classroomName) {
+                  <span class="actividad-card__sep" aria-hidden="true">·</span>
+                }
+                @if (event.classroomName) {
+                  <span class="actividad-card__aula">{{ event.classroomName }}</span>
+                }
+              </p>
             }
             <p class="actividad-card__meta">
               <span class="material-symbols-outlined actividad-card__meta-icon" aria-hidden="true">

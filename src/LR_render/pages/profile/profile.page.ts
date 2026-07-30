@@ -1,5 +1,4 @@
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
-import { Location } from '@angular/common';
 import { Router } from '@angular/router';
 import { GetIdentityUseCase } from '../../../L2_application/use-cases/get-identity.use-case';
 import { GetProfileUseCase } from '../../../L2_application/use-cases/get-profile.use-case';
@@ -34,7 +33,6 @@ type UpdateRowStatus = 'idle' | 'checking' | 'up-to-date' | 'applying';
   imports: [VersionFooterComponent, UpdateConfirmModalComponent],
 })
 export class ProfilePage {
-  private readonly location = inject(Location);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   private readonly getIdentity = inject(GetIdentityUseCase);
@@ -107,7 +105,16 @@ export class ProfilePage {
   }
 
   protected onBack(): void {
-    this.location.back();
+    // Padre lógico fijo — home del rol. NO usar location.back() porque el
+    // history del browser puede tener rutas hermanas (ej. /student/historial)
+    // y "volver" desde /profile debería llevar SIEMPRE al home, no al último
+    // sitio visitado.
+    const r = this.role();
+    if (r === 'tutor') {
+      void this.router.navigate(['/tutor/home']);
+    } else {
+      void this.router.navigate(['/student/home']);
+    }
   }
 
   protected onHistorialClick(): void {

@@ -8,11 +8,14 @@ import {
   EnvioResult,
   ExamsApi,
   ExamsListResult,
+  MySubmission,
 } from '../../L1_domain/ports/exams-api';
 import { Exam } from '../../L1_domain/entities/exam';
 import { ExamServerStatus } from '../../L1_domain/value-objects/exam-server-status';
 import { ServerTime } from '../../L1_domain/value-objects/server-time';
 import { SubmissionAck } from '../../L1_domain/value-objects/submission-ack';
+import { AlternativaValue, AnswersMap } from '../../L1_domain/ports/markings-storage';
+import { isAdmissionArea } from '../../L1_domain/value-objects/admission-area';
 import { InvalidAdmissionAreaError } from '../../L1_domain/errors/invalid-admission-area.error';
 import { InvalidExamError } from '../../L1_domain/errors/invalid-exam.error';
 import { InvalidPayloadError } from '../../L1_domain/errors/invalid-payload.error';
@@ -55,6 +58,19 @@ interface SubmitResponseDto {
   id: string;
   submission_hash: string;
   submitted_at: string;
+}
+
+// Shape del GET /my-submission — fuente de verdad del historial cuando no hay
+// ack local. `responses` viene con keys `P<n>` (misma forma que el body del
+// submit); el mapper convierte a AnswersMap con keys de string de número.
+interface MySubmissionResponseDto {
+  id: string;
+  submission_hash: string;
+  submitted_at: string;
+  client_finished_at: string;
+  responses: Record<string, 'A' | 'B' | 'C' | 'D' | 'E'>;
+  admission_area: string | null;
+  source: 'manual' | 'auto_saved';
 }
 
 // Enum cerrado de valores que el back emite en `body.message` para el POST
@@ -218,6 +234,40 @@ export class HttpExamsApi implements ExamsApi {
     } catch (err) {
       throw this.classifyDraftError(err);
     }
+  }
+
+  // GET /t/{slug}/student/exam-sessions/{sessionId}/my-submission
+  // 200 → MySubmission; 404 → null; otros → NetworkError.
+  async getMySubmission(sessionId: string): Promise<MySubmission | null> {
+    try {
+      const dto = await firstValueFrom(
+        this.http
+          .get<MySubmissionResponseDto>(apiPath.studentMySubmission(this.requireSlug(), sessionId))
+          .pipe(timeout(10_000)),
+      );
+      return this.toMySubmission(dto);
+    } catch (err) {
+      if (err instanceof HttpErrorResponse && err.status === 404) return null;
+      throw new NetworkError();
+    }
+  }
+
+  private toMySubmission(dto: MySubmissionResponseDto): MySubmission {
+    // El VO valida shape hash 64 hex + submittedAt Date válido.
+    const ack = new SubmissionAck(dto.id, dto.submission_hash, new Date(dto.submitted_at));
+    const responses: AnswersMap = {};
+    for (const [pKey, letra] of Object.entries(dto.responses)) {
+      // Keys `P1`, `P2`, ... → `1`, `2`, ...
+      const pregunta = pKey.replace(/^P/, '');
+      responses[pregunta] = letra as AlternativaValue;
+    }
+    return {
+      ack,
+      clientFinishedAt: new Date(dto.client_finished_at),
+      responses,
+      admissionArea: isAdmissionArea(dto.admission_area) ? dto.admission_area : null,
+      source: dto.source,
+    };
   }
 
   private toExam(dto: ExamDto): Exam {

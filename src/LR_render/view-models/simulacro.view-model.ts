@@ -1,6 +1,7 @@
 import { Injectable, Signal, computed, effect, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { GetTodaysExamsUseCase } from '../../L2_application/use-cases/get-todays-exams.use-case';
+import { GetMySubmissionUseCase } from '../../L2_application/use-cases/get-my-submission.use-case';
 import { MarcarRespuestaUseCase } from '../../L2_application/use-cases/marcar-respuesta.use-case';
 import { EnviarSimulacroUseCase } from '../../L2_application/use-cases/enviar-simulacro.use-case';
 import { EnviarTareaUseCase } from '../../L2_application/use-cases/enviar-tarea.use-case';
@@ -84,6 +85,7 @@ const EDITING_AUTO_LOCK_MS = 5_000;
 @Injectable()
 export class SimulacroPageViewModel {
   private readonly getTodaysExams = inject(GetTodaysExamsUseCase);
+  private readonly getMySubmission = inject(GetMySubmissionUseCase);
   private readonly marcarRespuesta = inject(MarcarRespuestaUseCase);
   private readonly enviarSimulacro = inject(EnviarSimulacroUseCase);
   private readonly enviarTarea = inject(EnviarTareaUseCase);
@@ -691,6 +693,18 @@ export class SimulacroPageViewModel {
   private handleSubmissionError(err: unknown): void {
     this.submissionState.set('error');
     if (err instanceof SimulacroCerradoError) {
+      // El back rechazó el envío porque el examen ya cerró. Aprovechamos que
+      // ya sabemos que hay potencialmente una fila del alumno en BD
+      // (promovida por el finalize del tutor) y la pre-cargamos en IDB para
+      // que /student/historial la vea sin round-trip adicional. Best-effort:
+      // si el fetch falla, el historial la resolverá igual en su próxima
+      // carga.
+      const examId = this.exam()?.id;
+      if (examId) {
+        void this.getMySubmission.execute(examId).catch(() => {
+          // Silencioso — el historial reintenta cuando se abra.
+        });
+      }
       this.errorState.set('cerrado');
       void this.router.navigate(['/home']);
       return;

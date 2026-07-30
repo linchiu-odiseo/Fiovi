@@ -16,6 +16,10 @@ export class FakeTutorExamsApi implements TutorExamsApi {
     return [];
   }
 
+  async getExamsFinalizadas(): Promise<readonly TutorExam[]> {
+    return [];
+  }
+
   async getExamDetail(_recordId: string): Promise<TutorExamDetail> {
     throw new Error('FakeTutorExamsApi.getExamDetail: not implemented in this stub');
   }

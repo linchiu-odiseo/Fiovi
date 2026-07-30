@@ -20,6 +20,7 @@ import {
   EnvioResult,
   ExamsApi,
   ExamsListResult,
+  MySubmission,
 } from '../../../src/L1_domain/ports/exams-api';
 import { AdmissionArea } from '../../../src/L1_domain/value-objects/admission-area';
 import { ServerTime } from '../../../src/L1_domain/value-objects/server-time';
@@ -170,7 +171,10 @@ export class InMemoryMarkingsStorage implements MarkingsStorage {
     snapshot: { answers: AnswersMap; admissionArea: AdmissionArea },
   ): Promise<void> {
     this.opsLog.push('markings.saveSubmissionSnapshot');
-    this.snapshots.set(examId, { answers: { ...snapshot.answers }, admissionArea: snapshot.admissionArea });
+    this.snapshots.set(examId, {
+      answers: { ...snapshot.answers },
+      admissionArea: snapshot.admissionArea,
+    });
   }
 
   async getSubmissionSnapshot(
@@ -331,6 +335,16 @@ export class FakeExamsApi implements ExamsApi {
       'FakeExamsApi: configurar willResolveEnviarHomework / willRejectEnviarHomework antes de llamar enviarHomework()',
     );
   }
+
+  // Stub para getMySubmission. Default: null (404). Los tests que ejerciten
+  // el path 200 pasan un valor concreto via willReturnMySubmission.
+  private mySubmissionResult: MySubmission | null = null;
+  willReturnMySubmission(result: MySubmission | null): void {
+    this.mySubmissionResult = result;
+  }
+  async getMySubmission(_examId: string): Promise<MySubmission | null> {
+    return this.mySubmissionResult;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -372,6 +386,34 @@ export class FakeTutorExamsApi implements TutorExamsApi {
     }
     if (this.nextGetTutorExams.kind === 'reject') throw this.nextGetTutorExams.error;
     return this.nextGetTutorExams.result;
+  }
+
+  // --- getExamsFinalizadas ---
+  private nextGetExamsFinalizadas:
+    | { kind: 'resolve'; result: readonly TutorExam[] }
+    | { kind: 'reject'; error: Error }
+    | null = null;
+  private getExamsFinalizadasCalls = 0;
+
+  willResolveGetExamsFinalizadas(result: readonly TutorExam[]): void {
+    this.nextGetExamsFinalizadas = { kind: 'resolve', result };
+  }
+  willRejectGetExamsFinalizadas(error: Error): void {
+    this.nextGetExamsFinalizadas = { kind: 'reject', error };
+  }
+  getGetExamsFinalizadasCalls(): number {
+    return this.getExamsFinalizadasCalls;
+  }
+
+  async getExamsFinalizadas(): Promise<readonly TutorExam[]> {
+    this.getExamsFinalizadasCalls++;
+    if (!this.nextGetExamsFinalizadas) {
+      throw new Error(
+        'FakeTutorExamsApi: configurar willResolveGetExamsFinalizadas o willRejectGetExamsFinalizadas antes de llamar getExamsFinalizadas()',
+      );
+    }
+    if (this.nextGetExamsFinalizadas.kind === 'reject') throw this.nextGetExamsFinalizadas.error;
+    return this.nextGetExamsFinalizadas.result;
   }
 
   // --- getExamDetail ---

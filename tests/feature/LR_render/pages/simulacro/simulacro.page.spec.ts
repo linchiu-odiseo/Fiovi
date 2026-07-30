@@ -6,6 +6,7 @@ import { convertToParamMap, ParamMap } from '@angular/router';
 import { SimulacroPage } from '../../../../../src/LR_render/pages/simulacro/simulacro.page';
 import { SimulacroPageViewModel } from '../../../../../src/LR_render/view-models/simulacro.view-model';
 import { GetTodaysExamsUseCase } from '../../../../../src/L2_application/use-cases/get-todays-exams.use-case';
+import { GetMySubmissionUseCase } from '../../../../../src/L2_application/use-cases/get-my-submission.use-case';
 import { MarcarRespuestaUseCase } from '../../../../../src/L2_application/use-cases/marcar-respuesta.use-case';
 import { EnviarSimulacroUseCase } from '../../../../../src/L2_application/use-cases/enviar-simulacro.use-case';
 import { EnviarTareaUseCase } from '../../../../../src/L2_application/use-cases/enviar-tarea.use-case';
@@ -220,6 +221,12 @@ describe('SimulacroPage', () => {
         provideRouter([{ path: 'home', component: HomeStub }]),
         { provide: ActivatedRoute, useValue: buildActivatedRouteStub(idParam) },
         { provide: GetTodaysExamsUseCase, useValue: fakeGetTodaysExams },
+        // Stub para GetMySubmissionUseCase: el path solo se dispara en el
+        // SimulacroCerradoError handler (no ejercitado por estos tests).
+        {
+          provide: GetMySubmissionUseCase,
+          useValue: { execute: async (): Promise<null> => null },
+        },
         { provide: MarcarRespuestaUseCase, useValue: fakeMarcar },
         { provide: EnviarSimulacroUseCase, useValue: new FakeEnviarSimulacroUseCase() },
         // Reusa la misma clase fake para EnviarTareaUseCase — el fixture usa

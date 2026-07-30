@@ -40,6 +40,30 @@ interface TutorVirtualExamListResponseDto {
   items: TutorVirtualExamListItemDto[];
 }
 
+// DTO del endpoint dedicado /tutor/exams/finalizadas. Difiere del anterior:
+// incluye classroomCode/classroomName (para mostrar el aula sin ir al profile)
+// y garantiza finishedAt non-null porque el filtro es status='finalized'.
+interface TutorFinalizadaItemDto {
+  id: string;
+  recordId: string;
+  classroomId: string;
+  classroomCode: string;
+  classroomName: string;
+  name: string;
+  course: string | null;
+  area: string | null;
+  count: number | null;
+  duration: number;
+  startedAt: string;
+  finishedAt: string;
+  openUntil: string | null;
+}
+
+interface TutorFinalizadasResponseDto {
+  serverTime: string;
+  items: TutorFinalizadaItemDto[];
+}
+
 interface VirtualExamDetailDto {
   id: string;
   recordId: string;
@@ -99,6 +123,20 @@ export class HttpTutorExamsApi implements TutorExamsApi {
           .pipe(timeout(10_000)),
       );
       return dto.items.map((item) => this.toTutorExam(item));
+    } catch (err) {
+      throw this.classifyTutorError(err);
+    }
+  }
+
+  // GET /t/:slug/tutor/exams/finalizadas — endpoint dedicado (payload liviano).
+  async getExamsFinalizadas(): Promise<readonly TutorExam[]> {
+    try {
+      const dto = await firstValueFrom(
+        this.http
+          .get<TutorFinalizadasResponseDto>(apiPath.tutorExamsFinalizadas(this.requireSlug()))
+          .pipe(timeout(10_000)),
+      );
+      return dto.items.map((item) => this.toTutorExamFromFinalizada(item));
     } catch (err) {
       throw this.classifyTutorError(err);
     }
@@ -259,6 +297,29 @@ export class HttpTutorExamsApi implements TutorExamsApi {
       scheduled: new Date(dto.scheduled),
       startedAt: this.parseNullableDate(dto.startedAt),
       finishedAt: this.parseNullableDate(dto.finishedAt),
+      openUntil: this.parseNullableDate(dto.openUntil),
+    });
+  }
+
+  private toTutorExamFromFinalizada(dto: TutorFinalizadaItemDto): TutorExam {
+    // El endpoint /finalizadas no devuelve `scheduled` — usamos `startedAt`
+    // como fallback (los finalizados siempre lo tienen). Coherente con el uso
+    // real: el ordenamiento del historial va por finishedAt, no scheduled.
+    return new TutorExam({
+      detailId: dto.id,
+      recordId: dto.recordId,
+      classroomId: dto.classroomId,
+      classroomCode: dto.classroomCode,
+      classroomName: dto.classroomName,
+      serverStatus: new ExamServerStatus('finalized'),
+      name: dto.name,
+      course: dto.course,
+      area: dto.area,
+      count: dto.count,
+      duration: dto.duration,
+      scheduled: new Date(dto.startedAt),
+      startedAt: new Date(dto.startedAt),
+      finishedAt: new Date(dto.finishedAt),
       openUntil: this.parseNullableDate(dto.openUntil),
     });
   }

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TutorExamDetailViewModel } from '../../../../src/LR_render/view-models/tutor-exam-detail.view-model';
 import { TutorExamsStore } from '../../../../src/LR_render/state/tutor-exams.store';
 import { GetTutorExamsUseCase } from '../../../../src/L2_application/use-cases/get-tutor-exams.use-case';
@@ -233,7 +233,7 @@ class FakeActualizarAlumnosHabilitadosUseCase {
 
 // ─── test setup ──────────────────────────────────────────────────────────────
 
-function setup(recordId = 'rec-1') {
+function setup(recordId = 'rec-1', from: string | null = null) {
   const fakeGetList = new FakeGetTutorExamsUseCase();
   const fakeGetDetail = new FakeGetTutorExamDetailUseCase();
   const fakeListStudents = new FakeListClassroomStudentsUseCase();
@@ -256,7 +256,12 @@ function setup(recordId = 'rec-1') {
       { provide: CLOCK, useValue: new FakeClock() },
       {
         provide: ActivatedRoute,
-        useValue: { snapshot: { paramMap: { get: () => recordId } } },
+        useValue: {
+          snapshot: {
+            paramMap: { get: () => recordId },
+            queryParamMap: { get: (key: string) => (key === 'from' ? from : null) },
+          },
+        },
       },
     ],
   });
@@ -1202,6 +1207,47 @@ describe('TutorExamDetailViewModel', () => {
       const meta = (TutorExamDetailViewModel as unknown as { ɵprov?: { providedIn?: unknown } })
         .ɵprov;
       expect(meta?.providedIn).not.toBe('root');
+    });
+  });
+
+  describe('parentRoute — destino de Volver / post-archivar', () => {
+    it('sin queryParam ?from → cae a /tutor/home (default)', () => {
+      const { vm } = setup('rec-1');
+      expect(vm.parentRoute()).toBe('/tutor/home');
+    });
+
+    it('con ?from=/tutor/actividad (whitelisted) → devuelve /tutor/actividad', () => {
+      const { vm } = setup('rec-1', '/tutor/actividad');
+      expect(vm.parentRoute()).toBe('/tutor/actividad');
+    });
+
+    it('con ?from=/otra/ruta (no whitelisted) → cae a /tutor/home (anti open-redirect)', () => {
+      const { vm } = setup('rec-1', '/otra/ruta');
+      expect(vm.parentRoute()).toBe('/tutor/home');
+    });
+
+    it('archivar exitoso navega al parentRoute (respeta ?from=/tutor/actividad)', async () => {
+      const { vm, store, fakeGetDetail, fakeListStudents, fakeArchivar } = setup(
+        'rec-1',
+        '/tutor/actividad',
+      );
+      store.setExams([
+        buildTutorExam({
+          recordId: 'rec-1',
+          classroomId: 'cls-1',
+          serverStatus: new ExamServerStatus('finalized'),
+        }),
+      ]);
+      fakeGetDetail.willResolve(buildDetail({ status: new ExamServerStatus('finalized') }));
+      fakeListStudents.willResolve([]);
+      fakeArchivar.willResolve();
+
+      await vm.load();
+      const routerSpy = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+      await vm.archivar();
+
+      expect(routerSpy).toHaveBeenCalledWith(['/tutor/actividad']);
     });
   });
 });

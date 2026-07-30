@@ -112,11 +112,12 @@ export class TutorExamDetailPage {
     });
   }
 
-  // Volver a /tutor/home usando Router.navigate — robusto para deep-links e
-  // iOS standalone PWA donde no hay historial de navegación previo ni gesto
-  // del sistema para volver. NO usar history.back().
+  // Volver al padre lógico — /tutor/home por default, o el destino que el
+  // caller haya pasado via queryParam `?from=` (ej. /tutor/actividad cuando
+  // venís de la lista de actividad). Router.navigate directo para robustez
+  // en deep-links e iOS standalone PWA. NO usar history.back().
   onVolver(): void {
-    void this.router.navigate(['/tutor/home']);
+    void this.router.navigate([this.vm.parentRoute()]);
   }
 
   // Mapa de estado del backend → chip visible en la UI. Mismo patrón que

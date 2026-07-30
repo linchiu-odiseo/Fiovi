@@ -51,6 +51,13 @@ export const apiPath = {
   // Response 201 con { id, submission_hash, submitted_at } — igual que /submit.
   studentExamSubmitHomework: (slug: string, sessionId: string): string =>
     `${tenantBase(slug)}/student/exam-sessions/${encodeURIComponent(sessionId)}/submit-homework`,
+  // GET del recibo + respuestas guardadas del alumno para una sesión (200 con
+  // shape {id, submission_hash, submitted_at, client_finished_at, responses,
+  // admission_area, source} o 404 si no hay entrega). Consumido por el
+  // historial cuando el ack local no existe (auto-guardado post-finalize o
+  // envío desde otro device).
+  studentMySubmission: (slug: string, sessionId: string): string =>
+    `${tenantBase(slug)}/student/exam-sessions/${encodeURIComponent(sessionId)}/my-submission`,
 
   // ---- Tutor (virtual exams) -------------------------------------------
 
@@ -64,6 +71,10 @@ export const apiPath = {
     `/semanas/${encodeURIComponent(periodId)}/examenes`,
   // Shortcut cross-aula: exámenes actualmente in_progress del tutor logueado.
   tutorExamsEnCurso: (slug: string): string => `${tenantBase(slug)}/tutor/exams/en-curso`,
+  // Análogo a en-curso pero para finalizados no-archivados. Payload liviano
+  // (0-10 items típicos post-archived 00h) contra las ~2000+ del endpoint
+  // gordo /tutor/virtual-exams. Consumido por /tutor/actividad.
+  tutorExamsFinalizadas: (slug: string): string => `${tenantBase(slug)}/tutor/exams/finalizadas`,
   virtualExam: (slug: string, recordId: string): string =>
     `${tenantBase(slug)}/virtual-exams/${encodeURIComponent(recordId)}`,
   classroomStudents: (slug: string, classroomId: string, virtualExamDetailId: string): string =>

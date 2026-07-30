@@ -5,9 +5,7 @@ import { FakeAuthRepository } from '../../fixtures/auth-repository.fake';
 import { FakeIdentityStorage } from '../../fixtures/identity-storage.fake';
 import { FakeProfileStorage } from '../../fixtures/profile-storage.fake';
 import { FakeTenantSlugCache } from '../../fixtures/tenant-slug-cache.fake';
-import { MarkingsStorage } from '../../../../src/L1_domain/ports/markings-storage';
-import { SubmissionAck } from '../../../../src/L1_domain/value-objects/submission-ack';
-import { OutboxStoragePort } from '../../../../src/L1_domain/ports/outbox-storage.port';
+import { DraftDispatcher } from '../../../../src/L1_domain/ports/draft-dispatcher';
 import { RouterPort } from '../../../../src/L1_domain/ports/router-port';
 import { SwMessengerPort } from '../../../../src/L1_domain/ports/sw-messenger.port';
 
@@ -24,8 +22,7 @@ const makeIdentity = (role: 'student' | 'tutor' = 'student') =>
     NOW + 900_000,
   );
 
-// Fake MarkingsStorage mínimo
-class FakeMarkingsStorage implements MarkingsStorage {
+class FakeDraftDispatcher implements DraftDispatcher {
   private wipeCalls = 0;
   private shouldFail = false;
   private opsLog: string[] | null = null;
@@ -33,66 +30,17 @@ class FakeMarkingsStorage implements MarkingsStorage {
   bindOpsLog(log: string[]): void {
     this.opsLog = log;
   }
-  willRejectWipe(): void {
+  willThrowOnWipe(): void {
     this.shouldFail = true;
   }
   getWipeCalls(): number {
     return this.wipeCalls;
   }
 
-  async setMarcacion(): Promise<void> {
-    return Promise.resolve();
-  }
-  async getMarcaciones(): Promise<Record<string, null>> {
-    return {};
-  }
-  async clearMarcaciones(): Promise<void> {
-    return Promise.resolve();
-  }
-  async enqueueEnvio(): Promise<void> {
-    return Promise.resolve();
-  }
-  async getEnviosPendientes(): Promise<never[]> {
-    return [];
-  }
-  async dequeueEnvio(): Promise<void> {
-    return Promise.resolve();
-  }
-  async getSubmissionAck(): Promise<null> {
-    return null;
-  }
-  async getAllSubmissionAcks(): Promise<ReadonlyMap<string, SubmissionAck>> {
-    return new Map();
-  }
-  async setSubmissionAck(): Promise<void> {
-    return Promise.resolve();
-  }
-  async getAdmissionArea(): Promise<null> {
-    return null;
-  }
-  async setAdmissionArea(): Promise<void> {
-    return Promise.resolve();
-  }
-  async saveSubmissionSnapshot(): Promise<void> {
-    return Promise.resolve();
-  }
-  async getSubmissionSnapshot(): Promise<null> {
-    return null;
-  }
-  async wipeUserScope(): Promise<void> {
-    this.opsLog?.push('markings.wipeUserScope');
+  wipeAll(): void {
+    this.opsLog?.push('draft.wipeAll');
     this.wipeCalls++;
-    if (this.shouldFail) throw new Error('wipe failed');
-  }
-}
-
-class FakeOutboxStorage implements OutboxStoragePort {
-  private clearCalls = 0;
-  async clear(): Promise<void> {
-    this.clearCalls++;
-  }
-  getClearCalls(): number {
-    return this.clearCalls;
+    if (this.shouldFail) throw new Error('dispatcher wipe failed');
   }
 }
 
@@ -121,8 +69,7 @@ describe('LogoutUseCase', () => {
   let identityStorage: FakeIdentityStorage;
   let profileStorage: FakeProfileStorage;
   let slugCache: FakeTenantSlugCache;
-  let markingsStorage: FakeMarkingsStorage;
-  let outboxStorage: FakeOutboxStorage;
+  let draftDispatcher: FakeDraftDispatcher;
   let router: FakeRouter;
   let swMessenger: FakeSwMessenger;
   let useCase: LogoutUseCase;
@@ -132,8 +79,7 @@ describe('LogoutUseCase', () => {
     identityStorage = new FakeIdentityStorage();
     profileStorage = new FakeProfileStorage();
     slugCache = new FakeTenantSlugCache();
-    markingsStorage = new FakeMarkingsStorage();
-    outboxStorage = new FakeOutboxStorage();
+    draftDispatcher = new FakeDraftDispatcher();
     router = new FakeRouter();
     swMessenger = new FakeSwMessenger();
     useCase = new LogoutUseCase(
@@ -141,20 +87,18 @@ describe('LogoutUseCase', () => {
       identityStorage,
       slugCache,
       profileStorage,
-      markingsStorage,
-      outboxStorage,
+      draftDispatcher,
       router,
       swMessenger,
     );
   });
 
   describe('con identity activa', () => {
-    it('ejecuta todos los pasos: repo.logout + markings + outbox + profile + identity + navigate', async () => {
+    it('ejecuta los pasos esperados: repo.logout + dispatcher.wipeAll + profile + identity + navigate', async () => {
       await identityStorage.write(makeIdentity());
       await useCase.execute();
       expect(repo.getLogoutCalls()).toBe(1);
-      expect(markingsStorage.getWipeCalls()).toBe(1);
-      expect(outboxStorage.getClearCalls()).toBe(1);
+      expect(draftDispatcher.getWipeCalls()).toBe(1);
       expect(profileStorage.getClearCalls()).toBe(1);
       expect(await identityStorage.read()).toBeNull();
       expect(router.getNavigateCalls()).toEqual([['/login']]);
@@ -164,28 +108,27 @@ describe('LogoutUseCase', () => {
       await identityStorage.write(makeIdentity());
       repo.willRejectLogout();
       await useCase.execute();
-      // A pesar del fallo del repo, el storage se limpió
       expect(await identityStorage.read()).toBeNull();
-      expect(markingsStorage.getWipeCalls()).toBe(1);
+      expect(draftDispatcher.getWipeCalls()).toBe(1);
       expect(router.getNavigateCalls()).toEqual([['/login']]);
     });
 
-    it('wipeUserScope se invoca ANTES de identityStorage.clear (orden crítico)', async () => {
+    it('draftDispatcher.wipeAll se invoca ANTES de identityStorage.clear (orden crítico)', async () => {
       await identityStorage.write(makeIdentity());
       const opsLog: string[] = [];
-      markingsStorage.bindOpsLog(opsLog);
+      draftDispatcher.bindOpsLog(opsLog);
       identityStorage.bindOpsLog(opsLog);
       await useCase.execute();
-      const wipeIdx = opsLog.indexOf('markings.wipeUserScope');
+      const wipeIdx = opsLog.indexOf('draft.wipeAll');
       const clearIdx = opsLog.indexOf('identity.clear');
       expect(wipeIdx).toBeGreaterThanOrEqual(0);
       expect(clearIdx).toBeGreaterThanOrEqual(0);
       expect(wipeIdx).toBeLessThan(clearIdx);
     });
 
-    it('navega a /login siempre (incluso si algún paso de limpieza falla)', async () => {
+    it('draftDispatcher.wipeAll falla → sigue igual, navega a /login', async () => {
       await identityStorage.write(makeIdentity());
-      markingsStorage.willRejectWipe();
+      draftDispatcher.willThrowOnWipe();
       await useCase.execute();
       expect(router.getNavigateCalls()).toEqual([['/login']]);
     });
@@ -203,8 +146,7 @@ describe('LogoutUseCase', () => {
         identityStorage,
         slugCache,
         profileStorage,
-        markingsStorage,
-        outboxStorage,
+        draftDispatcher,
         router,
       );
       await expect(ucWithoutSw.execute()).resolves.toBeUndefined();
@@ -212,11 +154,10 @@ describe('LogoutUseCase', () => {
   });
 
   describe('sin identity activa', () => {
-    it('identity null → solo navega a /login, no invoca repo ni markings', async () => {
-      // storage vacío
+    it('identity null → solo navega a /login, no invoca repo ni dispatcher', async () => {
       await useCase.execute();
       expect(repo.getLogoutCalls()).toBe(0);
-      expect(markingsStorage.getWipeCalls()).toBe(0);
+      expect(draftDispatcher.getWipeCalls()).toBe(0);
       expect(router.getNavigateCalls()).toEqual([['/login']]);
     });
 

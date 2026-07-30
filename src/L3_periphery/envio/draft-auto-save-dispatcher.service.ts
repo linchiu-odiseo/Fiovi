@@ -18,6 +18,7 @@
 
 import { Injectable, Signal, signal } from '@angular/core';
 import { GuardarDraftUseCase } from '../../L2_application/use-cases/guardar-draft.use-case';
+import { DraftDispatcher } from '../../L1_domain/ports/draft-dispatcher';
 import { NetworkError } from '../../L1_domain/errors/network.error';
 import { SimulacroCerradoError } from '../../L1_domain/errors/simulacro-cerrado.error';
 import { InvalidPayloadError } from '../../L1_domain/errors/invalid-payload.error';
@@ -29,7 +30,7 @@ import { SessionExpiredError } from '../../L1_domain/errors/session-expired.erro
 // Interfaz pública del dispatcher. Implementada tanto por el real como por el
 // stub no-op (NoopDraftAutoSaveDispatcher) para que el view-model no conozca
 // qué está inyectado.
-export interface IDraftAutoSaveDispatcher {
+export interface IDraftAutoSaveDispatcher extends DraftDispatcher {
   // `count` es Exam.count del simulacro activo. El dispatcher lo persiste en
   // DraftState y el use case lo necesita para armar el string compacto de
   // longitud fija (design.md D12). El view-model lo conoce desde el Exam
@@ -219,6 +220,28 @@ export class DraftAutoSaveDispatcher implements IDraftAutoSaveDispatcher {
     }
   }
 
+  // Reset total del dispatcher — llamado por LogoutUseCase. Cancela todos los
+  // debounce timers pendientes y borra el state Map. Sin esto, el singleton
+  // arrastra entre sesiones el `stopped=true` que quedó pegado cuando un draft
+  // falló durante un logout previo (identity limpia → SessionExpiredError →
+  // clasificación "duro"), y el próximo alumno logueado nunca puede volver
+  // a mandar drafts para ese sessionId.
+  //
+  // Los POST inflight NO se abortan (Angular HttpClient no expone cancel
+  // sync). Si resuelven después del wipe, tocan una referencia al state VIEJO
+  // (capturada al principio de fire()) que ya no está en el Map. Setear
+  // stopped o lastPostAt sobre ese objeto huérfano no afecta al state
+  // nuevo — verificado.
+  wipeAll(): void {
+    for (const st of this.state.values()) {
+      if (st.debounceTimer !== null) {
+        clearTimeout(st.debounceTimer);
+      }
+    }
+    this.state.clear();
+    this._closedSessions.set([]);
+  }
+
   // Calcula el delay de backoff para retryCount > 0 (design.md D11).
   // BACKOFF_SCHEDULE_MS[min(retryCount-1, 4)]:
   //   1° falla → 30s, 2° → 60s, 3° → 2min, 4° → 4min, 5°+ → 5min (techo).
@@ -244,5 +267,9 @@ export class NoopDraftAutoSaveDispatcher implements IDraftAutoSaveDispatcher {
 
   cancelarDraftsPendientes(_sessionId: string): void {
     // no-op
+  }
+
+  wipeAll(): void {
+    // no-op — el Noop no mantiene state.
   }
 }
