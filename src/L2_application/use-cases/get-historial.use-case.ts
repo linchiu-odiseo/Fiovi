@@ -21,15 +21,19 @@ export interface HistorialEntry {
   readonly estado: HistorialEstado;
 }
 
-// Lee todos los acks locales (envíos hechos en esta device / sesión) y los
-// combina con `todaysExams` para armar la lista del historial. Casos:
+// Lee los acks locales y los combina con `todaysExams` para armar la lista
+// del historial. Casos:
 //
-//   1. Ack presente → estado 'envio', con fecha + hash.
+//   1. Ack local + examen en `todaysExams` → estado 'envio', con fecha +
+//      hash + nombre + curso del back.
 //   2. Examen `finalized` en `todaysExams` sin ack → estado 'no-envio' —
 //      el examen cerró y el alumno no envió (o envió desde otra device).
-//      Este caso solo se detecta MIENTRAS el examen sigue en la lista "de
-//      hoy" del back. Al día siguiente el back lo archiva y ya no se puede
-//      distinguir de "nunca existió".
+//
+// Filtro clave: los acks solo aparecen si su `examId` está en `todaysExams`.
+// Así, cuando el back archiva a las 00 hs, tanto los envíos como los
+// no-envíos desaparecen del historial en la próxima carga — el back es el
+// TTL implícito. Sin este filtro, quedarían "acks huérfanos" con nombre
+// null que confunden al alumno.
 //
 // Auto-envío server-side (TODO): hoy Fiovi NO puede distinguir "el back
 // auto-envió al vencerse el tiempo" de "el alumno no envió". Ambos casos
@@ -48,13 +52,14 @@ export class GetHistorialUseCase {
     const entries: HistorialEntry[] = [];
     const seen = new Set<string>();
 
-    // 1) Entradas con ack (envíos registrados).
+    // 1) Entradas con ack, filtradas por presencia en todaysExams.
     for (const [examId, ack] of acks) {
-      const exam = examsById.get(examId) ?? null;
+      const exam = examsById.get(examId);
+      if (!exam) continue; // Ack huérfano (examen archivado por el back).
       entries.push({
         examId,
-        examName: exam?.name ?? null,
-        courseName: exam?.course ?? null,
+        examName: exam.name,
+        courseName: exam.course,
         submittedAt: ack.submittedAt,
         submissionHash: ack.submissionHash,
         ackId: ack.id,

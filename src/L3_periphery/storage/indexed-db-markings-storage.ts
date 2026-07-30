@@ -140,7 +140,10 @@ export class IndexedDbMarkingsStorage implements MarkingsStorage, OutboxStorageP
         continue;
       }
       try {
-        out.set(examId, new SubmissionAck(stored.id, stored.submissionHash, new Date(stored.submittedAt)));
+        out.set(
+          examId,
+          new SubmissionAck(stored.id, stored.submissionHash, new Date(stored.submittedAt)),
+        );
       } catch {
         // shape válido pero VO rechaza (hash mal, date inválido): skip.
       }
@@ -196,12 +199,18 @@ export class IndexedDbMarkingsStorage implements MarkingsStorage, OutboxStorageP
 
   // Sin identity → no-op (caso normal durante logout cuando el storage ya
   // fue limpiado, o cuando se llama defensivamente). NO throw.
+  //
+  // Conserva `ack.*` y `submission-snapshot.*` para que el historial del
+  // alumno persista tras logout (mismo email → mismo scope al reloguear).
+  // Borra marcaciones activas, queue de envíos pendientes y admission-area
+  // — todo lo que es estado "en vuelo" del examen actual.
   async wipeUserScope(): Promise<void> {
     const email = await this.getUserEmailOrNull();
     if (!email) return;
     const db = await this.db();
-    const prefix = `${KEY_ROOT}.${email}.`;
-    await this.deleteRange(db, prefix);
+    await this.deleteRange(db, `${KEY_ROOT}.${email}.simulacro.`);
+    await this.deleteRange(db, `${KEY_ROOT}.${email}.queue.`);
+    await this.deleteRange(db, `${KEY_ROOT}.${email}.admission-area.`);
   }
 
   // Implementación de `OutboxStoragePort.clear()`. Borra sólo la cola del

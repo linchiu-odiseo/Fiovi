@@ -7,8 +7,6 @@ import { FakeProfileStorage } from '../../fixtures/profile-storage.fake';
 import { FakeTenantSlugCache } from '../../fixtures/tenant-slug-cache.fake';
 import { MarkingsStorage } from '../../../../src/L1_domain/ports/markings-storage';
 import { SubmissionAck } from '../../../../src/L1_domain/value-objects/submission-ack';
-import { TutorActivityStorage } from '../../../../src/L1_domain/ports/tutor-activity-storage';
-import { TutorActivityEvent } from '../../../../src/L1_domain/value-objects/tutor-activity-event';
 import { OutboxStoragePort } from '../../../../src/L1_domain/ports/outbox-storage.port';
 import { RouterPort } from '../../../../src/L1_domain/ports/router-port';
 import { SwMessengerPort } from '../../../../src/L1_domain/ports/sw-messenger.port';
@@ -98,25 +96,6 @@ class FakeOutboxStorage implements OutboxStoragePort {
   }
 }
 
-class FakeTutorActivityStorage implements TutorActivityStorage {
-  private wipeCalls = 0;
-  async append(): Promise<void> {
-    /* no-op */
-  }
-  async list(): Promise<TutorActivityEvent[]> {
-    return [];
-  }
-  async archive(): Promise<void> {
-    /* no-op */
-  }
-  async wipeUserScope(): Promise<void> {
-    this.wipeCalls++;
-  }
-  getWipeCalls(): number {
-    return this.wipeCalls;
-  }
-}
-
 class FakeRouter implements RouterPort {
   private navigateCalls: unknown[][] = [];
   navigate(commands: unknown[]): void {
@@ -146,7 +125,6 @@ describe('LogoutUseCase', () => {
   let outboxStorage: FakeOutboxStorage;
   let router: FakeRouter;
   let swMessenger: FakeSwMessenger;
-  let tutorActivityStorage: FakeTutorActivityStorage;
   let useCase: LogoutUseCase;
 
   beforeEach(() => {
@@ -158,7 +136,6 @@ describe('LogoutUseCase', () => {
     outboxStorage = new FakeOutboxStorage();
     router = new FakeRouter();
     swMessenger = new FakeSwMessenger();
-    tutorActivityStorage = new FakeTutorActivityStorage();
     useCase = new LogoutUseCase(
       repo,
       identityStorage,
@@ -167,7 +144,6 @@ describe('LogoutUseCase', () => {
       markingsStorage,
       outboxStorage,
       router,
-      tutorActivityStorage,
       swMessenger,
     );
   });
@@ -230,7 +206,6 @@ describe('LogoutUseCase', () => {
         markingsStorage,
         outboxStorage,
         router,
-        tutorActivityStorage,
       );
       await expect(ucWithoutSw.execute()).resolves.toBeUndefined();
     });

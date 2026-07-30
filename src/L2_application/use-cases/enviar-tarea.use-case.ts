@@ -51,12 +51,12 @@ export class EnviarTareaUseCase {
         responses,
         clientFinishedAt,
       });
-      await this.storage.setSubmissionAck(input.examId, result.ack);
-      // Snapshot para el historial local — ver EnviarSimulacroUseCase.
+      // Orden: snapshot → ack → clear. Ver comentario en EnviarSimulacroUseCase.
       await this.storage.saveSubmissionSnapshot(input.examId, {
         answers,
         admissionArea,
       });
+      await this.storage.setSubmissionAck(input.examId, result.ack);
       await this.storage.clearMarcaciones(input.examId);
       return { status: 'enviado', ack: result.ack };
     } catch (err) {

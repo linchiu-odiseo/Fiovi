@@ -1,7 +1,7 @@
 import { Component, DestroyRef, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { TutorActividadListViewModel } from '../../view-models/tutor-actividad-list.view-model';
-import { TutorActivityEvent } from '../../../L1_domain/value-objects/tutor-activity-event';
+import { TutorExam } from '../../../L1_domain/entities/tutor-exam';
 
 @Component({
   selector: 'app-tutor-actividad-list-page',
@@ -25,17 +25,26 @@ export class TutorActividadListPage {
     void this.router.navigate(['/profile']);
   }
 
-  protected onCardClick(event: TutorActivityEvent): void {
-    this.vm.goToExam(event);
+  protected onCardClick(exam: TutorExam): void {
+    this.vm.goToExam(exam);
   }
 
-  protected onArchive(event: TutorActivityEvent, mouseEvent: Event): void {
-    mouseEvent.stopPropagation();
-    void this.vm.archive(event);
-  }
-
-  protected formatFecha(date: Date): string {
-    const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  protected formatFecha(date: Date | null): string {
+    if (date === null) return '—';
+    const months = [
+      'ene',
+      'feb',
+      'mar',
+      'abr',
+      'may',
+      'jun',
+      'jul',
+      'ago',
+      'sep',
+      'oct',
+      'nov',
+      'dic',
+    ];
     const dd = date.getDate();
     const mm = months[date.getMonth()];
     const hh = String(date.getHours()).padStart(2, '0');

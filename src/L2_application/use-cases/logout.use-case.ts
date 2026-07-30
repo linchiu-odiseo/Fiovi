@@ -6,13 +6,15 @@ import { MarkingsStorage } from '../../L1_domain/ports/markings-storage';
 import { OutboxStoragePort } from '../../L1_domain/ports/outbox-storage.port';
 import { RouterPort } from '../../L1_domain/ports/router-port';
 import { SwMessengerPort } from '../../L1_domain/ports/sw-messenger.port';
-import { TutorActivityStorage } from '../../L1_domain/ports/tutor-activity-storage';
 
-// Use case de logout con 8 pasos ordenados estrictamente.
+// Use case de logout con 7 pasos ordenados estrictamente.
 //
 // CRÍTICO: `markingsStorage.wipeUserScope()` se invoca ANTES de `identityStorage.clear()`
 // para que el adapter (`IndexedDbMarkingsStorage`) todavía pueda leer el email del usuario
 // desde `IdentityStorage` internamente y determinar el scope a borrar.
+//
+// El wipe conserva acks + snapshots del historial — al reloguear con el
+// mismo email se ven los envíos previos hasta que el back los archive.
 //
 // Todos los pasos de limpieza local son best-effort: un error en uno no detiene los siguientes.
 // El logout del repo también es best-effort (errores de red se ignoran con console.warn).
@@ -27,7 +29,6 @@ export class LogoutUseCase {
     private readonly markingsStorage: MarkingsStorage,
     private readonly outboxStorage: OutboxStoragePort,
     private readonly router: RouterPort,
-    private readonly tutorActivityStorage: TutorActivityStorage,
     private readonly swMessenger?: SwMessengerPort,
   ) {}
 
@@ -60,15 +61,6 @@ export class LogoutUseCase {
       await this.outboxStorage.clear();
     } catch (err) {
       console.warn('outbox clear failed during logout', err);
-    }
-
-    // Paso 4.5: limpiar historial de actividad del tutor (Item 4 del refine).
-    // Mismo criterio que markings: se llama ANTES de identityStorage.clear()
-    // porque el adapter lee IdentityStorage internamente.
-    try {
-      await this.tutorActivityStorage.wipeUserScope();
-    } catch (err) {
-      console.warn('tutor activity wipe failed during logout', err);
     }
 
     // Paso 5: limpiar caché de perfil.
