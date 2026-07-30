@@ -87,6 +87,28 @@
     border-radius: var(--radius-md);
     background: var(--color-error-container, #ffdad6);
     color: var(--color-on-error-container, #93000a);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+  }
+
+  &__banner-close {
+    background: transparent;
+    border: none;
+    color: inherit;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    border-radius: 4px;
+    cursor: pointer;
+    flex-shrink: 0;
+
+    .material-symbols-outlined {
+      font-size: 1.1rem;
+      line-height: 1;
+    }
   }
 
   &__list {
@@ -96,6 +118,13 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-sm);
+  }
+
+  &__item {
+    // El swipeable-card interno tiene overflow:hidden; el LI queda como
+    // wrapper semántico sin estilos propios.
+    margin: 0;
+    padding: 0;
   }
 }
 
@@ -192,5 +221,23 @@
     font-size: 1.5rem;
     line-height: 1;
     flex-shrink: 0;
+  }
+
+  &__spinner {
+    align-self: center;
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--color-outline-variant);
+    border-top-color: var(--color-primary);
+    border-radius: 50%;
+    animation: actividad-card-spin 700ms linear infinite;
+    flex-shrink: 0;
+    margin-right: 0.25rem;
+  }
+}
+
+@keyframes actividad-card-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
