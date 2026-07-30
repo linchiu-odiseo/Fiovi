@@ -45,7 +45,13 @@ export class TutorActividadListViewModel {
   }
 
   goToExam(exam: TutorExam): void {
-    void this.router.navigate(['/tutor/exams', exam.recordId]);
+    // Pasa `from=/tutor/actividad` para que el detail sepa a dónde volver
+    // cuando el tutor tape Volver o Archivar. Sin esto cae al default
+    // /tutor/home, que es lo correcto cuando venís del home pero no
+    // cuando venís de la lista de actividad.
+    void this.router.navigate(['/tutor/exams', exam.recordId], {
+      queryParams: { from: '/tutor/actividad' },
+    });
   }
 }
 

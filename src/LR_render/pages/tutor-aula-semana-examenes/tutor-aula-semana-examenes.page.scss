@@ -191,7 +191,8 @@
     }
 
     &--finalized {
-      color: var(--color-outline);
+      background: var(--color-error-container);
+      color: var(--color-on-error-container);
     }
   }
 
@@ -260,9 +261,12 @@
       color: var(--color-on-success-container);
     }
 
+    // Tint error (rojo tenue) — el examen ya cerró; señalizamos con el mismo
+    // color-container del sistema de errores para diferenciarlo del gris
+    // neutro de "programado".
     &--finalized {
-      background: var(--color-surface-container-low);
-      color: var(--color-on-surface-variant);
+      background: var(--color-error-container);
+      color: var(--color-on-error-container);
     }
   }
 }

@@ -154,6 +154,9 @@ class FakeTutorExamDetailViewModel {
   stop(): void {
     /* no-op — el fake no arranca timers */
   }
+  // Ruta de salida del detail (Volver + post-archivar). Default /tutor/home.
+  // El caller puede sobrescribir con `queryParam ?from=` (ej. /tutor/actividad).
+  parentRoute = vi.fn(() => '/tutor/home');
 }
 
 @Component({ template: '' })
