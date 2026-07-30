@@ -44,6 +44,7 @@ import { GuardarDraftUseCase } from './L2_application/use-cases/guardar-draft.us
 import { SeleccionarAdmissionAreaUseCase } from './L2_application/use-cases/seleccionar-admission-area.use-case';
 import { GetHistorialUseCase } from './L2_application/use-cases/get-historial.use-case';
 import { GetHistorialEntryUseCase } from './L2_application/use-cases/get-historial-entry.use-case';
+import { GetMySubmissionUseCase } from './L2_application/use-cases/get-my-submission.use-case';
 
 // L3 implementaciones de los puertos.
 import { CloudflareTurnstileProvider } from './L3_periphery/captcha/cloudflare-turnstile-provider';
@@ -77,6 +78,7 @@ import { environment } from './environments/environment';
 
 // L2 use-cases del tutor — puras TS, sin decorador Angular.
 import { GetTutorExamsUseCase } from './L2_application/use-cases/get-tutor-exams.use-case';
+import { GetTutorExamsFinalizadasUseCase } from './L2_application/use-cases/get-tutor-exams-finalizadas.use-case';
 import { GetTutorExamDetailUseCase } from './L2_application/use-cases/get-tutor-exam-detail.use-case';
 import { ListClassroomStudentsUseCase } from './L2_application/use-cases/list-classroom-students.use-case';
 import { IniciarExamenUseCase } from './L2_application/use-cases/iniciar-examen.use-case';
@@ -289,9 +291,16 @@ export const appConfig: ApplicationConfig = {
       deps: [MARKINGS_STORAGE],
     },
     {
+      provide: GetMySubmissionUseCase,
+      useFactory: (api: ExamsApi, markings: MarkingsStorage) =>
+        new GetMySubmissionUseCase(api, markings),
+      deps: [EXAMS_API, MARKINGS_STORAGE],
+    },
+    {
       provide: GetHistorialUseCase,
-      useFactory: (markings: MarkingsStorage) => new GetHistorialUseCase(markings),
-      deps: [MARKINGS_STORAGE],
+      useFactory: (markings: MarkingsStorage, getMy: GetMySubmissionUseCase) =>
+        new GetHistorialUseCase(markings, getMy),
+      deps: [MARKINGS_STORAGE, GetMySubmissionUseCase],
     },
     {
       provide: GetHistorialEntryUseCase,
@@ -304,6 +313,11 @@ export const appConfig: ApplicationConfig = {
     {
       provide: GetTutorExamsUseCase,
       useFactory: (api: TutorExamsApi) => new GetTutorExamsUseCase(api),
+      deps: [TUTOR_EXAMS_API],
+    },
+    {
+      provide: GetTutorExamsFinalizadasUseCase,
+      useFactory: (api: TutorExamsApi) => new GetTutorExamsFinalizadasUseCase(api),
       deps: [TUTOR_EXAMS_API],
     },
     {

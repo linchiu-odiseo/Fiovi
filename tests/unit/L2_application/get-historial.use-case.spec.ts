@@ -1,9 +1,24 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { GetHistorialUseCase } from '../../../src/L2_application/use-cases/get-historial.use-case';
+import { GetMySubmissionUseCase } from '../../../src/L2_application/use-cases/get-my-submission.use-case';
 import { Exam } from '../../../src/L1_domain/entities/exam';
 import { ExamServerStatus } from '../../../src/L1_domain/value-objects/exam-server-status';
 import { SubmissionAck } from '../../../src/L1_domain/value-objects/submission-ack';
+import { MySubmission } from '../../../src/L1_domain/ports/exams-api';
 import { InMemoryMarkingsStorage } from './fakes';
+
+// Fake para GetMySubmissionUseCase: retorna null por defecto (comportamiento
+// pre-fix: 'no-envio'). Tests que ejerciten el path 200 setean el resultado
+// vía willReturnFor(examId, my).
+class FakeGetMySubmission {
+  private readonly resultados = new Map<string, MySubmission | null>();
+  willReturnFor(examId: string, my: MySubmission | null): void {
+    this.resultados.set(examId, my);
+  }
+  async execute(examId: string): Promise<MySubmission | null> {
+    return this.resultados.get(examId) ?? null;
+  }
+}
 
 const HASH = '0'.repeat(64);
 const ALT_HASH = '1'.repeat(64);
@@ -33,11 +48,16 @@ function buildExam(
 
 describe('GetHistorialUseCase', () => {
   let markings: InMemoryMarkingsStorage;
+  let getMySubmission: FakeGetMySubmission;
   let useCase: GetHistorialUseCase;
 
   beforeEach(() => {
     markings = new InMemoryMarkingsStorage();
-    useCase = new GetHistorialUseCase(markings);
+    getMySubmission = new FakeGetMySubmission();
+    useCase = new GetHistorialUseCase(
+      markings,
+      getMySubmission as unknown as GetMySubmissionUseCase,
+    );
   });
 
   it('retorna lista vacía cuando no hay acks locales', async () => {
@@ -154,6 +174,38 @@ describe('GetHistorialUseCase', () => {
       expect(entries).toHaveLength(2);
       expect(entries[0].estado).toBe('envio');
       expect(entries[1].estado).toBe('no-envio');
+    });
+  });
+
+  describe('backfill vía /my-submission', () => {
+    it('promueve finalized sin ack local a estado="envio" con source cuando el back devuelve 200', async () => {
+      const backAck = new SubmissionAck('ack-back', ALT_HASH, new Date('2026-06-17T15:45:00.000Z'));
+      getMySubmission.willReturnFor('exam-cerrado', {
+        ack: backAck,
+        clientFinishedAt: new Date('2026-06-17T15:44:55.000Z'),
+        responses: { '1': 'A', '2': 'B' },
+        admissionArea: 'GENERAL',
+        source: 'auto_saved',
+      });
+
+      const entries = await useCase.execute([
+        buildExam('exam-cerrado', 'Con auto-guardado', 'Anatomía', 'finalized'),
+      ]);
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0].estado).toBe('envio');
+      expect(entries[0].source).toBe('auto_saved');
+      expect(entries[0].submissionHash).toBe(ALT_HASH);
+      expect(entries[0].ackId).toBe('ack-back');
+    });
+
+    it('deja como "no-envio" cuando /my-submission devuelve null (404)', async () => {
+      const entries = await useCase.execute([
+        buildExam('exam-cerrado', 'Sin envío real', 'Anatomía', 'finalized'),
+      ]);
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0].estado).toBe('no-envio');
     });
   });
 });

@@ -33,6 +33,13 @@ export interface TutorExamsApi {
   // Errores posibles: TutorExamForbiddenError (403), NetworkError (red/timeout).
   getTutorExams(): Promise<readonly TutorExam[]>;
 
+  // GET /t/:slug/tutor/exams/finalizadas — lista cross-classroom de virtual
+  // exams finalizados no-archivados del tutor. Payload liviano (0-10 items
+  // típicos post-archived 00h) para /tutor/actividad. Los items traen
+  // `classroomCode`/`classroomName` (a diferencia del endpoint gordo).
+  // Errores posibles: TutorExamForbiddenError (403), NetworkError.
+  getExamsFinalizadas(): Promise<readonly TutorExam[]>;
+
   // GET /t/:slug/virtual-exams/:recordId — detalle con enabledStudentIds.
   // Errores posibles: VirtualExamNotFoundError (404), TutorExamForbiddenError (403), NetworkError.
   getExamDetail(recordId: string): Promise<TutorExamDetail>;

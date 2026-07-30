@@ -1,5 +1,6 @@
 import { Exam } from '../../L1_domain/entities/exam';
 import { MarkingsStorage } from '../../L1_domain/ports/markings-storage';
+import { GetMySubmissionUseCase } from './get-my-submission.use-case';
 
 // Estado del examen desde la perspectiva del historial. Coincide con la
 // matriz de composición usada en /home (serverStatus × ack), acotada a los
@@ -11,6 +12,10 @@ export type HistorialEstado = 'envio' | 'no-envio';
 // cuando está disponible (nombre + curso vienen de `getTodaysExams()` y
 // desaparecen al día siguiente cuando el back archiva). Fecha y hash SÍ
 // sobreviven porque viven en IDB.
+//
+// `source` diferencia el envío manual del alumno del auto-guardado por el
+// finalize del tutor (draft promovido a submission). Solo presente en el
+// estado 'envio'.
 export interface HistorialEntry {
   readonly examId: string;
   readonly examName: string | null;
@@ -19,6 +24,7 @@ export interface HistorialEntry {
   readonly submissionHash: string | null; // null solo en 'no-envio'
   readonly ackId: string | null;
   readonly estado: HistorialEstado;
+  readonly source?: 'manual' | 'auto_saved';
 }
 
 // Lee los acks locales y los combina con `todaysExams` para armar la lista
@@ -40,10 +46,16 @@ export interface HistorialEntry {
 // llegan como `finalized + ack === null`. Cuando learnex marque el
 // auto-envío con un flag propio, se agrega un tercer estado 'auto-envio'.
 //
-// NO hace fetch al back: `todaysExams` se pasa por argumento (el view-model
-// ya lo tiene desde el home). Mantiene el use case desacoplado de ExamsApi.
+// Fetch al back en la rama "no-envio": cuando el back devuelve un examen
+// finalized y no hay ack local, consultamos /my-submission para saber si hay
+// fila en BD (envío desde otro device o auto-guardado por el finalize del
+// tutor). Si 200 → convertimos a 'envio' con `source`. Si 404 → 'no-envio'
+// verdadero. El use case persiste el ack + snapshot vía `GetMySubmissionUseCase`.
 export class GetHistorialUseCase {
-  constructor(private readonly markings: MarkingsStorage) {}
+  constructor(
+    private readonly markings: MarkingsStorage,
+    private readonly getMySubmission: GetMySubmissionUseCase,
+  ) {}
 
   async execute(todaysExams: readonly Exam[]): Promise<HistorialEntry[]> {
     const acks = await this.markings.getAllSubmissionAcks();
@@ -52,7 +64,7 @@ export class GetHistorialUseCase {
     const entries: HistorialEntry[] = [];
     const seen = new Set<string>();
 
-    // 1) Entradas con ack, filtradas por presencia en todaysExams.
+    // 1) Entradas con ack local, filtradas por presencia en todaysExams.
     for (const [examId, ack] of acks) {
       const exam = examsById.get(examId);
       if (!exam) continue; // Ack huérfano (examen archivado por el back).
@@ -68,22 +80,47 @@ export class GetHistorialUseCase {
       seen.add(examId);
     }
 
-    // 2) Exámenes finalized sin ack (alumno no envió — o envió desde otra
-    // device y no tenemos ack local). Solo detectables mientras el back los
-    // sigue devolviendo en "hoy".
-    for (const exam of todaysExams) {
-      if (seen.has(exam.id)) continue;
-      if (!exam.serverStatus.is('finalized')) continue;
-      if (exam.esTarea()) continue; // Las tareas viven en /student/tareas.
-      entries.push({
-        examId: exam.id,
-        examName: exam.name,
-        courseName: exam.course,
-        submittedAt: null,
-        submissionHash: null,
-        ackId: null,
-        estado: 'no-envio',
-      });
+    // 2) Exámenes finalized sin ack local: consultamos al back para cerrar el
+    // hueco de auto-guardado / envío desde otro device.
+    const finalizedSinAck = todaysExams.filter(
+      (exam) => !seen.has(exam.id) && exam.serverStatus.is('finalized') && !exam.esTarea(),
+    );
+    const backfills = await Promise.all(
+      finalizedSinAck.map(async (exam) => {
+        try {
+          const my = await this.getMySubmission.execute(exam.id);
+          return { exam, my };
+        } catch {
+          // Network/timeout: caemos a 'no-envio' silencioso. Próxima carga
+          // reintenta.
+          return { exam, my: null };
+        }
+      }),
+    );
+
+    for (const { exam, my } of backfills) {
+      if (my !== null) {
+        entries.push({
+          examId: exam.id,
+          examName: exam.name,
+          courseName: exam.course,
+          submittedAt: my.ack.submittedAt,
+          submissionHash: my.ack.submissionHash,
+          ackId: my.ack.id,
+          estado: 'envio',
+          source: my.source,
+        });
+      } else {
+        entries.push({
+          examId: exam.id,
+          examName: exam.name,
+          courseName: exam.course,
+          submittedAt: null,
+          submissionHash: null,
+          ackId: null,
+          estado: 'no-envio',
+        });
+      }
     }
 
     return entries.sort(byMostRecentFirst);
