@@ -1,0 +1,91 @@
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: block;
+}
+
+.modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: hsl(0deg 0% 0% / 60%);
+  backdrop-filter: blur(2px);
+}
+
+.modal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(20rem, calc(100vw - 2rem));
+  // Fondo hardcoded pedido por diseño — la "Acerca de" tiene su propia
+  // identidad visual y se sale del token surface del theme a propósito.
+  background: #fcf9f8;
+  color: var(--color-on-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md);
+  overflow: hidden;
+  box-shadow: 0 20px 60px hsl(0deg 0% 0% / 25%);
+  cursor: pointer;
+
+  &__logo {
+    display: block;
+    width: 70%;
+    max-width: 12rem;
+    height: auto;
+    margin-top: var(--space-sm);
+    position: relative;
+    z-index: 1;
+  }
+
+  &__summary {
+    margin: 0;
+    text-align: center;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--color-on-surface-variant);
+    position: relative;
+    z-index: 1;
+  }
+
+  &__version {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    background: hsl(0deg 0% 0% / 6%);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-on-surface-variant);
+    position: relative;
+    z-index: 1;
+  }
+
+  &__credit {
+    margin: 0;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--color-on-surface-variant);
+    opacity: 0.7;
+    position: relative;
+    z-index: 1;
+  }
+
+  // Marca de agua al pie del modal. `pointer-events: none` para que no
+  // capture el tap-to-close, `z-index: 0` para quedar detrás del contenido.
+  &__watermark {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 55%;
+    height: auto;
+    opacity: 0.15;
+    pointer-events: none;
+    user-select: none;
+    z-index: 0;
+  }
+}
