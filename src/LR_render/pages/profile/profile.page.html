@@ -77,10 +77,14 @@
       </button>
     </li>
     <li>
-      <button type="button" class="menu-item" (click)="onAcercaDeClick()">
+      <button
+        type="button"
+        class="menu-item"
+        (click)="onAcercaDeClick()"
+        data-testid="acerca-de-link"
+      >
         <span class="material-symbols-outlined menu-item__icon" aria-hidden="true">info</span>
         <span class="menu-item__label">Acerca de</span>
-        <span class="menu-item__hint">Próximamente</span>
       </button>
     </li>
   </ul>
@@ -109,5 +113,9 @@
       (dismiss)="onUpdateModalCancel()"
       (accept)="onUpdateModalConfirm()"
     />
+  }
+
+  @if (showAboutModal()) {
+    <app-about-modal [appVersion]="appVersion" (dismiss)="onAboutModalDismiss()" />
   }
 </main>

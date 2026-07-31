@@ -1,0 +1,25 @@
+<div class="modal-overlay" (click)="dismiss.emit()" aria-hidden="true"></div>
+<div
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="about-modal-title"
+  class="modal"
+  tabindex="0"
+  (click)="dismiss.emit()"
+  (keyup.enter)="dismiss.emit()"
+  (keyup.space)="dismiss.emit()"
+>
+  <img
+    id="about-modal-title"
+    src="/img/logo.png"
+    alt="Fiovi — cartilla virtual de marcaciones"
+    class="modal__logo"
+  />
+  <p class="modal__summary">
+    Cartilla virtual de marcaciones para simulacros. Marcá las alternativas en el celular; el
+    enunciado va en la hoja física.
+  </p>
+  <span class="modal__version">v{{ appVersion }}</span>
+  <p class="modal__credit">Elaborado por el equipo R&amp;D+I · 2026</p>
+  <img src="/img/fondo20.png" alt="" aria-hidden="true" class="modal__watermark" />
+</div>

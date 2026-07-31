@@ -78,9 +78,7 @@ export const routes: Routes = [
     path: 'tutor/tareas',
     canActivate: [authGuard, roleGuard('tutor')],
     loadComponent: () =>
-      import('./pages/tutor-tasks-list/tutor-tasks-list.page').then(
-        (m) => m.TutorTasksListPage,
-      ),
+      import('./pages/tutor-tasks-list/tutor-tasks-list.page').then((m) => m.TutorTasksListPage),
   },
   {
     path: 'tutor/actividad',

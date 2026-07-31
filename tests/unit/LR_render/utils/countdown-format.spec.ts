@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { formatRestante, formatRestanteTarea } from '../../../../src/LR_render/utils/countdown-format';
+import {
+  formatRestante,
+  formatRestanteTarea,
+} from '../../../../src/LR_render/utils/countdown-format';
 
 // formatRestante — reloj digital MM:SS o HH:MM:SS
 describe('formatRestante', () => {

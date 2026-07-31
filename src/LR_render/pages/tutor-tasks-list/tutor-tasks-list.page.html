@@ -35,10 +35,7 @@
          Los grupos están ordenados por deadline más próximo del primer item
          (Map insertion-ordered — ver VM). -->
     @for (grupo of vm.grupos(); track grupo.classroomId) {
-      <section
-        class="tutor-tasks__grupo"
-        [attr.data-testid]="'grupo-' + grupo.classroomId"
-      >
+      <section class="tutor-tasks__grupo" [attr.data-testid]="'grupo-' + grupo.classroomId">
         <header class="tutor-tasks__grupo-header">
           <h2 class="tutor-tasks__grupo-name">{{ grupo.classroomName }}</h2>
           <span class="tutor-tasks__grupo-count">
@@ -73,12 +70,17 @@
 
               @if (card.closeAt) {
                 <p class="task-card__deadline">
-                  <span class="material-symbols-outlined task-card__deadline-icon" aria-hidden="true">
+                  <span
+                    class="material-symbols-outlined task-card__deadline-icon"
+                    aria-hidden="true"
+                  >
                     hourglass_top
                   </span>
                   <span class="task-card__countdown">{{ card.countdownText }}</span>
                   <span class="task-card__deadline-sep">·</span>
-                  <span class="task-card__deadline-abs">cierra {{ formatDeadline(card.closeAt) }}</span>
+                  <span class="task-card__deadline-abs"
+                    >cierra {{ formatDeadline(card.closeAt) }}</span
+                  >
                 </p>
               }
 

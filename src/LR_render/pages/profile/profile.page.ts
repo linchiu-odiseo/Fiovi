@@ -8,6 +8,7 @@ import { environment } from '../../../environments/environment';
 import { StudentProfile } from '../../../L1_domain/value-objects/student-profile';
 import { TutorProfile } from '../../../L1_domain/value-objects/tutor-profile';
 import { Role } from '../../../L1_domain/entities/identity';
+import { AboutModalComponent } from '../../components/about-modal/about-modal.component';
 import { UpdateConfirmModalComponent } from '../../components/update-confirm-modal/update-confirm-modal.component';
 import { VersionFooterComponent } from '../../components/version-footer/version-footer.component';
 
@@ -30,7 +31,7 @@ type UpdateRowStatus = 'idle' | 'checking' | 'up-to-date' | 'applying';
   selector: 'app-profile-page',
   templateUrl: './profile.page.html',
   styleUrl: './profile.page.scss',
-  imports: [VersionFooterComponent, UpdateConfirmModalComponent],
+  imports: [VersionFooterComponent, UpdateConfirmModalComponent, AboutModalComponent],
 })
 export class ProfilePage {
   private readonly router = inject(Router);
@@ -43,6 +44,7 @@ export class ProfilePage {
   protected readonly appVersion = environment.appVersion;
   protected readonly updateStatus = signal<UpdateRowStatus>('idle');
   protected readonly showUpdateModal = signal(false);
+  protected readonly showAboutModal = signal(false);
 
   // Datos del usuario. `email` viene siempre de la identity (garantizado por
   // authGuard). `role`, `firstName`, `lastName`, `code` vienen del perfil
@@ -166,8 +168,11 @@ export class ProfilePage {
   }
 
   protected onAcercaDeClick(): void {
-    // Placeholder: la vista "Acerca de" (versión, tenant, licencias)
-    // queda como follow-up.
+    this.showAboutModal.set(true);
+  }
+
+  protected onAboutModalDismiss(): void {
+    this.showAboutModal.set(false);
   }
 
   protected async onSignOut(): Promise<void> {

@@ -19,6 +19,20 @@
     </p>
   </header>
 
+  @if (vm.archiveError(); as errMsg) {
+    <div class="actividad__banner" role="alert" data-testid="archive-error">
+      <span>{{ errMsg }}</span>
+      <button
+        type="button"
+        class="actividad__banner-close"
+        (click)="onDismissArchiveError()"
+        aria-label="Cerrar"
+      >
+        <span class="material-symbols-outlined" aria-hidden="true">close</span>
+      </button>
+    </div>
+  }
+
   @if (vm.isLoading() && vm.events().length === 0) {
     <p class="actividad__empty">Cargando…</p>
   } @else if (vm.loadError()) {
@@ -32,40 +46,55 @@
   } @else {
     <ul class="actividad__list">
       @for (event of vm.events(); track event.recordId) {
-        <li
-          class="actividad-card"
-          data-testid="actividad-card"
-          (click)="onCardClick(event)"
-          (keydown.enter)="onCardClick(event)"
-          role="button"
-          tabindex="0"
-        >
-          <span class="actividad-card__strip" aria-hidden="true"></span>
-          <div class="actividad-card__body">
-            <h2 class="actividad-card__name">{{ event.name }}</h2>
-            @if (event.course || event.classroomName) {
-              <p class="actividad-card__course">
-                @if (event.course) {
-                  <span>{{ event.course }}</span>
+        <li class="actividad__item">
+          <app-swipeable-card
+            actionLabel="Archivar"
+            actionIcon="archive"
+            (action)="onArchive(event.recordId)"
+          >
+            <div
+              class="actividad-card"
+              data-testid="actividad-card"
+              (click)="onCardClick(event)"
+              (keydown.enter)="onCardClick(event)"
+              role="button"
+              tabindex="0"
+            >
+              <span class="actividad-card__strip" aria-hidden="true"></span>
+              <div class="actividad-card__body">
+                <h2 class="actividad-card__name">{{ event.name }}</h2>
+                @if (event.course || event.classroomName) {
+                  <p class="actividad-card__course">
+                    @if (event.course) {
+                      <span>{{ event.course }}</span>
+                    }
+                    @if (event.course && event.classroomName) {
+                      <span class="actividad-card__sep" aria-hidden="true">·</span>
+                    }
+                    @if (event.classroomName) {
+                      <span class="actividad-card__aula">{{ event.classroomName }}</span>
+                    }
+                  </p>
                 }
-                @if (event.course && event.classroomName) {
-                  <span class="actividad-card__sep" aria-hidden="true">·</span>
-                }
-                @if (event.classroomName) {
-                  <span class="actividad-card__aula">{{ event.classroomName }}</span>
-                }
-              </p>
-            }
-            <p class="actividad-card__meta">
-              <span class="material-symbols-outlined actividad-card__meta-icon" aria-hidden="true">
-                stop_circle
-              </span>
-              Finalizado · {{ formatFecha(event.finishedAt) }}
-            </p>
-          </div>
-          <span class="material-symbols-outlined actividad-card__chevron" aria-hidden="true">
-            chevron_right
-          </span>
+                <p class="actividad-card__meta">
+                  <span
+                    class="material-symbols-outlined actividad-card__meta-icon"
+                    aria-hidden="true"
+                  >
+                    stop_circle
+                  </span>
+                  Finalizado · {{ formatFecha(event.finishedAt) }}
+                </p>
+              </div>
+              @if (vm.archivingId() === event.recordId) {
+                <span class="actividad-card__spinner" aria-label="Archivando…"></span>
+              } @else {
+                <span class="material-symbols-outlined actividad-card__chevron" aria-hidden="true">
+                  chevron_right
+                </span>
+              }
+            </div>
+          </app-swipeable-card>
         </li>
       }
     </ul>

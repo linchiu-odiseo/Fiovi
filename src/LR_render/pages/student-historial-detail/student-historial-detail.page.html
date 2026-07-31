@@ -15,9 +15,7 @@
   @if (vm.isLoading()) {
     <p class="detalle__loading">Cargando…</p>
   } @else if (vm.storageError() || !vm.detalle()) {
-    <p class="detalle__empty" data-testid="empty-state">
-      No se encontró el envío en esta device.
-    </p>
+    <p class="detalle__empty" data-testid="empty-state">No se encontró el envío en esta device.</p>
   } @else if (vm.detalle(); as d) {
     <header class="detalle__header">
       <h1 class="detalle__title">
@@ -72,9 +70,7 @@
           <span class="material-symbols-outlined" aria-hidden="true">do_not_disturb_on</span>
           No enviaste este examen
         </p>
-        <p class="no-envio__hint">
-          La sesión cerró sin registrar tu envío en esta device.
-        </p>
+        <p class="no-envio__hint">La sesión cerró sin registrar tu envío en esta device.</p>
       </section>
     }
 
@@ -91,7 +87,8 @@
                 <span
                   class="grilla__alt grilla__alt--pill"
                   [class]="'grilla__alt--' + row.alternativa"
-                >{{ row.alternativa }}</span>
+                  >{{ row.alternativa }}</span
+                >
               } @else {
                 <span class="grilla__alt grilla__alt--empty" aria-label="Sin marcar">—</span>
               }

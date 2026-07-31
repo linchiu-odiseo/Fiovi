@@ -2,11 +2,13 @@ import { Component, DestroyRef, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { TutorActividadListViewModel } from '../../view-models/tutor-actividad-list.view-model';
 import { TutorExam } from '../../../L1_domain/entities/tutor-exam';
+import { SwipeableCardComponent } from '../../components/swipeable-card/swipeable-card.component';
 
 @Component({
   selector: 'app-tutor-actividad-list-page',
   templateUrl: './tutor-actividad-list.page.html',
   styleUrl: './tutor-actividad-list.page.scss',
+  imports: [SwipeableCardComponent],
   providers: [TutorActividadListViewModel],
 })
 export class TutorActividadListPage {
@@ -27,6 +29,14 @@ export class TutorActividadListPage {
 
   protected onCardClick(exam: TutorExam): void {
     this.vm.goToExam(exam);
+  }
+
+  protected onArchive(recordId: string): void {
+    void this.vm.archivar(recordId);
+  }
+
+  protected onDismissArchiveError(): void {
+    this.vm.dismissArchiveError();
   }
 
   protected formatFecha(date: Date | null): string {
