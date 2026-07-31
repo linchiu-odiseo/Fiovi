@@ -565,9 +565,7 @@ describe('HomePageViewModel', () => {
       const vm = createVm();
       await vm.start();
 
-      expect(vm.cards()[0].secondaryText).toBe(
-        'Envío registrado · toca para ver el detalle',
-      );
+      expect(vm.cards()[0].secondaryText).toBe('Envío registrado · toca para ver el detalle');
       vm.stop();
     });
   });

@@ -1,6 +1,9 @@
 import { Exam } from '../../L1_domain/entities/exam';
 import { AnswersMap, MarkingsStorage } from '../../L1_domain/ports/markings-storage';
-import { AdmissionArea, DEFAULT_ADMISSION_AREA } from '../../L1_domain/value-objects/admission-area';
+import {
+  AdmissionArea,
+  DEFAULT_ADMISSION_AREA,
+} from '../../L1_domain/value-objects/admission-area';
 import { SubmissionAck } from '../../L1_domain/value-objects/submission-ack';
 
 // Bundle para el detalle del historial. `ack` es null cuando el estado es

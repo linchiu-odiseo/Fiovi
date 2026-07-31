@@ -48,7 +48,9 @@ export class StudentHistorialDetailViewModel {
 
   // Área de POSTULACIÓN persistida en el snapshot. null cuando no hay
   // snapshot (envío legacy) o cuando la entrada es "no-envío".
-  readonly admissionArea = computed<AdmissionArea | null>(() => this.detalle()?.admissionArea ?? null);
+  readonly admissionArea = computed<AdmissionArea | null>(
+    () => this.detalle()?.admissionArea ?? null,
+  );
 
   async start(examId: string): Promise<void> {
     this.examId.set(examId);

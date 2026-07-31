@@ -8,11 +8,7 @@ import { SwipeableCardComponent } from '../../../../src/LR_render/components/swi
   standalone: true,
   imports: [SwipeableCardComponent],
   template: `
-    <app-swipeable-card
-      actionLabel="Archivar"
-      actionIcon="archive"
-      (action)="onAction()"
-    >
+    <app-swipeable-card actionLabel="Archivar" actionIcon="archive" (action)="onAction()">
       <div data-testid="card-body">Contenido</div>
     </app-swipeable-card>
     <div data-testid="outside">Afuera</div>

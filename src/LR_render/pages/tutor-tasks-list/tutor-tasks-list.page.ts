@@ -1,6 +1,9 @@
 import { Component, DestroyRef, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { TareaTutorCard, TutorTasksListViewModel } from '../../view-models/tutor-tasks-list.view-model';
+import {
+  TareaTutorCard,
+  TutorTasksListViewModel,
+} from '../../view-models/tutor-tasks-list.view-model';
 
 @Component({
   selector: 'app-tutor-tasks-list-page',
@@ -32,7 +35,20 @@ export class TutorTasksListPage {
 
   // Fecha absoluta compacta es-PE ("28 jul · 00:00").
   protected formatDeadline(date: Date): string {
-    const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    const months = [
+      'ene',
+      'feb',
+      'mar',
+      'abr',
+      'may',
+      'jun',
+      'jul',
+      'ago',
+      'sep',
+      'oct',
+      'nov',
+      'dic',
+    ];
     const dd = date.getDate();
     const mm = months[date.getMonth()];
     const hh = String(date.getHours()).padStart(2, '0');

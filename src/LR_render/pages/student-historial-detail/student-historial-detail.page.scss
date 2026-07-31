@@ -306,11 +306,21 @@
     color: var(--color-on-alt);
   }
 
-  &__alt--A { background: var(--color-alt-a); }
-  &__alt--B { background: var(--color-alt-b); }
-  &__alt--C { background: var(--color-alt-c); }
-  &__alt--D { background: var(--color-alt-d); }
-  &__alt--E { background: var(--color-alt-e); }
+  &__alt--A {
+    background: var(--color-alt-a);
+  }
+  &__alt--B {
+    background: var(--color-alt-b);
+  }
+  &__alt--C {
+    background: var(--color-alt-c);
+  }
+  &__alt--D {
+    background: var(--color-alt-d);
+  }
+  &__alt--E {
+    background: var(--color-alt-e);
+  }
 
   &__alt--empty {
     color: var(--color-outline);

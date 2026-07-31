@@ -32,7 +32,20 @@ export class StudentHistorialListPage {
   // Formatea la fecha del envío como "28 jul · 14:32". Reutiliza el patrón
   // de student-tasks-list.page.ts (sin Intl para no traer polyfills).
   protected formatFecha(date: Date): string {
-    const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    const months = [
+      'ene',
+      'feb',
+      'mar',
+      'abr',
+      'may',
+      'jun',
+      'jul',
+      'ago',
+      'sep',
+      'oct',
+      'nov',
+      'dic',
+    ];
     const dd = date.getDate();
     const mm = months[date.getMonth()];
     const hh = String(date.getHours()).padStart(2, '0');
