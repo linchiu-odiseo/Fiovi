@@ -27,17 +27,16 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-md);
+  gap: var(--space-sm);
   overflow: hidden;
   box-shadow: 0 20px 60px hsl(0deg 0% 0% / 25%);
   cursor: pointer;
 
   &__logo {
     display: block;
-    width: 70%;
-    max-width: 12rem;
+    width: 90%;
+    max-width: 16rem;
     height: auto;
-    margin-top: var(--space-sm);
     position: relative;
     z-index: 1;
   }
@@ -75,15 +74,18 @@
     z-index: 1;
   }
 
-  // Marca de agua al pie del modal. `pointer-events: none` para que no
-  // capture el tap-to-close, `z-index: 0` para quedar detrás del contenido.
+  // Marca de agua — solo la cabeza del pájaro debe asomar por la esquina
+  // inferior izquierda. La imagen es más grande que el hueco visible y
+  // se desplaza con offsets negativos hacia fuera del modal: `left` corre
+  // la imagen a la izquierda para cortar por las plumas, `bottom` la baja
+  // para cortar por el pico. El `overflow: hidden` del .modal recorta.
+  // Sin `opacity` — el PNG ya viene al 20%.
   &__watermark {
     position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 55%;
+    bottom: -3.5rem;
+    left: -4rem;
+    width: 75%;
     height: auto;
-    opacity: 0.15;
     pointer-events: none;
     user-select: none;
     z-index: 0;
