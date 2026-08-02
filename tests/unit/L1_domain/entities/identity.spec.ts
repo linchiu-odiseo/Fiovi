@@ -11,7 +11,8 @@ const makeIdentity = (overrides: Record<string, unknown> = {}) => {
     tenantSlug: 'vonex',
     email: 'alumno@vonex.edu.pe',
     codigo: '79507732' as string | null,
-    roles: ['student'] as ['student'] | ['tutor'],
+    roles: ['student'] as string[],
+    dashboardKind: 'student' as 'student' | 'tutor',
     expiresAt: NOW + 60_000,
   };
   const merged = { ...defaults, ...overrides };
@@ -21,49 +22,58 @@ const makeIdentity = (overrides: Record<string, unknown> = {}) => {
     merged.tenantSlug as string,
     merged.email as string,
     merged.codigo as string | null,
-    merged.roles as ['student'] | ['tutor'],
+    merged.roles as string[],
+    merged.dashboardKind as 'student' | 'tutor',
     merged.expiresAt as number,
   );
 };
 
 describe('Identity', () => {
   describe('constructor', () => {
-    it('construye correctamente con 1 rol student', () => {
-      const identity = makeIdentity({ roles: ['student'] });
-      expect(identity.roles).toEqual(['student']);
+    it('construye correctamente con dashboardKind student', () => {
+      const identity = makeIdentity({ dashboardKind: 'student' });
+      expect(identity.dashboardKind).toBe('student');
       expect(identity.email).toBe('alumno@vonex.edu.pe');
     });
 
-    it('construye correctamente con 1 rol tutor', () => {
-      const identity = makeIdentity({ roles: ['tutor'], email: 'tutor1@vonex.pe', codigo: null });
-      expect(identity.roles).toEqual(['tutor']);
+    it('construye correctamente con dashboardKind tutor', () => {
+      const identity = makeIdentity({
+        dashboardKind: 'tutor',
+        roles: ['tutor'],
+        email: 'tutor1@vonex.pe',
+        codigo: null,
+      });
+      expect(identity.dashboardKind).toBe('tutor');
       expect(identity.codigo).toBeNull();
     });
 
-    it('lanza InvalidIdentityError con 0 roles', () => {
-      expect(
-        () => new Identity('id', 'tid', 'vonex', 'email@test.pe', null, [], NOW + 1000),
-      ).toThrow(InvalidIdentityError);
+    it('acepta múltiples roles (custom + system) — el filtrado por Fiovi lo hace el mapper', () => {
+      // Después de introducir custom roles, un user puede traer varios nombres
+      // (`admin`, `student-seleccion`, `anual`...). Identity no valida el contenido
+      // ni la cantidad — el dashboardKind (resuelto por el backend con prioridad)
+      // es lo único que Fiovi rutea. La membresía `dashboardKind ∈ {student, tutor}`
+      // se valida en el HTTP repo antes de instanciar Identity.
+      const identity = makeIdentity({
+        roles: ['student', 'student-seleccion'],
+        dashboardKind: 'student',
+      });
+      expect(identity.roles).toEqual(['student', 'student-seleccion']);
+      expect(identity.dashboardKind).toBe('student');
     });
 
-    it('lanza InvalidIdentityError con 2 roles', () => {
-      expect(
-        () =>
-          new Identity(
-            'id',
-            'tid',
-            'vonex',
-            'email@test.pe',
-            null,
-            ['student', 'tutor'],
-            NOW + 1000,
-          ),
-      ).toThrow(InvalidIdentityError);
+    it('acepta roles vacío (el filtrado por dashboardKind vive en el mapper)', () => {
+      // Mismo motivo que arriba: Identity es data pura, no valida contenido de
+      // roles. Si algún caller construye Identity sin roles pero con dashboardKind
+      // válido, Fiovi funciona normalmente porque nunca branchea por roles[].
+      const identity = makeIdentity({ roles: [], dashboardKind: 'student' });
+      expect(identity.roles).toEqual([]);
+      expect(identity.dashboardKind).toBe('student');
     });
 
     it('lanza InvalidIdentityError si tenantSlug es vacío', () => {
       expect(
-        () => new Identity('id', 'tid', '', 'email@test.pe', null, ['student'], NOW + 1000),
+        () =>
+          new Identity('id', 'tid', '', 'email@test.pe', null, ['student'], 'student', NOW + 1000),
       ).toThrow(InvalidIdentityError);
     });
 
@@ -73,15 +83,25 @@ describe('Identity', () => {
     });
   });
 
-  describe('role()', () => {
-    it('devuelve el único rol (student)', () => {
-      const identity = makeIdentity({ roles: ['student'] });
+  describe('role() (alias legacy de dashboardKind)', () => {
+    it('devuelve dashboardKind cuando es student', () => {
+      const identity = makeIdentity({ dashboardKind: 'student' });
       expect(identity.role()).toBe('student');
     });
 
-    it('devuelve el único rol (tutor)', () => {
-      const identity = makeIdentity({ roles: ['tutor'] });
+    it('devuelve dashboardKind cuando es tutor', () => {
+      const identity = makeIdentity({ dashboardKind: 'tutor' });
       expect(identity.role()).toBe('tutor');
+    });
+
+    it('no depende de roles[0] — devuelve dashboardKind aunque roles[0] no matchee', () => {
+      // Ejemplo: user con role custom `alumno-becado` que el backend resuelve
+      // como dashboardKind='student'. Fiovi rutea a /student/home igual.
+      const identity = makeIdentity({
+        roles: ['alumno-becado'],
+        dashboardKind: 'student',
+      });
+      expect(identity.role()).toBe('student');
     });
   });
 
@@ -114,7 +134,6 @@ describe('Identity', () => {
     });
 
     it('usa threshold por defecto de 60_000ms si no se pasa', () => {
-      // Con expiresAt NOW + 30_000 y default 60_000 → debe devolver true
       const identity = makeIdentity({ expiresAt: NOW + 30_000 });
       expect(identity.shouldRefresh(NOW)).toBe(true);
     });

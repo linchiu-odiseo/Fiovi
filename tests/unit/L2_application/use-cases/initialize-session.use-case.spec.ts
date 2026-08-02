@@ -20,11 +20,12 @@ const makeStudentIdentity = () =>
     'alumno@vonex.edu.pe',
     '79507732',
     ['student'],
+    'student',
     NOW + 900_000,
   );
 
 const makeTutorIdentity = () =>
-  new Identity('uid2', 'tid', 'vonex', 'tutor@vonex.pe', null, ['tutor'], NOW + 900_000);
+  new Identity('uid2', 'tid', 'vonex', 'tutor@vonex.pe', null, ['tutor'], 'tutor', NOW + 900_000);
 
 describe('InitializeSessionUseCase', () => {
   let repo: FakeAuthRepository;

@@ -40,6 +40,7 @@ function buildIdentity(): Identity {
     'fulano@panda.test',
     '79507732',
     ['student'],
+    'student',
     Date.now() + 900_000,
   );
 }

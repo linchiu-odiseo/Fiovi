@@ -36,7 +36,16 @@ class LoginStub {}
 function buildIdentity(role: 'student' | 'tutor' = 'student'): Identity {
   const email = role === 'student' ? '79507732@vonex.edu.pe' : 'tutor1@vonex.pe';
   const codigo = role === 'student' ? '79507732' : null;
-  return new Identity('user-id', 'tenant-id', 'vonex', email, codigo, [role], Date.now() + 900_000);
+  return new Identity(
+    'user-id',
+    'tenant-id',
+    'vonex',
+    email,
+    codigo,
+    [role],
+    role,
+    Date.now() + 900_000,
+  );
 }
 
 const buildStudentProfile = (overrides: Partial<StudentProfile> = {}): StudentProfile => ({

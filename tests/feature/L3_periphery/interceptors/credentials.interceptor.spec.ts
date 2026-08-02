@@ -86,6 +86,7 @@ function makeIdentity(): Identity {
     'alumno@vonex.edu.pe',
     '79507732',
     ['student'],
+    'student',
     Date.now() + 900_000,
   );
 }

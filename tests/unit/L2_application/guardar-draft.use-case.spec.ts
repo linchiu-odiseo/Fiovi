@@ -54,6 +54,7 @@ function studentIdentity(codigo: string | null = VALID_CODIGO): Identity {
     VALID_EMAIL,
     codigo,
     ['student'],
+    'student',
     Date.now() + 900_000,
   );
 }
