@@ -23,8 +23,15 @@ interface PersistedShape {
   email?: string;
   codigo?: string | null;
   roles?: string[];
+  // Optional en el shape para tolerar sesiones persistidas antes del PR que
+  // introdujo dashboardKind en Identity. Al leer, si falta pero roles[0] es
+  // 'student'|'tutor' (lo único que Fiovi aceptaba antes), lo backfilleamos
+  // para no forzar re-login. Si no matchea, limpiamos y devolvemos null.
+  dashboardKind?: string;
   expiresAt?: number;
 }
+
+const VALID_DASHBOARD_KINDS: ReadonlySet<Role> = new Set(['student', 'tutor']);
 
 @Injectable({ providedIn: 'root' })
 export class LocalStorageIdentityStorage implements IdentityStorage {
@@ -52,6 +59,22 @@ export class LocalStorageIdentityStorage implements IdentityStorage {
       return null;
     }
 
+    // dashboardKind: preferí el persisted; fallback al primer role si es válido
+    // (backwards-compat con sesiones anteriores a este PR — ver comment del
+    // shape). Si ninguno matchea → clear + null.
+    const persistedKind = parsed.dashboardKind;
+    const fallbackKind = parsed.roles[0];
+    const candidateKind =
+      persistedKind && VALID_DASHBOARD_KINDS.has(persistedKind as Role)
+        ? persistedKind
+        : fallbackKind && VALID_DASHBOARD_KINDS.has(fallbackKind as Role)
+          ? fallbackKind
+          : null;
+    if (candidateKind === null) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+
     try {
       return new Identity(
         parsed.id,
@@ -59,12 +82,13 @@ export class LocalStorageIdentityStorage implements IdentityStorage {
         parsed.tenantSlug,
         parsed.email,
         parsed.codigo ?? null,
-        parsed.roles as Role[],
+        parsed.roles,
+        candidateKind as Role,
         parsed.expiresAt,
       );
     } catch {
       // Shape sintácticamente OK pero rompe algún invariante de Identity
-      // (p.ej. roles.length !== 1, tenantSlug vacío). Limpiar y empezar de cero.
+      // (p.ej. tenantSlug vacío). Limpiar y empezar de cero.
       localStorage.removeItem(STORAGE_KEY);
       return null;
     }
@@ -78,6 +102,7 @@ export class LocalStorageIdentityStorage implements IdentityStorage {
       email: identity.email,
       codigo: identity.codigo,
       roles: [...identity.roles],
+      dashboardKind: identity.dashboardKind,
       expiresAt: identity.expiresAt,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
