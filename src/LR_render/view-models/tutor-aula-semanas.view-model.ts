@@ -24,6 +24,7 @@ export class TutorAulaSemanasViewModel {
 
   readonly classroomId = signal<string>('');
   readonly classroomName = signal<string | null>(null);
+  readonly classroomCode = signal<string | null>(null);
   readonly cycleName = signal<string | null>(null);
   readonly semanas = signal<readonly AulaSemana[]>([]);
   readonly loading = signal(true);
@@ -73,6 +74,7 @@ export class TutorAulaSemanasViewModel {
     try {
       const result = await this.getSemanas.execute(classroomId);
       this.classroomName.set(result.classroom.name);
+      this.classroomCode.set(result.classroom.code);
       this.cycleName.set(result.cycle.name);
       // Orden cronológico ascendente: Semana 1 primero, última al final.
       // Convención iOS/Apple para pickers de tiempo: scroll up = avanzar en

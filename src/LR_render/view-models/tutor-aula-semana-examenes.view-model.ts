@@ -22,6 +22,7 @@ export class TutorAulaSemanaExamenesViewModel {
   readonly classroomId = signal<string>('');
   readonly periodId = signal<string>('');
   readonly classroomName = signal<string | null>(null);
+  readonly classroomCode = signal<string | null>(null);
   readonly semanaName = signal<string | null>(null);
   readonly startDate = signal<string | null>(null);
   readonly endDate = signal<string | null>(null);
@@ -65,6 +66,7 @@ export class TutorAulaSemanaExamenesViewModel {
     try {
       const result = await this.getExamenes.execute(classroomId, periodId);
       this.classroomName.set(result.classroom.name);
+      this.classroomCode.set(result.classroom.code);
       this.semanaName.set(result.week.name);
       this.startDate.set(result.week.startDate);
       this.endDate.set(result.week.endDate);

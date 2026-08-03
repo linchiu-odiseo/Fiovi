@@ -16,6 +16,11 @@
     <h1 class="tutor-aula-semanas__title">
       {{ vm.classroomName() ?? 'Aula sin nombre' }}
     </h1>
+    @if (vm.classroomCode()) {
+      <p class="tutor-aula-semanas__subtitle" data-testid="classroom-code">
+        {{ vm.classroomCode() }}
+      </p>
+    }
     @if (vm.cycleName()) {
       <p class="tutor-aula-semanas__subtitle">{{ vm.cycleName() }}</p>
     }
