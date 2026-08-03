@@ -51,6 +51,11 @@ export class EnviarTareaUseCase {
         responses,
         clientFinishedAt,
       });
+      // Orden: snapshot → ack → clear. Ver comentario en EnviarSimulacroUseCase.
+      await this.storage.saveSubmissionSnapshot(input.examId, {
+        answers,
+        admissionArea,
+      });
       await this.storage.setSubmissionAck(input.examId, result.ack);
       await this.storage.clearMarcaciones(input.examId);
       return { status: 'enviado', ack: result.ack };

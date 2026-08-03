@@ -1,17 +1,23 @@
-// Rueda horizontal — scroll snap nativo. El chip centrado en el viewport
-// es el seleccionado; el "lens" central se dibuja con un ::before del
-// viewport para que quede fijo mientras los chips pasan por debajo.
+// Rueda horizontal — scroll snap nativo. El chip que queda dentro del
+// "lens" central (::before) es el seleccionado.
 //
-// $item-width DEBE matchear con `itemWidthPx` del componente TS — el
-// cálculo del padding inicial + final se basa en ese valor.
+// STRUCT:
+//   .h-wheel            outer, position:relative, dibuja ::before lens fijo
+//     .h-wheel__scroll  inner, overflow-x:auto, scroll-snap. Aquí vive el scroll.
+//       .h-wheel__list  ul flex. ::before y ::after son SPACERS de flex-basis
+//                        (W - $item-width) / 2, para que:
+//                        (a) el primer y último chip puedan centrarse en el viewport,
+//                        (b) scrollWidth extienda lo suficiente para que el ÚLTIMO
+//                            chip llegue al centro (bug histórico: usar padding-inline
+//                            sobre la ul no extiende scrollWidth porque los chips
+//                            overflowan más allá del padding).
+//
+// $item-width DEBE matchear con `itemWidthPx` del componente TS.
 $item-width: 72px;
 $item-height: 60px;
 
 // :host debe ser block para ocupar el 100% del container (por default
-// custom elements son inline y colapsan al ancho del contenido). Sin
-// esto, el padding-inline calc(100% - w) se calcula contra el ancho
-// intrínseco de la rueda, no el del padre, y todo el snap queda mal
-// posicionado en mobile.
+// custom elements son inline y colapsan al ancho del contenido).
 :host {
   display: block;
   width: 100%;
@@ -19,53 +25,71 @@ $item-height: 60px;
 
 .h-wheel {
   position: relative;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
   padding-block: 0.35rem;
 
-  &::-webkit-scrollbar {
-    display: none;
-  }
-
-  // Lens central: outline sutil que marca la "ventana" donde el chip está
-  // seleccionado. No captura eventos.
+  // Lens central: cuadrado tenue con borde primary + fondo primary muy sutil.
+  // Vive en el outer (fuera del scroll) — no se mueve cuando el usuario
+  // scrollea. z-index: 2 para quedar por encima de los chips, pointer-events:
+  // none para no robar clicks.
   &::before {
     content: '';
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: $item-width + 2px;
-    height: $item-height + 2px;
+    width: $item-width + 4px;
+    height: $item-height + 4px;
     border: 1.5px solid var(--color-primary);
     border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--color-primary) 6%, transparent);
     pointer-events: none;
-    z-index: 1;
+    z-index: 2;
+  }
+
+  &__scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
   }
 
   &__list {
     list-style: none;
     margin: 0;
-    // Padding lateral = (100% - $item-width) / 2 para que el primer y último
-    // chip puedan quedar centrados horizontalmente. Requiere que el viewport
-    // sea al menos $item-width de ancho.
-    padding-inline: calc((100% - #{$item-width}) / 2);
-    padding-block: 0;
+    padding: 0;
     display: flex;
     gap: 0;
+
+    // Spacers laterales — son flex items (no chips reales) que ocupan justo el
+    // hueco necesario para que el primer y último chip puedan quedar en el
+    // centro visual. Sin ellos, el scroll no llega al final. `flex: 0 0 X`
+    // fija el ancho a X sin permitir grow/shrink. El `100%` de `calc` se
+    // resuelve contra el ancho de la ul (que hereda del .h-wheel__scroll).
+    &::before,
+    &::after {
+      content: '';
+      flex: 0 0 calc((100% - #{$item-width}) / 2);
+    }
   }
 
   &__item {
     scroll-snap-align: center;
+    scroll-snap-stop: always;
     flex-shrink: 0;
     width: $item-width;
     height: $item-height;
     display: flex;
     align-items: stretch;
     justify-content: stretch;
+    // z-index sobre el lens para que el color del chip activo se vea "por
+    // dentro" del cuadrado, no atrás. background: transparent.
+    position: relative;
+    z-index: 3;
   }
 
   &__btn {
@@ -90,7 +114,7 @@ $item-height: 60px;
   }
 
   &__item--active &__btn {
-    color: var(--color-on-surface);
+    color: var(--color-primary);
     opacity: 1;
     font-weight: 700;
   }

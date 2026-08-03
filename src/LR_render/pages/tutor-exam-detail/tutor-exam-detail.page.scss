@@ -82,6 +82,13 @@
       background: var(--color-success-container);
       color: var(--color-on-success-container);
     }
+
+    // Rojo tenue: el examen ya cerró. Coherente con la lista de exámenes
+    // por semana. El default (scheduled/programado) queda en gris neutro.
+    &--finalized {
+      background: var(--color-error-container);
+      color: var(--color-on-error-container);
+    }
   }
 
   // Chip de tipo (examen | tarea) — outline en vez de fill para diferenciarlo

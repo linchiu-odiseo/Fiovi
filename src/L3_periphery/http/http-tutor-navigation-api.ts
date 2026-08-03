@@ -88,6 +88,9 @@ interface TutorEnCursoItemDto {
   count: number | null;
   duration: number;
   startedAt: string;
+  // Wire: `openUntil` en camelCase (learnex tutor endpoints). null en exámenes
+  // clásicos; ISO string en tareas (openUntil !== null).
+  openUntil: string | null;
 }
 
 interface TutorExamsEnCursoResponseDto {
@@ -241,6 +244,7 @@ export class HttpTutorNavigationApi implements TutorNavigationApi {
       count: dto.count,
       duration: dto.duration,
       startedAt: new Date(dto.startedAt),
+      openUntil: this.parseNullableDate(dto.openUntil),
     });
   }
 

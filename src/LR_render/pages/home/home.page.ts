@@ -38,12 +38,20 @@ export class HomePage {
 
   protected onSimulacroClick(card: SimulacroCard): void {
     if (!card.clickable) return;
+    if (card.estado === 'enviado') {
+      void this.router.navigate(['/student/historial', card.id]);
+      return;
+    }
     if (this.vm.offlineStorageBlocked()) return;
     void this.router.navigate(['/simulacro', card.id]);
   }
 
   protected onProfileClick(): void {
     void this.router.navigate(['/profile']);
+  }
+
+  protected onTareasClick(): void {
+    void this.router.navigate(['/student/tareas']);
   }
 
   protected retry(): void {

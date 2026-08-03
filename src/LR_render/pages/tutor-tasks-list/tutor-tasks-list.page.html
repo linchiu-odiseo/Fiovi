@@ -1,0 +1,96 @@
+<main class="tutor-tasks">
+  <nav class="tutor-tasks__nav">
+    <button
+      type="button"
+      class="tutor-tasks__back"
+      data-testid="btn-volver"
+      (click)="onBack()"
+      aria-label="Volver"
+    >
+      <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+      Volver
+    </button>
+  </nav>
+
+  <header class="tutor-tasks__header">
+    <h1 class="tutor-tasks__title">Tareas abiertas</h1>
+    @if (vm.hasTareas()) {
+      <span class="tutor-tasks__count" data-testid="tareas-count">{{ vm.totalTareas() }}</span>
+    }
+  </header>
+
+  @if (vm.loading() && !vm.hasTareas()) {
+    <p class="tutor-tasks__empty">Cargando tareas…</p>
+  } @else if (vm.error()) {
+    <div class="tutor-tasks__banner tutor-tasks__banner--error" role="alert">
+      <p>Sin conexión. Revisá tu red y reintentá.</p>
+      <button type="button" class="tutor-tasks__retry" (click)="onRetry()">Reintentar</button>
+    </div>
+  } @else if (!vm.hasTareas()) {
+    <p class="tutor-tasks__empty" data-testid="empty-state">
+      Ninguna aula tiene tareas abiertas ahora.
+    </p>
+  } @else {
+    <!-- Agrupado por aula. Cada grupo tiene su header con nombre + count.
+         Los grupos están ordenados por deadline más próximo del primer item
+         (Map insertion-ordered — ver VM). -->
+    @for (grupo of vm.grupos(); track grupo.classroomId) {
+      <section class="tutor-tasks__grupo" [attr.data-testid]="'grupo-' + grupo.classroomId">
+        <header class="tutor-tasks__grupo-header">
+          <h2 class="tutor-tasks__grupo-name">{{ grupo.classroomName }}</h2>
+          <span class="tutor-tasks__grupo-count">
+            {{ grupo.tareas.length === 1 ? '1 tarea' : grupo.tareas.length + ' tareas' }}
+          </span>
+        </header>
+
+        <ul class="tutor-tasks__list">
+          @for (card of grupo.tareas; track card.recordId) {
+            <li
+              class="task-card task-card--clickable"
+              (click)="onCardClick(card)"
+              (keydown.enter)="onCardClick(card)"
+              role="button"
+              tabindex="0"
+              [attr.data-testid]="'task-card-' + card.recordId"
+            >
+              <span class="task-card__strip" aria-hidden="true"></span>
+
+              <div class="task-card__header">
+                <h3 class="task-card__name">{{ card.name }}</h3>
+                <span class="task-card__type-chip">Tarea</span>
+              </div>
+
+              <p class="task-card__meta">
+                @if (card.course) {
+                  <span>{{ card.course }}</span>
+                  <span class="task-card__meta-sep">·</span>
+                }
+                <span>{{ card.count === null ? '—' : card.count }} preg</span>
+              </p>
+
+              @if (card.closeAt) {
+                <p class="task-card__deadline">
+                  <span
+                    class="material-symbols-outlined task-card__deadline-icon"
+                    aria-hidden="true"
+                  >
+                    hourglass_top
+                  </span>
+                  <span class="task-card__countdown">{{ card.countdownText }}</span>
+                  <span class="task-card__deadline-sep">·</span>
+                  <span class="task-card__deadline-abs"
+                    >cierra {{ formatDeadline(card.closeAt) }}</span
+                  >
+                </p>
+              }
+
+              <span class="material-symbols-outlined task-card__chevron" aria-hidden="true">
+                chevron_right
+              </span>
+            </li>
+          }
+        </ul>
+      </section>
+    }
+  }
+</main>

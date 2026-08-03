@@ -44,7 +44,7 @@
   }
 
   <section class="simulacros">
-    <h2 class="section-title">Exámenes de hoy</h2>
+    <h2 class="section-title">Actividades de hoy</h2>
 
     @if (vm.serverError() === 'network') {
       <div class="banner banner--error" role="alert">
@@ -53,58 +53,82 @@
       </div>
     } @else if (vm.isLoading() && vm.exams().length === 0) {
       <p class="empty-state">Cargando simulacros…</p>
-    } @else if (vm.exams().length === 0) {
-      <p class="empty-state">No tienes simulacros asignados para hoy.</p>
+    } @else if (vm.cards().length === 0 && vm.tareasPendientesCount() === 0) {
+      <p class="empty-state">No hay exámenes ni tareas activas ahora.</p>
     } @else {
-      <ul class="card-list">
-        @for (card of vm.cards(); track card.id) {
-          <li
-            class="card"
-            [class.card--abierto]="card.estado === 'abierto'"
-            [class.card--enviado]="card.estado === 'enviado'"
-            [class.card--pendiente]="card.estado === 'pendiente'"
-            [class.card--cerrado]="card.estado === 'cerrado'"
-            [class.card--clickable]="card.clickable"
-            (click)="onSimulacroClick(card)"
-            (keydown.enter)="onSimulacroClick(card)"
-            [attr.role]="card.clickable ? 'button' : null"
-            [attr.tabindex]="card.clickable ? 0 : null"
-            [attr.aria-disabled]="card.clickable ? null : 'true'"
-          >
-            <span class="card__strip" aria-hidden="true"></span>
-            <div class="card__primary">
-              @if (card.estado === 'pendiente') {
-                <span class="material-symbols-outlined card__icon" aria-hidden="true">
-                  schedule
-                </span>
-              } @else if (card.estado === 'enviado') {
-                <span class="material-symbols-outlined card__icon" aria-hidden="true">
-                  check_circle
-                </span>
-              } @else if (card.estado === 'cerrado') {
-                <span class="material-symbols-outlined card__icon" aria-hidden="true">
-                  do_not_disturb_on
+      @if (vm.cards().length > 0) {
+        <ul class="card-list">
+          @for (card of vm.cards(); track card.id) {
+            <li
+              class="card"
+              [class.card--abierto]="card.estado === 'abierto'"
+              [class.card--enviado]="card.estado === 'enviado'"
+              [class.card--pendiente]="card.estado === 'pendiente'"
+              [class.card--cerrado]="card.estado === 'cerrado'"
+              [class.card--clickable]="card.clickable"
+              (click)="onSimulacroClick(card)"
+              (keydown.enter)="onSimulacroClick(card)"
+              [attr.role]="card.clickable ? 'button' : null"
+              [attr.tabindex]="card.clickable ? 0 : null"
+              [attr.aria-disabled]="card.clickable ? null : 'true'"
+            >
+              <span class="card__strip" aria-hidden="true"></span>
+              <div class="card__primary">
+                @if (card.estado === 'pendiente') {
+                  <span class="material-symbols-outlined card__icon" aria-hidden="true">
+                    schedule
+                  </span>
+                } @else if (card.estado === 'enviado') {
+                  <span class="material-symbols-outlined card__icon" aria-hidden="true">
+                    check_circle
+                  </span>
+                } @else if (card.estado === 'cerrado') {
+                  <span class="material-symbols-outlined card__icon" aria-hidden="true">
+                    do_not_disturb_on
+                  </span>
+                }
+                <span class="card__primary-text">{{ card.primaryText }}</span>
+              </div>
+              <h3 class="card__name">{{ card.name }}</h3>
+              <p class="card__secondary">
+                @if (card.estado === 'enviado') {
+                  <span class="material-symbols-outlined card__secondary-icon" aria-hidden="true"
+                    >hourglass_top</span
+                  >
+                }
+                {{ card.secondaryText }}
+              </p>
+              @if (card.clickable) {
+                <span class="material-symbols-outlined card__chevron" aria-hidden="true">
+                  chevron_right
                 </span>
               }
-              <span class="card__primary-text">{{ card.primaryText }}</span>
-            </div>
-            <h3 class="card__name">{{ card.name }}</h3>
-            <p class="card__secondary">
-              @if (card.estado === 'enviado') {
-                <span class="material-symbols-outlined card__secondary-icon" aria-hidden="true"
-                  >hourglass_top</span
-                >
-              }
-              {{ card.secondaryText }}
-            </p>
-            @if (card.clickable) {
-              <span class="material-symbols-outlined card__chevron" aria-hidden="true">
-                chevron_right
-              </span>
-            }
-          </li>
-        }
-      </ul>
+            </li>
+          }
+        </ul>
+      }
+
+      <!-- CTA de tareas pendientes. Aparece solo cuando hay ≥1 tarea con estado
+           `abierto`. Las tareas enviadas o cerradas siguen accesibles en la
+           página `/student/tareas` pero no cuentan para el badge — el alumno
+           tiene que ver acá lo que le queda por hacer, no lo que ya hizo. -->
+      @if (vm.tareasPendientesCount(); as tareasCount) {
+        <button
+          type="button"
+          class="tareas-cta"
+          data-testid="cta-tareas-pendientes"
+          (click)="onTareasClick()"
+          aria-label="Ver tareas pendientes"
+        >
+          <span class="material-symbols-outlined tareas-cta__icon" aria-hidden="true">task</span>
+          <span class="tareas-cta__label">
+            {{ tareasCount === 1 ? '1 tarea pendiente' : tareasCount + ' tareas pendientes' }}
+          </span>
+          <span class="material-symbols-outlined tareas-cta__chevron" aria-hidden="true">
+            chevron_right
+          </span>
+        </button>
+      }
     }
   </section>
 

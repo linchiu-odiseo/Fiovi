@@ -49,6 +49,7 @@ describe('EnviarSimulacroUseCase', () => {
       VALID_EMAIL,
       codigo,
       ['student'],
+      'student',
       Date.now() + 900_000,
     );
 
@@ -112,6 +113,42 @@ describe('EnviarSimulacroUseCase', () => {
 
       expect(await storage.getMarcaciones('exam-1')).toEqual({});
       expect(storage.getOpsLog()).toContain('markings.clearMarcaciones');
+    });
+
+    it('tras éxito, guarda snapshot con answers + admissionArea ANTES de clearMarcaciones', async () => {
+      storage.seedMarcacion('exam-1', 1, 'A');
+      storage.seedMarcacion('exam-1', 2, 'C');
+      // El alumno eligió expresamente el área 'B' antes de enviar.
+      storage.seedAdmissionArea('exam-1', 'B');
+      api.willResolveEnviar({ ack: validAck() });
+
+      await useCase.execute({ examId: 'exam-1' });
+
+      // Snapshot congelado con lo que se envió — el historial lo lee de acá,
+      // no de las marcaciones activas (que ya se borraron).
+      const snapshot = await storage.getSubmissionSnapshot('exam-1');
+      expect(snapshot).not.toBeNull();
+      expect(snapshot?.answers).toEqual({ '1': 'A', '2': 'C' });
+      expect(snapshot?.admissionArea).toBe('B');
+
+      // Orden importa: save debe ocurrir ANTES de clearMarcaciones (si el
+      // clear corre primero el snapshot quedaría vacío).
+      const log = storage.getOpsLog();
+      const saveIdx = log.indexOf('markings.saveSubmissionSnapshot');
+      const clearIdx = log.indexOf('markings.clearMarcaciones');
+      expect(saveIdx).toBeGreaterThanOrEqual(0);
+      expect(clearIdx).toBeGreaterThan(saveIdx);
+    });
+
+    it('snapshot usa DEFAULT_ADMISSION_AREA cuando el alumno nunca eligió expresamente', async () => {
+      storage.seedMarcacion('exam-1', 1, 'A');
+      // Sin seed de admissionArea → get devuelve null → use case aplica default.
+      api.willResolveEnviar({ ack: validAck() });
+
+      await useCase.execute({ examId: 'exam-1' });
+
+      const snapshot = await storage.getSubmissionSnapshot('exam-1');
+      expect(snapshot?.admissionArea).toBe('GENERAL');
     });
 
     it('marcaciones de OTRO examen NO se borran tras éxito en exam-1', async () => {

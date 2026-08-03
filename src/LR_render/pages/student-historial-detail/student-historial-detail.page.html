@@ -1,0 +1,101 @@
+<main class="detalle">
+  <nav class="detalle__nav">
+    <button
+      type="button"
+      class="detalle__back"
+      data-testid="btn-volver"
+      (click)="onBack()"
+      aria-label="Volver"
+    >
+      <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+      Volver
+    </button>
+  </nav>
+
+  @if (vm.isLoading()) {
+    <p class="detalle__loading">Cargando…</p>
+  } @else if (vm.storageError() || !vm.detalle()) {
+    <p class="detalle__empty" data-testid="empty-state">No se encontró el envío en esta device.</p>
+  } @else if (vm.detalle(); as d) {
+    <header class="detalle__header">
+      <h1 class="detalle__title">
+        {{ d.exam?.name ?? 'Envío del ' + (d.ack ? formatFecha(d.ack.submittedAt) : '—') }}
+      </h1>
+      <div class="detalle__meta">
+        @if (d.exam?.course; as course) {
+          <span class="detalle__course">{{ course }}</span>
+        }
+        @if (vm.admissionArea(); as area) {
+          <span class="detalle__area" data-testid="admission-area">Área {{ area }}</span>
+        }
+      </div>
+    </header>
+
+    @if (d.ack) {
+      <section class="acuse" data-testid="acuse">
+        <p class="acuse__title">
+          <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+          Envío registrado
+        </p>
+        <dl class="acuse__list">
+          <div>
+            <dt>Fecha</dt>
+            <dd>{{ formatFecha(d.ack.submittedAt) }}</dd>
+          </div>
+          <div>
+            <dt>Hash del envío</dt>
+            <dd class="acuse__hash">
+              <code data-testid="hash-full">{{ d.ack.submissionHash }}</code>
+              <button
+                type="button"
+                class="acuse__copy"
+                data-testid="btn-copy-hash"
+                (click)="onCopyHash()"
+                aria-label="Copiar hash"
+              >
+                <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
+              </button>
+            </dd>
+          </div>
+        </dl>
+      </section>
+    } @else {
+      <!-- Estado "no-envio": el examen cerró sin ack local. Puede ser porque
+           el alumno no envió, o envió desde otra device y este browser no
+           tiene el ack. La app no puede distinguir hoy — se comunica sin
+           acusar. Auto-envío server-side queda como TODO cuando el back
+           marque el flag. -->
+      <section class="no-envio" data-testid="no-envio">
+        <p class="no-envio__title">
+          <span class="material-symbols-outlined" aria-hidden="true">do_not_disturb_on</span>
+          No enviaste este examen
+        </p>
+        <p class="no-envio__hint">La sesión cerró sin registrar tu envío en esta device.</p>
+      </section>
+    }
+
+    <section class="respuestas">
+      <h2 class="respuestas__title">Respuestas marcadas</h2>
+      @if (vm.rows().length === 0) {
+        <p class="respuestas__empty">Sin marcaciones guardadas en esta device.</p>
+      } @else {
+        <ul class="grilla" data-testid="grilla">
+          @for (row of vm.rows(); track row.pregunta) {
+            <li class="grilla__row" [class.grilla__row--vacio]="row.alternativa === null">
+              <span class="grilla__n">{{ row.pregunta }}</span>
+              @if (row.alternativa) {
+                <span
+                  class="grilla__alt grilla__alt--pill"
+                  [class]="'grilla__alt--' + row.alternativa"
+                  >{{ row.alternativa }}</span
+                >
+              } @else {
+                <span class="grilla__alt grilla__alt--empty" aria-label="Sin marcar">—</span>
+              }
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  }
+</main>

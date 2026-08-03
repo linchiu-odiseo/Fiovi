@@ -14,6 +14,9 @@
   <header class="tutor-aula-semana-examenes__header">
     <p class="tutor-aula-semana-examenes__kicker">
       {{ vm.classroomName() ?? 'Aula' }}
+      @if (vm.classroomCode()) {
+        <span data-testid="classroom-code"> · {{ vm.classroomCode() }}</span>
+      }
     </p>
     <h1 class="tutor-aula-semana-examenes__title">
       {{ vm.semanaName() ?? 'Semana' }}

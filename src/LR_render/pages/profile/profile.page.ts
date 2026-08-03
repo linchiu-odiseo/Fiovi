@@ -1,5 +1,4 @@
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
-import { Location } from '@angular/common';
 import { Router } from '@angular/router';
 import { GetIdentityUseCase } from '../../../L2_application/use-cases/get-identity.use-case';
 import { GetProfileUseCase } from '../../../L2_application/use-cases/get-profile.use-case';
@@ -9,6 +8,7 @@ import { environment } from '../../../environments/environment';
 import { StudentProfile } from '../../../L1_domain/value-objects/student-profile';
 import { TutorProfile } from '../../../L1_domain/value-objects/tutor-profile';
 import { Role } from '../../../L1_domain/entities/identity';
+import { AboutModalComponent } from '../../components/about-modal/about-modal.component';
 import { UpdateConfirmModalComponent } from '../../components/update-confirm-modal/update-confirm-modal.component';
 import { VersionFooterComponent } from '../../components/version-footer/version-footer.component';
 
@@ -31,10 +31,9 @@ type UpdateRowStatus = 'idle' | 'checking' | 'up-to-date' | 'applying';
   selector: 'app-profile-page',
   templateUrl: './profile.page.html',
   styleUrl: './profile.page.scss',
-  imports: [VersionFooterComponent, UpdateConfirmModalComponent],
+  imports: [VersionFooterComponent, UpdateConfirmModalComponent, AboutModalComponent],
 })
 export class ProfilePage {
-  private readonly location = inject(Location);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   private readonly getIdentity = inject(GetIdentityUseCase);
@@ -45,6 +44,7 @@ export class ProfilePage {
   protected readonly appVersion = environment.appVersion;
   protected readonly updateStatus = signal<UpdateRowStatus>('idle');
   protected readonly showUpdateModal = signal(false);
+  protected readonly showAboutModal = signal(false);
 
   // Datos del usuario. `email` viene siempre de la identity (garantizado por
   // authGuard). `role`, `firstName`, `lastName`, `code` vienen del perfil
@@ -107,12 +107,25 @@ export class ProfilePage {
   }
 
   protected onBack(): void {
-    this.location.back();
+    // Padre lógico fijo — home del rol. NO usar location.back() porque el
+    // history del browser puede tener rutas hermanas (ej. /student/historial)
+    // y "volver" desde /profile debería llevar SIEMPRE al home, no al último
+    // sitio visitado.
+    const r = this.role();
+    if (r === 'tutor') {
+      void this.router.navigate(['/tutor/home']);
+    } else {
+      void this.router.navigate(['/student/home']);
+    }
   }
 
   protected onHistorialClick(): void {
-    // Placeholder: la vista de historial es follow-up declarado. Por ahora
-    // ignoramos el click para no navegar a una ruta rota.
+    const r = this.role();
+    if (r === 'student') {
+      void this.router.navigate(['/student/historial']);
+    } else if (r === 'tutor') {
+      void this.router.navigate(['/tutor/actividad']);
+    }
   }
 
   protected onConfigClick(): void {
@@ -155,8 +168,11 @@ export class ProfilePage {
   }
 
   protected onAcercaDeClick(): void {
-    // Placeholder: la vista "Acerca de" (versión, tenant, licencias)
-    // queda como follow-up.
+    this.showAboutModal.set(true);
+  }
+
+  protected onAboutModalDismiss(): void {
+    this.showAboutModal.set(false);
   }
 
   protected async onSignOut(): Promise<void> {

@@ -36,7 +36,16 @@ class LoginStub {}
 function buildIdentity(role: 'student' | 'tutor' = 'student'): Identity {
   const email = role === 'student' ? '79507732@vonex.edu.pe' : 'tutor1@vonex.pe';
   const codigo = role === 'student' ? '79507732' : null;
-  return new Identity('user-id', 'tenant-id', 'vonex', email, codigo, [role], Date.now() + 900_000);
+  return new Identity(
+    'user-id',
+    'tenant-id',
+    'vonex',
+    email,
+    codigo,
+    [role],
+    role,
+    Date.now() + 900_000,
+  );
 }
 
 const buildStudentProfile = (overrides: Partial<StudentProfile> = {}): StudentProfile => ({
@@ -182,6 +191,9 @@ class FakeMarkingsStorage implements MarkingsStorage {
   async getSubmissionAck(examId: string): Promise<SubmissionAck | null> {
     return this.acks.get(examId) ?? null;
   }
+  async getAllSubmissionAcks(): Promise<ReadonlyMap<string, SubmissionAck>> {
+    return new Map(this.acks);
+  }
   async setSubmissionAck(examId: string, ack: SubmissionAck): Promise<void> {
     this.acks.set(examId, ack);
   }
@@ -210,6 +222,12 @@ class FakeMarkingsStorage implements MarkingsStorage {
   async setAdmissionArea(_examId: string, _area: unknown): Promise<void> {
     /* no-op */
   }
+  async saveSubmissionSnapshot(_examId: string, _snapshot: unknown): Promise<void> {
+    /* no-op */
+  }
+  async getSubmissionSnapshot(_examId: string): Promise<null> {
+    return null;
+  }
   async wipeUserScope(): Promise<void> {
     /* no-op */
   }
@@ -231,6 +249,7 @@ const buildExam = (
     scheduled: Date;
     started: Date | null;
     finished: Date | null;
+    openUntil: Date | null;
   }> = {},
 ): Exam => {
   const inProgress = serverStatusValue === 'in_progress';
@@ -256,7 +275,7 @@ const buildExam = (
         : finalized
           ? new Date('2026-06-11T12:00:00Z')
           : null,
-    openUntil: null,
+    openUntil: 'openUntil' in overrides ? (overrides.openUntil ?? null) : null,
     serverStatus: new ExamServerStatus(serverStatusValue),
   });
 };
@@ -483,14 +502,16 @@ describe('HomePageViewModel', () => {
   });
 
   describe('cards() — composición de estado por (serverStatus, ack)', () => {
-    it('serverStatus=scheduled (sin ack) → estado="pendiente", not clickable', async () => {
+    // Filtro por in_progress: scheduled y finalized YA NO aparecen en el home
+    // (design ítem 1). scheduled quedaba como "pendiente" pero el alumno no
+    // podía hacer nada con él; finalized migra al historial local
+    // (/student/historial).
+    it('serverStatus=scheduled → NO aparece en cards() (filtrado por in_progress)', async () => {
       fakeGetTodaysExams.willResolve([buildExam('exam-sch', 'scheduled')]);
       const vm = createVm();
       await vm.start();
 
-      const card = vm.cards()[0];
-      expect(card.estado).toBe('pendiente');
-      expect(card.clickable).toBe(false);
+      expect(vm.cards()).toEqual([]);
       vm.stop();
     });
 
@@ -506,6 +527,9 @@ describe('HomePageViewModel', () => {
     });
 
     // Scenario "in_progress con ack → enviado" del spec exam-marking.
+    // Este caso SÍ queda en el home — el alumno acaba de enviar y el examen
+    // sigue abierto; el acuse fresco vale la pena, y ya es clickable al
+    // historial para ver el detalle.
     it('serverStatus=in_progress + ack persistido → estado="enviado", primaryText con HH:MM del ack.submittedAt', async () => {
       fakeMarkings.seedAck('exam-ip-ack', buildAck('ack-1', '2026-06-11T11:30:00.000Z'));
       fakeGetTodaysExams.willResolve([buildExam('exam-ip-ack', 'in_progress')]);
@@ -514,8 +538,7 @@ describe('HomePageViewModel', () => {
 
       const card = vm.cards()[0];
       expect(card.estado).toBe('enviado');
-      expect(card.clickable).toBe(false);
-      // primaryText usa ack.submittedAt — NO exam.effectiveCloseAt.
+      expect(card.clickable).toBe(true);
       const submittedAt = new Date('2026-06-11T11:30:00.000Z');
       const hh = String(submittedAt.getHours()).padStart(2, '0');
       const mm = String(submittedAt.getMinutes()).padStart(2, '0');
@@ -523,38 +546,35 @@ describe('HomePageViewModel', () => {
       vm.stop();
     });
 
-    // Scenario "finalized con ack → enviado" del spec exam-marking.
-    it('serverStatus=finalized + ack persistido → estado="enviado"', async () => {
+    it('serverStatus=finalized + ack persistido → NO aparece en cards() (migra a historial)', async () => {
       fakeMarkings.seedAck('exam-fin-ack', buildAck('ack-2'));
       fakeGetTodaysExams.willResolve([buildExam('exam-fin-ack', 'finalized')]);
       const vm = createVm();
       await vm.start();
 
-      const card = vm.cards()[0];
-      expect(card.estado).toBe('enviado');
-      expect(card.clickable).toBe(false);
+      expect(vm.cards()).toEqual([]);
       vm.stop();
     });
 
-    it('serverStatus=finalized + ack=null → estado="cerrado", not clickable', async () => {
+    it('serverStatus=finalized + ack=null → NO aparece en cards() (migra a historial)', async () => {
       fakeGetTodaysExams.willResolve([buildExam('exam-closed', 'finalized')]);
       const vm = createVm();
       await vm.start();
 
-      const card = vm.cards()[0];
-      expect(card.estado).toBe('cerrado');
-      expect(card.clickable).toBe(false);
+      expect(vm.cards()).toEqual([]);
       vm.stop();
     });
 
     // Scenario "secondaryText en estado enviado" del spec exam-marking.
-    it('estado=enviado → secondaryText = "Pendiente de calificación" (reemplaza fallback area/course)', async () => {
+    // Copy cambió de "Pendiente de calificación" (mentira operativa — no hay
+    // proceso de calificación en learnex) a acuse honesto + hint navegable.
+    it('estado=enviado → secondaryText apunta al historial en vez de prometer calificación', async () => {
       fakeMarkings.seedAck('exam-ip-ack', buildAck('ack-1'));
       fakeGetTodaysExams.willResolve([buildExam('exam-ip-ack', 'in_progress')]);
       const vm = createVm();
       await vm.start();
 
-      expect(vm.cards()[0].secondaryText).toBe('Pendiente de calificación');
+      expect(vm.cards()[0].secondaryText).toBe('Envío registrado · toca para ver el detalle');
       vm.stop();
     });
   });
@@ -655,6 +675,55 @@ describe('HomePageViewModel', () => {
       await vm.start();
 
       expect(warnSpy).not.toHaveBeenCalled();
+      vm.stop();
+    });
+  });
+
+  describe('split cards() vs tareasPendientesCount()', () => {
+    const openUntil = new Date('2026-06-15T00:00:00Z');
+
+    it('cards() excluye las tareas (openUntil !== null) y también los scheduled/finalized', async () => {
+      fakeGetTodaysExams.willResolve([
+        buildExam('exam-1', 'in_progress'),
+        buildExam('tarea-1', 'in_progress', { openUntil }),
+        // scheduled queda fuera por el filtro in_progress del ítem 1 del refine.
+        buildExam('exam-2', 'scheduled'),
+        buildExam('tarea-2', 'in_progress', { openUntil }),
+      ]);
+
+      const vm = createVm();
+      await vm.start();
+
+      expect(vm.cards().map((c) => c.id)).toEqual(['exam-1']);
+      vm.stop();
+    });
+
+    it('tareasPendientesCount() cuenta solo las tareas con estado "abierto" (in_progress sin ack)', async () => {
+      fakeGetTodaysExams.willResolve([
+        buildExam('tarea-abierta-1', 'in_progress', { openUntil }),
+        buildExam('tarea-abierta-2', 'in_progress', { openUntil }),
+        buildExam('tarea-scheduled', 'scheduled', { openUntil }),
+        buildExam('tarea-cerrada', 'finalized', { openUntil }),
+      ]);
+
+      const vm = createVm();
+      await vm.start();
+
+      // solo las 2 in_progress sin ack cuentan como pendientes de acción
+      expect(vm.tareasPendientesCount()).toBe(2);
+      vm.stop();
+    });
+
+    it('tareasPendientesCount() = 0 cuando no hay tareas (solo exámenes)', async () => {
+      fakeGetTodaysExams.willResolve([
+        buildExam('exam-1', 'in_progress'),
+        buildExam('exam-2', 'scheduled'),
+      ]);
+
+      const vm = createVm();
+      await vm.start();
+
+      expect(vm.tareasPendientesCount()).toBe(0);
       vm.stop();
     });
   });

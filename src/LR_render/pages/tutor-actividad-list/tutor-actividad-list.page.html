@@ -1,0 +1,102 @@
+<main class="actividad">
+  <nav class="actividad__nav">
+    <button
+      type="button"
+      class="actividad__back"
+      data-testid="btn-volver"
+      (click)="onBack()"
+      aria-label="Volver"
+    >
+      <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+      Volver
+    </button>
+  </nav>
+
+  <header class="actividad__header">
+    <h1 class="actividad__title">Actividad</h1>
+    <p class="actividad__hint">
+      Exámenes finalizados. El listado se limpia solo al cierre del día.
+    </p>
+  </header>
+
+  @if (vm.archiveError(); as errMsg) {
+    <div class="actividad__banner" role="alert" data-testid="archive-error">
+      <span>{{ errMsg }}</span>
+      <button
+        type="button"
+        class="actividad__banner-close"
+        (click)="onDismissArchiveError()"
+        aria-label="Cerrar"
+      >
+        <span class="material-symbols-outlined" aria-hidden="true">close</span>
+      </button>
+    </div>
+  }
+
+  @if (vm.isLoading() && vm.events().length === 0) {
+    <p class="actividad__empty">Cargando…</p>
+  } @else if (vm.loadError()) {
+    <div class="actividad__banner" role="alert">
+      No se pudo cargar el historial. Revisá tu conexión y volvé a entrar.
+    </div>
+  } @else if (vm.events().length === 0) {
+    <p class="actividad__empty" data-testid="empty-state">
+      Todavía no hay exámenes finalizados hoy.
+    </p>
+  } @else {
+    <ul class="actividad__list">
+      @for (event of vm.events(); track event.recordId) {
+        <li class="actividad__item">
+          <app-swipeable-card
+            actionLabel="Archivar"
+            actionIcon="archive"
+            (action)="onArchive(event.recordId)"
+          >
+            <div
+              class="actividad-card"
+              data-testid="actividad-card"
+              (click)="onCardClick(event)"
+              (keydown.enter)="onCardClick(event)"
+              role="button"
+              tabindex="0"
+            >
+              <span class="actividad-card__strip" aria-hidden="true"></span>
+              <div class="actividad-card__body">
+                <h2 class="actividad-card__name">{{ event.name }}</h2>
+                @if (event.course || event.classroomName) {
+                  <p class="actividad-card__course">
+                    @if (event.course) {
+                      <span>{{ event.course }}</span>
+                    }
+                    @if (event.course && event.classroomName) {
+                      <span class="actividad-card__sep" aria-hidden="true">·</span>
+                    }
+                    @if (event.classroomName) {
+                      <span class="actividad-card__aula">{{ event.classroomName }}</span>
+                    }
+                  </p>
+                }
+                <p class="actividad-card__meta">
+                  <span
+                    class="material-symbols-outlined actividad-card__meta-icon"
+                    aria-hidden="true"
+                  >
+                    stop_circle
+                  </span>
+                  Finalizado · {{ formatFecha(event.finishedAt) }}
+                </p>
+              </div>
+              @if (vm.archivingId() === event.recordId) {
+                <span class="actividad-card__spinner" aria-label="Archivando…"></span>
+              } @else {
+                <span class="material-symbols-outlined actividad-card__chevron" aria-hidden="true">
+                  chevron_right
+                </span>
+              }
+            </div>
+          </app-swipeable-card>
+        </li>
+      }
+    </ul>
+  }
+</main>

@@ -15,6 +15,7 @@ export const INSPIRATIONAL_QUOTES: readonly string[] = [
   'el tiempo que le dedicas hoy es el examen que apruebas mañana',
   'no es talento. es haber vuelto a empezar más veces',
   'cada pregunta es una decisión; cada decisión, una respuesta tuya',
+  'pulsa aquí y te encontrarás a ti mismo',
 ];
 
 export function randomQuote(): string {

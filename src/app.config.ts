@@ -21,7 +21,6 @@ import { MarkingsStorage } from './L1_domain/ports/markings-storage';
 import { ExamsApi } from './L1_domain/ports/exams-api';
 import { IdentityStorage } from './L1_domain/ports/identity-storage';
 import { ProfileStorage } from './L1_domain/ports/profile-storage';
-import { OutboxStoragePort } from './L1_domain/ports/outbox-storage.port';
 import { RouterPort } from './L1_domain/ports/router-port';
 import { TenantSlugCache } from './L1_domain/ports/tenant-slug-cache';
 
@@ -42,6 +41,9 @@ import { RetomarEnviosPendientesUseCase } from './L2_application/use-cases/retom
 import { ProgramarAutoEnvioUseCase } from './L2_application/use-cases/programar-auto-envio.use-case';
 import { GuardarDraftUseCase } from './L2_application/use-cases/guardar-draft.use-case';
 import { SeleccionarAdmissionAreaUseCase } from './L2_application/use-cases/seleccionar-admission-area.use-case';
+import { GetHistorialUseCase } from './L2_application/use-cases/get-historial.use-case';
+import { GetHistorialEntryUseCase } from './L2_application/use-cases/get-historial-entry.use-case';
+import { GetMySubmissionUseCase } from './L2_application/use-cases/get-my-submission.use-case';
 
 // L3 implementaciones de los puertos.
 import { CloudflareTurnstileProvider } from './L3_periphery/captcha/cloudflare-turnstile-provider';
@@ -75,6 +77,7 @@ import { environment } from './environments/environment';
 
 // L2 use-cases del tutor — puras TS, sin decorador Angular.
 import { GetTutorExamsUseCase } from './L2_application/use-cases/get-tutor-exams.use-case';
+import { GetTutorExamsFinalizadasUseCase } from './L2_application/use-cases/get-tutor-exams-finalizadas.use-case';
 import { GetTutorExamDetailUseCase } from './L2_application/use-cases/get-tutor-exam-detail.use-case';
 import { ListClassroomStudentsUseCase } from './L2_application/use-cases/list-classroom-students.use-case';
 import { IniciarExamenUseCase } from './L2_application/use-cases/iniciar-examen.use-case';
@@ -185,8 +188,7 @@ export const appConfig: ApplicationConfig = {
         identityStorage: IdentityStorage,
         slugCache: TenantSlugCache,
         profileStorage: ProfileStorage,
-        markings: MarkingsStorage,
-        outbox: OutboxStoragePort,
+        draftDispatcher: DraftAutoSaveDispatcher,
         routerPort: RouterPort,
       ) =>
         new LogoutUseCase(
@@ -194,8 +196,7 @@ export const appConfig: ApplicationConfig = {
           identityStorage,
           slugCache,
           profileStorage,
-          markings,
-          outbox,
+          draftDispatcher,
           routerPort,
         ),
       deps: [
@@ -203,8 +204,7 @@ export const appConfig: ApplicationConfig = {
         IDENTITY_STORAGE,
         TENANT_SLUG_CACHE,
         PROFILE_STORAGE,
-        MARKINGS_STORAGE,
-        OUTBOX_STORAGE,
+        DraftAutoSaveDispatcher,
         ROUTER_PORT,
       ],
     },
@@ -286,12 +286,34 @@ export const appConfig: ApplicationConfig = {
       useFactory: (markings: MarkingsStorage) => new SeleccionarAdmissionAreaUseCase(markings),
       deps: [MARKINGS_STORAGE],
     },
+    {
+      provide: GetMySubmissionUseCase,
+      useFactory: (api: ExamsApi, markings: MarkingsStorage) =>
+        new GetMySubmissionUseCase(api, markings),
+      deps: [EXAMS_API, MARKINGS_STORAGE],
+    },
+    {
+      provide: GetHistorialUseCase,
+      useFactory: (markings: MarkingsStorage, getMy: GetMySubmissionUseCase) =>
+        new GetHistorialUseCase(markings, getMy),
+      deps: [MARKINGS_STORAGE, GetMySubmissionUseCase],
+    },
+    {
+      provide: GetHistorialEntryUseCase,
+      useFactory: (markings: MarkingsStorage) => new GetHistorialEntryUseCase(markings),
+      deps: [MARKINGS_STORAGE],
+    },
     // Use-cases del tutor: fábricas puras que inyectan el puerto via TUTOR_EXAMS_API.
     // PR1 los registra aquí pero ninguna VM los inyecta todavía (compila, runtime-inert).
     // PR2/PR3 añadirán las VM y páginas que los consumen. Ver design.md D7.
     {
       provide: GetTutorExamsUseCase,
       useFactory: (api: TutorExamsApi) => new GetTutorExamsUseCase(api),
+      deps: [TUTOR_EXAMS_API],
+    },
+    {
+      provide: GetTutorExamsFinalizadasUseCase,
+      useFactory: (api: TutorExamsApi) => new GetTutorExamsFinalizadasUseCase(api),
       deps: [TUTOR_EXAMS_API],
     },
     {

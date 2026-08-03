@@ -1,0 +1,330 @@
+// Detalle del historial: acuse (fecha + hash + copy) arriba, grilla de
+// respuestas abajo en 4 columnas. La grilla replica el formato de la
+// cartilla (número + letra), pero read-only.
+
+:host {
+  display: block;
+  min-height: 100dvh;
+  background: var(--color-bg);
+  color: var(--color-on-surface);
+  padding: calc(env(safe-area-inset-top) + var(--top-chrome)) var(--space-md)
+    env(safe-area-inset-bottom);
+  box-sizing: border-box;
+  font-family: var(--font-body);
+}
+
+.detalle {
+  max-width: 32rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-height: calc(100dvh - var(--top-chrome) - env(safe-area-inset-top));
+  box-sizing: border-box;
+
+  &__nav {
+    display: flex;
+    align-items: center;
+  }
+
+  &__back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-height: 44px;
+    padding: var(--space-xs) var(--space-xs) var(--space-xs) 0;
+    border: none;
+    background: transparent;
+    color: var(--color-primary);
+    font-family: var(--font-body);
+    font-size: 0.9375rem;
+    font-weight: 500;
+    cursor: pointer;
+
+    .material-symbols-outlined {
+      font-size: 1.25rem;
+      margin-left: -4px;
+      line-height: 1;
+    }
+  }
+
+  &__header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  &__title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    line-height: 1.9rem;
+    font-weight: 700;
+    color: var(--color-on-surface);
+  }
+
+  &__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.15rem;
+  }
+
+  &__course {
+    font-size: 0.9rem;
+    color: var(--color-on-surface-variant);
+  }
+
+  &__area {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem 0.55rem;
+    border-radius: var(--radius-pill);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+
+  &__loading,
+  &__empty {
+    margin: 0;
+    padding: var(--space-md);
+    text-align: center;
+    color: var(--color-on-surface-variant);
+    border-radius: var(--radius-md);
+    border: 1px dashed var(--color-outline-variant);
+  }
+}
+
+.acuse {
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-outline-variant);
+  background: var(--color-surface-container-lowest);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+
+  &__title {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--color-success);
+
+    .material-symbols-outlined {
+      font-size: 1.15rem;
+      line-height: 1;
+    }
+  }
+
+  &__list {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    div {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+
+    dt {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--color-on-surface-variant);
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+
+    dd {
+      margin: 0;
+      font-size: 0.9rem;
+      color: var(--color-on-surface);
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  &__hash {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+
+    code {
+      flex: 1 1 auto;
+      font-family: var(--font-mono, monospace);
+      font-size: 0.7rem;
+      line-height: 1.4;
+      word-break: break-all;
+      background: var(--color-surface-container-low);
+      padding: 0.3rem 0.5rem;
+      border-radius: var(--radius-sm);
+      color: var(--color-on-surface);
+    }
+  }
+
+  &__copy {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    min-height: 40px;
+    padding: 0.4rem;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    border: 1px solid var(--color-outline-variant);
+    color: var(--color-on-surface-variant);
+    cursor: pointer;
+    transition: background 120ms ease;
+
+    &:hover,
+    &:focus-visible {
+      background: var(--color-surface-container-low);
+      color: var(--color-primary);
+    }
+
+    .material-symbols-outlined {
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+  }
+}
+
+.no-envio {
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-outline-variant);
+  background: var(--color-surface-container-lowest);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+
+  &__title {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--color-on-surface);
+
+    .material-symbols-outlined {
+      font-size: 1.2rem;
+      line-height: 1;
+      color: var(--color-on-surface-variant);
+    }
+  }
+
+  &__hint {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--color-on-surface-variant);
+    line-height: 1.4;
+  }
+}
+
+.respuestas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+
+  &__title {
+    margin: 0;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--color-on-surface-variant);
+  }
+
+  &__empty {
+    margin: 0;
+    padding: var(--space-md);
+    text-align: center;
+    color: var(--color-on-surface-variant);
+    font-size: 0.85rem;
+    border-radius: var(--radius-md);
+    border: 1px dashed var(--color-outline-variant);
+  }
+}
+
+.grilla {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.35rem;
+
+  &__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.4rem 0.6rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-outline-variant);
+    background: var(--color-surface-container-lowest);
+    font-variant-numeric: tabular-nums;
+
+    &--vacio {
+      opacity: 0.55;
+    }
+  }
+
+  &__n {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-on-surface-variant);
+  }
+
+  // Pastilla circular con la letra, coloreada por alternativa. Espeja el
+  // patrón visual de learnex (5 colores puros distintos por letra) para que
+  // el alumno reconozca de un vistazo qué marcó.
+  &__alt {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 0.85rem;
+    line-height: 1;
+  }
+
+  &__alt--pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: var(--radius-pill);
+    color: var(--color-on-alt);
+  }
+
+  &__alt--A {
+    background: var(--color-alt-a);
+  }
+  &__alt--B {
+    background: var(--color-alt-b);
+  }
+  &__alt--C {
+    background: var(--color-alt-c);
+  }
+  &__alt--D {
+    background: var(--color-alt-d);
+  }
+  &__alt--E {
+    background: var(--color-alt-e);
+  }
+
+  &__alt--empty {
+    color: var(--color-outline);
+    font-family: var(--font-mono, monospace);
+    font-weight: 500;
+  }
+}

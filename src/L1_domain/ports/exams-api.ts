@@ -1,5 +1,6 @@
 import { Exam } from '../entities/exam';
 import { AdmissionArea } from '../value-objects/admission-area';
+import { AnswersMap } from './markings-storage';
 import { ServerTime } from '../value-objects/server-time';
 import { SubmissionAck } from '../value-objects/submission-ack';
 
@@ -28,6 +29,20 @@ export interface EnvioRequest {
 // de comprobante.
 export interface EnvioResult {
   ack: SubmissionAck;
+}
+
+// Salida del GET /my-submission: la fila de student_exam_submissions del
+// alumno para una sesión. `source` distingue envío directo del alumno (manual)
+// del promovido por el finalize del tutor (auto_saved). `responses` viene
+// como AnswersMap ya con keys de string de número (`"1"`, `"2"`, ...) — el
+// mapper del adapter convierte el shape `P1/P2/...` del back a la forma
+// local.
+export interface MySubmission {
+  ack: SubmissionAck;
+  clientFinishedAt: Date;
+  responses: AnswersMap;
+  admissionArea: AdmissionArea | null;
+  source: 'manual' | 'auto_saved';
 }
 
 // Body del POST de draft (auto-save progresivo). `examId` es el `sessionId`
@@ -118,4 +133,18 @@ export interface ExamsApi {
    *   - 0 / 429 / 5xx / message fuera de enum   → NetworkError
    */
   enviarHomework(req: EnvioRequest): Promise<EnvioResult>;
+
+  /**
+   * GET /t/{slug}/student/exam-sessions/{sessionId}/my-submission — devuelve
+   * la fila de student_exam_submissions del alumno autenticado o null si no
+   * existe. Fuente de verdad del historial cuando el ack local no está
+   * (auto-guardado post-finalize, envío desde otro device, retry post-fail
+   * que igual llegó a BD).
+   *
+   * Mapeo de errores:
+   *   - 404                                → null (no hay submission).
+   *   - 401                                → interceptor.
+   *   - 0 / 429 / 5xx / network            → NetworkError.
+   */
+  getMySubmission(sessionId: string): Promise<MySubmission | null>;
 }

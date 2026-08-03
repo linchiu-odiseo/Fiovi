@@ -45,10 +45,48 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/simulacro/simulacro.page').then((m) => m.SimulacroPage),
   },
   {
+    path: 'student/tareas',
+    canActivate: [authGuard, roleGuard('student')],
+    loadComponent: () =>
+      import('./pages/student-tasks-list/student-tasks-list.page').then(
+        (m) => m.StudentTasksListPage,
+      ),
+  },
+  {
+    path: 'student/historial',
+    canActivate: [authGuard, roleGuard('student')],
+    loadComponent: () =>
+      import('./pages/student-historial-list/student-historial-list.page').then(
+        (m) => m.StudentHistorialListPage,
+      ),
+  },
+  {
+    path: 'student/historial/:examId',
+    canActivate: [authGuard, roleGuard('student')],
+    loadComponent: () =>
+      import('./pages/student-historial-detail/student-historial-detail.page').then(
+        (m) => m.StudentHistorialDetailPage,
+      ),
+  },
+  {
     path: 'tutor/home',
     canActivate: [authGuard, roleGuard('tutor')],
     loadComponent: () =>
       import('./pages/tutor-exams-list/tutor-exams-list.page').then((m) => m.TutorExamsListPage),
+  },
+  {
+    path: 'tutor/tareas',
+    canActivate: [authGuard, roleGuard('tutor')],
+    loadComponent: () =>
+      import('./pages/tutor-tasks-list/tutor-tasks-list.page').then((m) => m.TutorTasksListPage),
+  },
+  {
+    path: 'tutor/actividad',
+    canActivate: [authGuard, roleGuard('tutor')],
+    loadComponent: () =>
+      import('./pages/tutor-actividad-list/tutor-actividad-list.page').then(
+        (m) => m.TutorActividadListPage,
+      ),
   },
   // Nav mobile AULA → SEMANA → CURSO → EXÁMENES (change tutor-aulas-semanas-view).
   // La ruta legacy `/tutor/aulas/:classroomId` (que apuntaba a la lista plana de

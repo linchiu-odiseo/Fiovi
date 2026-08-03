@@ -20,6 +20,15 @@ export class TutorExam {
   public readonly detailId: string;
   public readonly recordId: string;
   public readonly classroomId: string;
+  /**
+   * Código y nombre del aula. Null cuando el DTO fuente no los provee (endpoint
+   * gordo `/tutor/virtual-exams`); string cuando vienen de los endpoints
+   * dedicados que sí los incluyen (`/tutor/exams/finalizadas`, `/tutor/exams/en-curso`).
+   * Consumers que necesiten el nombre y no lo tengan pueden lookupearlo en
+   * `TutorProfile.classrooms` por `classroomId`.
+   */
+  public readonly classroomCode: string | null;
+  public readonly classroomName: string | null;
   public readonly serverStatus: ExamServerStatus;
   public readonly name: string;
   public readonly course: string | null;
@@ -41,6 +50,8 @@ export class TutorExam {
     detailId: string;
     recordId: string;
     classroomId: string;
+    classroomCode?: string | null;
+    classroomName?: string | null;
     serverStatus: ExamServerStatus;
     name: string;
     course: string | null;
@@ -55,6 +66,8 @@ export class TutorExam {
     this.detailId = params.detailId;
     this.recordId = params.recordId;
     this.classroomId = params.classroomId;
+    this.classroomCode = params.classroomCode ?? null;
+    this.classroomName = params.classroomName ?? null;
     this.serverStatus = params.serverStatus;
     this.name = params.name;
     this.course = params.course;

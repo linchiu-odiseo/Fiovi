@@ -63,6 +63,7 @@ function buildItem(classroomId: string): ExamEnCurso {
     count: 4,
     duration: 900,
     startedAt: new Date('2026-07-21T14:00:00Z'),
+    openUntil: null,
   });
 }
 

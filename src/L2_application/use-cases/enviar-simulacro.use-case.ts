@@ -85,6 +85,17 @@ export class EnviarSimulacroUseCase {
         responses,
         clientFinishedAt,
       });
+      // Orden: snapshot → ack → clear.
+      // El ack es la señal de "está enviado" para el historial-list. Si
+      // crashea entre snapshot y ack, la próxima app abre sin ack local
+      // → el alumno puede reintentar el envío con las marcaciones live
+      // (que aún no fueron limpiadas). Si crashea entre ack y clear, el
+      // historial lee el snapshot ya persistido; sin snapshot solo pasaría
+      // si crasheara entre snapshot y ack (imposible por await).
+      await this.storage.saveSubmissionSnapshot(input.examId, {
+        answers,
+        admissionArea,
+      });
       await this.storage.setSubmissionAck(input.examId, result.ack);
       await this.storage.clearMarcaciones(input.examId);
       return { status: 'enviado', ack: result.ack };

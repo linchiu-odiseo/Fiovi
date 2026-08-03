@@ -18,6 +18,7 @@ import { ExamConflictError } from '../../L1_domain/errors/exam-conflict.error';
 import { ExamPreconditionError } from '../../L1_domain/errors/exam-precondition.error';
 import { VirtualExamNotFoundError } from '../../L1_domain/errors/virtual-exam-not-found.error';
 import { TutorExamForbiddenError } from '../../L1_domain/errors/tutor-exam-forbidden.error';
+import { formatRestante, formatRestanteTarea } from '../utils/countdown-format';
 
 // Ticker del countdown: refresca `nowTick` cada 1s para que los signals
 // derivados (countdownRestante) recomputen. Idéntico al del simulacro del
@@ -544,7 +545,9 @@ export class TutorExamDetailViewModel {
   }
 
   // Archiva el examen (finalized → archived). Tras éxito, quita el exam del
-  // store local (deja de aparecer en la lista) y redirige a /tutor/home.
+  // store local (deja de aparecer en la lista) y redirige al padre lógico
+  // (parentRoute()) — que respeta `?from=` para volver a /tutor/actividad
+  // cuando ese fue el punto de entrada, o a /tutor/home por default.
   async archivar(): Promise<void> {
     if (!this.canArchivar()) return;
 
@@ -557,12 +560,24 @@ export class TutorExamDetailViewModel {
       // El back ya no lo va a devolver en la lista — sacamos del store local
       // para que /tutor/home no muestre el card obsoleto.
       this.store.remove(recordId);
-      void this.router.navigate(['/tutor/home']);
+      void this.router.navigate([this.parentRoute()]);
     } catch (err) {
       this.actionError.set(this.copyForAction('archivar', err));
     } finally {
       this.isSaving.set(false);
     }
+  }
+
+  // Ruta a la que "Volver" y "Archivar" navegan al salir del detail. Se lee
+  // del queryParam `?from=` (seteado por el caller cuando venís de una
+  // pantalla específica como /tutor/actividad) o cae al default /tutor/home.
+  // Whitelist de destinos permitidos: los paths conocidos donde tiene sentido
+  // volver. Cualquier otro valor cae al default para evitar open redirect.
+  parentRoute(): string {
+    const from = this.route.snapshot.queryParamMap.get('from');
+    const allowed = new Set(['/tutor/home', '/tutor/actividad']);
+    if (from !== null && allowed.has(from)) return from;
+    return '/tutor/home';
   }
 
   /**
@@ -848,7 +863,7 @@ export class TutorExamDetailViewModel {
 // Re-export ExamServerStatus for template usage (avoids extra imports in page).
 export { ExamServerStatus };
 
-// ── Formatting helpers (mismo criterio que simulacro.view-model.ts) ─────────
+// ── Formatting helpers locales (los de countdown viven en utils/) ───────────
 
 function formatHHMM(d: Date): string {
   const hh = d.getHours().toString().padStart(2, '0');
@@ -860,41 +875,4 @@ function formatDDMM(d: Date): string {
   const dd = d.getDate().toString().padStart(2, '0');
   const mm = (d.getMonth() + 1).toString().padStart(2, '0');
   return `${dd}/${mm}`;
-}
-
-function formatRestante(ms: number): string {
-  if (ms <= 0) return '00:00';
-  const totalSeconds = Math.ceil(ms / 1_000);
-  const hh = Math.floor(totalSeconds / 3600);
-  const mm = Math.floor((totalSeconds % 3600) / 60);
-  const ss = totalSeconds % 60;
-  const pad = (n: number): string => n.toString().padStart(2, '0');
-  // Solo mostramos las horas cuando aportan — un examen de 15 min no debería
-  // ver "00:15:00", pero uno de 90 min sí "01:30:00" (más natural que 90:00).
-  if (hh > 0) return `${pad(hh)}:${pad(mm)}:${pad(ss)}`;
-  return `${pad(mm)}:${pad(ss)}`;
-}
-
-// Formato humano para el countdown de tarea (puede durar días). Escalona:
-//   > 24h        → "1 día 5 h" / "3 días"
-//   1h – 24h     → "5 h 32 min" / "12 h"
-//   5min – 1h    → "32 min"
-//   < 5min       → cae a MM:SS (mismo reloj que examen — momento de acción).
-// Mostrar segundos cuando faltan días es ruido puro (2 días 5 h 12 min 43 s
-// no da información accionable), por eso solo aparecen en el último tramo.
-function formatRestanteTarea(ms: number): string {
-  if (ms <= 0) return '00:00';
-  const totalSeconds = Math.ceil(ms / 1_000);
-  if (totalSeconds < 5 * 60) return formatRestante(ms);
-  const days = Math.floor(totalSeconds / 86_400);
-  const hours = Math.floor((totalSeconds % 86_400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  if (days > 0) {
-    const dLabel = days === 1 ? 'día' : 'días';
-    return hours > 0 ? `${days} ${dLabel} ${hours} h` : `${days} ${dLabel}`;
-  }
-  if (hours > 0) {
-    return minutes > 0 ? `${hours} h ${minutes} min` : `${hours} h`;
-  }
-  return `${minutes} min`;
 }

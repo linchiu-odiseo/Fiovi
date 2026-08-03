@@ -23,6 +23,13 @@ export class ExamEnCurso {
   /** Duración configurada, en segundos. */
   public readonly duration: number;
   public readonly startedAt: Date;
+  /**
+   * Fecha absoluta de cierre para tareas (openUntil !== null). En exámenes
+   * clásicos es null y el cierre se calcula como `startedAt + duration`
+   * (ver `expectedEndAt`). Alimenta `esTarea()` y el countdown humano en
+   * los listados del tutor.
+   */
+  public readonly openUntil: Date | null;
 
   constructor(params: {
     id: string;
@@ -36,6 +43,7 @@ export class ExamEnCurso {
     count: number | null;
     duration: number;
     startedAt: Date;
+    openUntil: Date | null;
   }) {
     this.id = params.id;
     this.recordId = params.recordId;
@@ -48,6 +56,12 @@ export class ExamEnCurso {
     this.count = params.count;
     this.duration = params.duration;
     this.startedAt = params.startedAt;
+    this.openUntil = params.openUntil;
+  }
+
+  /** True cuando el examen fue iniciado como tarea (openUntil !== null). */
+  esTarea(): boolean {
+    return this.openUntil !== null;
   }
 
   /**

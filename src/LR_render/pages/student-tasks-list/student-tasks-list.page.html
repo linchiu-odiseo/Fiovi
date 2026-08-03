@@ -1,0 +1,106 @@
+<main class="tasks">
+  <nav class="tasks__nav">
+    <button
+      type="button"
+      class="tasks__back"
+      data-testid="btn-volver"
+      (click)="onBack()"
+      aria-label="Volver"
+    >
+      <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+      Volver
+    </button>
+  </nav>
+
+  <header class="tasks__header">
+    <h1 class="tasks__title">Tareas pendientes</h1>
+    @if (vm.cards().length > 0) {
+      <span class="tasks__count" data-testid="tareas-count">{{ vm.cards().length }}</span>
+    }
+  </header>
+
+  @if (vm.serverError() === 'network') {
+    <div class="tasks__banner tasks__banner--error" role="alert">
+      <p>No se pudo conectar al servidor.</p>
+      <button type="button" class="tasks__retry" (click)="onRetry()">Reintentar</button>
+    </div>
+  } @else if (vm.studentNotLinked()) {
+    <div class="tasks__banner tasks__banner--blocking" role="alert">
+      Tu cuenta no tiene un alumno asociado, contacta al tutor.
+    </div>
+  } @else if (vm.isLoading() && vm.cards().length === 0) {
+    <p class="tasks__empty">Cargando tareas…</p>
+  } @else if (vm.cards().length === 0) {
+    <p class="tasks__empty" data-testid="empty-state">No tenés tareas pendientes por ahora.</p>
+  } @else {
+    <ul class="tasks__list">
+      @for (card of vm.cards(); track card.id) {
+        <li
+          class="task-card"
+          [class.task-card--abierto]="card.estado === 'abierto'"
+          [class.task-card--enviado]="card.estado === 'enviado'"
+          [class.task-card--pendiente]="card.estado === 'pendiente'"
+          [class.task-card--cerrado]="card.estado === 'cerrado'"
+          [class.task-card--clickable]="card.clickable"
+          (click)="onCardClick(card)"
+          (keydown.enter)="onCardClick(card)"
+          [attr.role]="card.clickable ? 'button' : null"
+          [attr.tabindex]="card.clickable ? 0 : null"
+          [attr.aria-disabled]="card.clickable ? null : 'true'"
+          [attr.data-testid]="'task-card-' + card.id"
+        >
+          <span class="task-card__strip" aria-hidden="true"></span>
+
+          <!-- Header de card: nombre a la izq, chip TAREA a la der. La chip
+               diferencia visualmente de las cards de examen del home aunque
+               la página solo tenga tareas — coherencia entre pantallas -->
+          <div class="task-card__header">
+            <h2 class="task-card__name">{{ card.name }}</h2>
+            <span class="task-card__type-chip">Tarea</span>
+          </div>
+
+          <!-- Contexto: curso + cantidad de preguntas -->
+          <p class="task-card__meta">{{ card.course ?? '—' }} · {{ card.count }} preg</p>
+
+          <!-- Countdown + deadline absoluto. En una sola fila con ícono al
+               principio para lectura rápida "cuánto me queda y cuándo cierra" -->
+          @if (card.closeAt) {
+            <p class="task-card__deadline">
+              <span class="material-symbols-outlined task-card__deadline-icon" aria-hidden="true">
+                hourglass_top
+              </span>
+              <span class="task-card__countdown">{{ card.countdownText }}</span>
+              <span class="task-card__deadline-sep">·</span>
+              <span class="task-card__deadline-abs">cierra {{ formatDeadline(card.closeAt) }}</span>
+            </p>
+          }
+
+          <!-- Badge de estado (solo cuando no está `abierto`), reemplaza el
+               countdown activo con un mensaje corto sobre qué pasó -->
+          @if (card.estado === 'enviado') {
+            <p class="task-card__status task-card__status--enviado">
+              <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+              Enviado
+            </p>
+          } @else if (card.estado === 'cerrado') {
+            <p class="task-card__status task-card__status--cerrado">
+              <span class="material-symbols-outlined" aria-hidden="true">do_not_disturb_on</span>
+              No enviaste · cerrado
+            </p>
+          } @else if (card.estado === 'pendiente') {
+            <p class="task-card__status task-card__status--pendiente">
+              <span class="material-symbols-outlined" aria-hidden="true">schedule</span>
+              Pendiente de que el tutor la active
+            </p>
+          }
+
+          @if (card.clickable) {
+            <span class="material-symbols-outlined task-card__chevron" aria-hidden="true">
+              chevron_right
+            </span>
+          }
+        </li>
+      }
+    </ul>
+  }
+</main>

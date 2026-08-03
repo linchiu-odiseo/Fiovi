@@ -19,6 +19,7 @@ import { ExamServerStatus } from '../../../../../src/L1_domain/value-objects/exa
 import { ServerTime } from '../../../../../src/L1_domain/value-objects/server-time';
 import { NetworkError } from '../../../../../src/L1_domain/errors/network.error';
 import { OfflineStorageUnavailableError } from '../../../../../src/L1_domain/errors/offline-storage-unavailable.error';
+import { SubmissionAck } from '../../../../../src/L1_domain/value-objects/submission-ack';
 import { StudentNotLinkedError } from '../../../../../src/L1_domain/errors/student-not-linked.error';
 import { Clock } from '../../../../../src/L1_domain/ports/clock';
 import {
@@ -39,6 +40,7 @@ function buildIdentity(): Identity {
     'fulano@panda.test',
     '79507732',
     ['student'],
+    'student',
     Date.now() + 900_000,
   );
 }
@@ -147,6 +149,9 @@ class FakeMarkingsStorage implements MarkingsStorage {
   async getSubmissionAck(_examId: string): Promise<null> {
     return null;
   }
+  async getAllSubmissionAcks(): Promise<ReadonlyMap<string, SubmissionAck>> {
+    return new Map();
+  }
   async setSubmissionAck(_examId: string, _ack: unknown): Promise<void> {
     /* no-op */
   }
@@ -174,6 +179,12 @@ class FakeMarkingsStorage implements MarkingsStorage {
   }
   async setAdmissionArea(_examId: string, _area: unknown): Promise<void> {
     /* no-op */
+  }
+  async saveSubmissionSnapshot(_examId: string, _snapshot: unknown): Promise<void> {
+    /* no-op */
+  }
+  async getSubmissionSnapshot(_examId: string): Promise<null> {
+    return null;
   }
   async wipeUserScope(): Promise<void> {
     throw new Error('not used in HomePage tests');
@@ -303,10 +314,12 @@ describe('HomePage', () => {
   // de la ProfilePage.
 
   describe('lista de exámenes', () => {
-    it('renderiza una card por examen cuando el use case devuelve lista', async () => {
+    it('renderiza una card por examen in_progress (scheduled/finalized filtrados por ítem 1 del refine)', async () => {
       fakeGetTodaysExams.willResolve([
         buildExam('exam-1', 'in_progress'),
-        buildExam('exam-2', 'scheduled'),
+        buildExam('exam-2', 'in_progress'),
+        buildExam('exam-3', 'scheduled'), // no aparece
+        buildExam('exam-4', 'finalized'), // no aparece
       ]);
 
       const fixture = TestBed.createComponent(HomePage);
@@ -320,7 +333,7 @@ describe('HomePage', () => {
       expect(cards.length).toBe(2);
     });
 
-    it('muestra "No tienes simulacros asignados para hoy" cuando la lista está vacía y no hay error', async () => {
+    it('muestra "No hay exámenes ni tareas activas ahora" cuando la lista está vacía y no hay error', async () => {
       fakeGetTodaysExams.willResolve([]);
 
       const fixture = TestBed.createComponent(HomePage);
@@ -331,7 +344,7 @@ describe('HomePage', () => {
 
       const el = fixture.nativeElement as HTMLElement;
       expect(el.querySelector('.empty-state')?.textContent).toContain(
-        'No tienes simulacros asignados para hoy',
+        'No hay exámenes ni tareas activas ahora',
       );
     });
   });

@@ -50,6 +50,7 @@ const STUDENT_LOGIN_RESPONSE = {
     codigo: '79507732',
     roles: ['student'],
     permissions: ['student:dashboard:view', 'student:exams:view'],
+    dashboardKind: 'student',
   },
   expiresAt: 1781458612856,
 };
@@ -62,6 +63,7 @@ const STUDENT_TENANT_RESPONSE = {
     codigo: '79507732',
     roles: ['student'],
     permissions: ['student:dashboard:view', 'student:exams:view'],
+    dashboardKind: 'student',
   },
   expiresAt: 1781458612856,
 };
@@ -75,6 +77,7 @@ const TUTOR_LOGIN_RESPONSE = {
     codigo: null,
     roles: ['tutor'],
     permissions: ['tutor:dashboard:view'],
+    dashboardKind: 'tutor',
   },
   expiresAt: 1781410002223,
 };
@@ -224,34 +227,53 @@ describe('HttpAuthRepository', () => {
       await expect(pending).rejects.toBeInstanceOf(NetworkError);
     });
 
-    it('mapea 200 con roles: ["admin"] a UnsupportedRoleError', async () => {
+    it('mapea 200 con dashboardKind: "admin" a UnsupportedRoleError', async () => {
       const pending = repo.login(credentials);
       const req = httpMock.expectOne(LOGIN_URL);
       req.flush({
         ...STUDENT_LOGIN_RESPONSE,
-        user: { ...STUDENT_LOGIN_RESPONSE.user, roles: ['admin'] },
+        user: { ...STUDENT_LOGIN_RESPONSE.user, dashboardKind: 'admin' },
       });
       await expect(pending).rejects.toBeInstanceOf(UnsupportedRoleError);
     });
 
-    it('mapea 200 con roles: [] a UnsupportedRoleError (defensivo)', async () => {
+    it('mapea 200 sin dashboardKind (undefined) a UnsupportedRoleError', async () => {
       const pending = repo.login(credentials);
       const req = httpMock.expectOne(LOGIN_URL);
+      const { dashboardKind: _dk, ...userNoKind } = STUDENT_LOGIN_RESPONSE.user;
       req.flush({
         ...STUDENT_LOGIN_RESPONSE,
-        user: { ...STUDENT_LOGIN_RESPONSE.user, roles: [] },
+        user: userNoKind,
       });
       await expect(pending).rejects.toBeInstanceOf(UnsupportedRoleError);
     });
 
-    it('mapea 200 con roles: ["student","tutor"] a UnsupportedRoleError (rompe single-role invariant)', async () => {
+    it('mapea 200 con dashboardKind: "generic" a UnsupportedRoleError (role custom sin baseKind)', async () => {
       const pending = repo.login(credentials);
       const req = httpMock.expectOne(LOGIN_URL);
       req.flush({
         ...STUDENT_LOGIN_RESPONSE,
-        user: { ...STUDENT_LOGIN_RESPONSE.user, roles: ['student', 'tutor'] },
+        user: { ...STUDENT_LOGIN_RESPONSE.user, dashboardKind: 'generic' },
       });
       await expect(pending).rejects.toBeInstanceOf(UnsupportedRoleError);
+    });
+
+    it('acepta role custom cuando dashboardKind es student (student-seleccion, anual, etc.)', async () => {
+      // Simula un tenant admin que creó un role custom llamado 'student-seleccion'
+      // con baseKind='student'. El backend resuelve dashboardKind='student' por
+      // prioridad. Fiovi acepta y rutea a /student/home como si fuera role de sistema.
+      const pending = repo.login(credentials);
+      const req = httpMock.expectOne(LOGIN_URL);
+      req.flush({
+        ...STUDENT_LOGIN_RESPONSE,
+        user: {
+          ...STUDENT_LOGIN_RESPONSE.user,
+          roles: ['student-seleccion'],
+          dashboardKind: 'student',
+        },
+      });
+      const identity = await pending;
+      expect((identity as { dashboardKind: string }).dashboardKind).toBe('student');
     });
 
     it('incluye captchaToken en el body cuando viene en las credenciales', async () => {

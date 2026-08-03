@@ -395,9 +395,29 @@ export class TutorAulaSemanasPage {
     // Uso scrollTop directo en instant para bypass del scroll-behavior CSS
     // (que en algunos browsers ignora la opción 'instant' de scrollIntoView).
     if (behavior === 'instant') {
-      const targetCenter = target.offsetTop + target.clientHeight / 2;
-      const viewportCenter = viewportEl.clientHeight / 2;
-      viewportEl.scrollTop = targetCenter - viewportCenter;
+      const wanted = target.offsetTop + target.clientHeight / 2 - viewportEl.clientHeight / 2;
+      // `scroll-snap-type: y mandatory` + `scroll-behavior: smooth` en .page.scss
+      // hacen que la primera asignación de `scrollTop` durante el primer paint
+      // sea rechazada silenciosamente (el navegador la descarta porque el layout
+      // aún no puede snappear a un item, y la deja en 0). Sin esto, con N > ~20
+      // la rueda arranca en Semana 1 en lugar de HOY.
+      //
+      // Suspendemos ambos estilos, asignamos, y los restauramos un frame
+      // después — el scroll queda ya en el snap-point correcto, así que el
+      // re-attach del snap no mueve nada. Blindamos el scroll listener con
+      // `reanchorInFlight` para que los valores intermedios no desincronicen
+      // `observedVirtualIndex`.
+      this.reanchorInFlight = true;
+      const prevSnap = viewportEl.style.scrollSnapType;
+      const prevBehavior = viewportEl.style.scrollBehavior;
+      viewportEl.style.scrollSnapType = 'none';
+      viewportEl.style.scrollBehavior = 'auto';
+      viewportEl.scrollTop = wanted;
+      requestAnimationFrame(() => {
+        viewportEl.style.scrollSnapType = prevSnap;
+        viewportEl.style.scrollBehavior = prevBehavior;
+        this.reanchorInFlight = false;
+      });
     } else {
       target.scrollIntoView({ behavior, block: 'center' });
     }
