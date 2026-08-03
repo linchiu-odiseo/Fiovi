@@ -1,13 +1,14 @@
 // Tests del adapter L3 `LocalStorageIdentityStorage` — persistencia de
-// `Identity` bajo la key `fiovi.identity`. Reemplaza al viejo
-// `LocalStorageSessionStorage`.
+// `Identity` bajo la key `fiovi.identity`.
 //
 // Cubre los scenarios del spec `session-storage`:
-// - Round-trip write/read
+// - Round-trip write/read (incluye dashboardKind)
 // - Storage vacío → null
 // - JSON corrupto → null + key eliminada
 // - Shape inválido (campos faltantes / tipos errados) → null + key eliminada
-// - Invariante de Identity violado (roles.length !== 1) → null + key eliminada
+// - Sin dashboardKind válido ni fallback en roles[0] → null + key eliminada
+// - Backwards-compat: shape sin dashboardKind pero con roles[0] ∈ {student, tutor}
+//   → carga OK con dashboardKind derivado de roles[0]
 // - Key legacy `lugia.session` queda ignorada
 // - clear() elimina la key
 // - `codigo: null` (tutor real) es válido
@@ -20,6 +21,9 @@ import { Identity } from '../../../../src/L1_domain/entities/identity';
 const STORAGE_KEY = 'fiovi.identity';
 const LEGACY_KEY = 'lugia.session';
 
+// Payload persisted "canónico" — sin dashboardKind. Sirve para tests de fallback
+// donde el read tiene que derivar dashboardKind desde roles[0]. Los tests que
+// específicamente verifican persistencia de dashboardKind usan otro fixture.
 const VALID_PERSISTED = {
   id: '766aac21-71f9-4f48-a14a-5c2bcebc7d0b',
   tenantId: '5fff5eec-34dc-40a2-b15e-10e503e7c2dc',
@@ -41,7 +45,7 @@ describe('LocalStorageIdentityStorage', () => {
   afterEach(() => localStorage.clear());
 
   describe('write + read (round-trip)', () => {
-    it('persiste y devuelve la Identity con todos los campos', async () => {
+    it('persiste y devuelve la Identity con todos los campos (incluyendo dashboardKind)', async () => {
       const identity = new Identity(
         '766aac21-71f9-4f48-a14a-5c2bcebc7d0b',
         '5fff5eec-34dc-40a2-b15e-10e503e7c2dc',
@@ -49,6 +53,7 @@ describe('LocalStorageIdentityStorage', () => {
         '79507732@vonex.edu.pe',
         '79507732',
         ['student'],
+        'student',
         1781458612856,
       );
       await storage.write(identity);
@@ -59,6 +64,7 @@ describe('LocalStorageIdentityStorage', () => {
       expect(restored?.email).toBe('79507732@vonex.edu.pe');
       expect(restored?.codigo).toBe('79507732');
       expect(restored?.roles).toEqual(['student']);
+      expect(restored?.dashboardKind).toBe('student');
       expect(restored?.expiresAt).toBe(1781458612856);
       expect(restored?.role()).toBe('student');
     });
@@ -71,6 +77,7 @@ describe('LocalStorageIdentityStorage', () => {
         'a@b.test',
         '12345',
         ['student'],
+        'student',
         Date.now() + 60_000,
       );
       await storage.write(identity);
@@ -88,6 +95,7 @@ describe('LocalStorageIdentityStorage', () => {
         'a@b.test',
         '12345',
         ['student'],
+        'student',
         Date.now() + 60_000,
       );
       await storage.write(identity);
@@ -102,11 +110,13 @@ describe('LocalStorageIdentityStorage', () => {
         'tutor1@vonex.pe',
         null, // tutor real: codigo viene null del back
         ['tutor'],
+        'tutor',
         1781410002223,
       );
       await storage.write(tutor);
       const restored = await storage.read();
       expect(restored?.codigo).toBeNull();
+      expect(restored?.dashboardKind).toBe('tutor');
       expect(restored?.role()).toBe('tutor');
     });
   });
@@ -147,23 +157,54 @@ describe('LocalStorageIdentityStorage', () => {
       expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
     });
 
-    it('shape sintácticamente OK pero roles.length === 0 → null + key eliminada (Identity constructor lanza)', async () => {
+    it('shape sin dashboardKind y con roles vacío → null (ninguna fuente de tipo válida)', async () => {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...VALID_PERSISTED, roles: [] }));
       expect(await storage.read()).toBeNull();
       expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
     });
 
-    it('shape sintácticamente OK pero roles.length === 2 → null + key eliminada', async () => {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ ...VALID_PERSISTED, roles: ['student', 'tutor'] }),
-      );
+    it('shape sin dashboardKind y con roles[0] no soportado → null (fallback falla)', async () => {
+      // Ejemplo: sesión persistida donde el back ahora devuelve un role custom
+      // como primary y no hay dashboardKind. Sin fuente válida → limpiar.
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...VALID_PERSISTED, roles: ['admin'] }));
       expect(await storage.read()).toBeNull();
       expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
     });
   });
 
-  describe('compatibilidad con instalaciones previas', () => {
+  describe('backwards-compat con sesiones previas al PR de dashboardKind', () => {
+    it('shape sin dashboardKind pero con roles[0]=student → carga con dashboardKind=student', async () => {
+      // Sesiones persistidas antes del PR no tienen dashboardKind. Fallback:
+      // usar roles[0] si es student|tutor. Evita forzar re-login.
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(VALID_PERSISTED));
+      const restored = await storage.read();
+      expect(restored).toBeInstanceOf(Identity);
+      expect(restored?.dashboardKind).toBe('student');
+      expect(restored?.role()).toBe('student');
+    });
+
+    it('shape sin dashboardKind pero con roles[0]=tutor → carga con dashboardKind=tutor', async () => {
+      const tutorLegacy = { ...VALID_PERSISTED, roles: ['tutor'], codigo: null };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(tutorLegacy));
+      const restored = await storage.read();
+      expect(restored?.dashboardKind).toBe('tutor');
+    });
+
+    it('dashboardKind persistido tiene precedencia sobre roles[0]', async () => {
+      // Un user real con role custom `alumno-becado` que el backend resuelve a
+      // dashboardKind='student' — la fuente autoritativa es dashboardKind, no
+      // roles[].
+      const customRole = {
+        ...VALID_PERSISTED,
+        roles: ['alumno-becado'],
+        dashboardKind: 'student',
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(customRole));
+      const restored = await storage.read();
+      expect(restored?.dashboardKind).toBe('student');
+      expect(restored?.roles).toEqual(['alumno-becado']);
+    });
+
     it('payload legacy con `permissions` extra → se lee OK ignorando el campo', async () => {
       // Instalaciones anteriores a F5-03 dejaron `permissions` en localStorage.
       // Al bootear, la app debe rehidratar la Identity sin crashear ni descartar
@@ -203,6 +244,7 @@ describe('LocalStorageIdentityStorage', () => {
         'a@b.test',
         null,
         ['student'],
+        'student',
         Date.now() + 60_000,
       );
       await storage.write(identity);

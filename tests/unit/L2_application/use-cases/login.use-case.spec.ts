@@ -21,6 +21,7 @@ const makeStudentIdentity = () =>
     '79507732@vonex.edu.pe',
     '79507732',
     ['student'],
+    'student',
     NOW + 900_000,
   );
 
@@ -32,6 +33,7 @@ const makeTutorIdentity = () =>
     'tutor1@vonex.pe',
     null,
     ['tutor'],
+    'tutor',
     NOW + 900_000,
   );
 

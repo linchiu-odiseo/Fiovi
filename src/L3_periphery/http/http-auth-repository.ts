@@ -18,10 +18,14 @@ import { UnsupportedRoleError } from '../../L1_domain/errors/unsupported-role.er
 import { apiPath } from './api-paths';
 import { SlugStore } from './slug-store';
 
-// Roles que Fiovi soporta hoy. Cualquier otro (admin, teacher, custom)
-// que devuelva el back se rechaza en el mapper con UnsupportedRoleError.
-// Cuando se agregue soporte, ampliar este set y el tipo `Role` en L1.
-const SUPPORTED_ROLES: ReadonlySet<Role> = new Set(['student', 'tutor']);
+// Tipos de dashboard que Fiovi renderiza hoy. Fiovi rutea por `dashboardKind`
+// (resuelto por el backend a partir del `baseKind` de los roles del user) —
+// NO por el nombre literal del role. Así un role custom del tenant (ej.
+// `student-seleccion`, `anual`) con `baseKind='student'` cae acá como
+// `student` y entra a `/student/home` sin que Fiovi conozca su nombre.
+// Cualquier otro dashboardKind (admin, teacher, parent, generic o undefined)
+// se rechaza con UnsupportedRoleError — Fiovi no tiene esas UI.
+const SUPPORTED_DASHBOARD_KINDS: ReadonlySet<Role> = new Set(['student', 'tutor']);
 
 // Shape del user en `PublicAuthResponse` (POST /auth/login 1 tenant, POST
 // /auth/select-tenant): incluye `slug` que hidrata `Identity.tenantSlug`.
@@ -40,6 +44,10 @@ interface PublicAuthResponseDto {
     email: string;
     codigo: string | null;
     roles: string[];
+    // Optional en la wire porque tokens/sesiones previas al PR que expuso
+    // dashboardKind en login pueden no traerlo. El mapper valida presencia +
+    // membresía en SUPPORTED_DASHBOARD_KINDS y tira UnsupportedRoleError si no.
+    dashboardKind?: string;
   };
   expiresAt: number;
 }
@@ -54,6 +62,7 @@ interface TenantAuthResponseDto {
     email: string;
     codigo: string | null;
     roles: string[];
+    dashboardKind?: string;
   };
   expiresAt: number;
 }
@@ -255,6 +264,7 @@ export class HttpAuthRepository implements AuthRepository {
       email: dto.user.email,
       codigo: dto.user.codigo,
       roles: dto.user.roles,
+      dashboardKind: dto.user.dashboardKind,
       expiresAt: dto.expiresAt,
     });
   }
@@ -267,6 +277,7 @@ export class HttpAuthRepository implements AuthRepository {
       email: dto.user.email,
       codigo: dto.user.codigo,
       roles: dto.user.roles,
+      dashboardKind: dto.user.dashboardKind,
       expiresAt: dto.expiresAt,
     });
   }
@@ -278,15 +289,18 @@ export class HttpAuthRepository implements AuthRepository {
     email: string;
     codigo: string | null;
     roles: string[];
+    dashboardKind: string | undefined;
     expiresAt: number;
   }): Identity {
-    // Validamos rol ANTES de construir Identity: el cast `as Role[]` sería
-    // una mentira de TypeScript si el back devuelve admin/teacher. El
-    // invariante single-role de Identity ya se aplica en su constructor;
-    // acá agregamos el invariante "rol soportado por este cliente".
-    const rawRole = fields.roles[0];
-    if (fields.roles.length !== 1 || !SUPPORTED_ROLES.has(rawRole as Role)) {
-      throw new UnsupportedRoleError(rawRole ?? '(empty)');
+    // Validamos que el backend haya resuelto dashboardKind a un tipo que Fiovi
+    // renderiza (student|tutor). Cualquier otro valor (admin, teacher, parent,
+    // generic o undefined) → UnsupportedRoleError. Undefined puede ocurrir con
+    // sesiones/tokens previos al PR de learnex que expuso dashboardKind en
+    // login — el user vuelve a /login, se re-loguea, y en el próximo /me el
+    // token nuevo trae dashboardKind.
+    const kind = fields.dashboardKind;
+    if (!kind || !SUPPORTED_DASHBOARD_KINDS.has(kind as Role)) {
+      throw new UnsupportedRoleError(kind ?? '(missing)');
     }
     return new Identity(
       fields.id,
@@ -294,7 +308,8 @@ export class HttpAuthRepository implements AuthRepository {
       fields.tenantSlug,
       fields.email,
       fields.codigo,
-      [rawRole as Role],
+      fields.roles,
+      kind as Role,
       fields.expiresAt,
     );
   }
