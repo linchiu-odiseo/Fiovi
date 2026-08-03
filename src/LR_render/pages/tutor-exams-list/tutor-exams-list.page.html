@@ -62,6 +62,9 @@
                     </span>
                   }
                 </div>
+                @if (aula.code) {
+                  <p class="aula-card__cycle" data-testid="aula-code">{{ aula.code }}</p>
+                }
                 <p class="aula-card__cycle">{{ aula.cycleName }}</p>
                 <p class="aula-card__meta">{{ aula.modality }} · {{ aula.shift }}</p>
                 <p class="aula-card__students">
