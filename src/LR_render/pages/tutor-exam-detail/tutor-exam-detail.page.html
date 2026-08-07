@@ -400,7 +400,17 @@
            alumnos sin scroll infinito. Cada fila es un label que envuelve
            el checkbox custom + nombre — click en cualquier parte del label
            toggle el checkbox (área táctil grande). El input real está
-           visualmente oculto pero accesible por teclado y screen readers. -->
+           visualmente oculto pero accesible por teclado y screen readers.
+
+           Usamos (click)+preventDefault en vez de (change) porque el
+           navegador toggle nativo del <input type=checkbox> ocurre ANTES
+           de que corra Angular. Cuando `requestToggleStudent` sólo abre el
+           modal de confirmación (in_progress + desactivar), el signal no
+           cambia — Angular no detecta delta en [checked] y no re-sincroniza
+           el DOM, dejando el tick visualmente apagado hasta que otro cambio
+           dispare re-render. Con preventDefault el toggle nativo se bloquea
+           y el signal es la única fuente de verdad. -->
+
       <ul class="tutor-exam-detail__student-list">
         @for (student of vm.students(); track student.studentId) {
           <li class="tutor-exam-detail__student-item" data-testid="student-item">
@@ -411,7 +421,7 @@
                 data-testid="student-checkbox"
                 [checked]="isStudentEnabled(student.studentId)"
                 [disabled]="isCheckboxDisabled(student)"
-                (change)="onToggleStudent(student.studentId)"
+                (click)="$event.preventDefault(); onToggleStudent(student.studentId)"
               />
               <span class="tutor-exam-detail__student-checkbox" aria-hidden="true">
                 <span class="material-symbols-outlined">check</span>
