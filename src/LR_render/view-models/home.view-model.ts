@@ -25,8 +25,14 @@ export type ServerErrorKind = 'network' | 'session-expired' | 'unknown';
 // clase CSS (`card--abierto`, `card--cerrado`, etc.).
 export type CardEstado = 'pendiente' | 'abierto' | 'enviado' | 'cerrado';
 
-// Cada 120s mientras la pestaña está visible: refresca la lista contra backend.
-const POLL_INTERVAL_MS = 120_000;
+// Cada 180s mientras la pestaña está visible: refresca la lista contra backend.
+// El filtro del home muestra sólo `in_progress`, así que el poll detecta la
+// activación de nuevas fichas por el tutor. `visibilitychange` (refresh
+// on-focus) y el refresh post-cierre cubren los otros disparadores, así que
+// 180s es holgado — reduce ~33% del tráfico a `/student/exam-sessions` sin
+// dañar la UX (el alumno espera máximo 3 min extra para ver una activación
+// automática si mira fijo la pantalla sin cambiar de app).
+const POLL_INTERVAL_MS = 180_000;
 
 // El countdown re-renderiza cada segundo. Lo separamos del polling porque son
 // dos relojes con razones distintas: este es solo cosmético (texto del countdown),
