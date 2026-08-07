@@ -28,8 +28,13 @@ import { RefreshFailedError } from '../../L1_domain/errors/refresh-failed.error'
 //    Si el refresh falla con `RefreshFailedError`, dispara `LogoutUseCase`
 //    (fire-and-forget, ya navega a /login) y propaga el error al caller.
 //
-// Las URLs que contienen `/auth/` (login, refresh, logout, me) NUNCA
-// intentan refresh — un 401 ahí se propaga directo para evitar loops.
+// Sólo `/auth/{login,refresh,logout}` se excluyen del retry: refrescar el
+// refresh es un loop; login/logout no requieren sesión previa. Los demás
+// endpoints protegidos bajo `/auth/*` (ej. `/auth/me`, `/auth/me/password`)
+// SÍ refrescan en 401 como cualquier request de negocio — así el boot de la
+// app tras JWT expirado recupera con el refresh cookie en vez de expulsar
+// al login (regresión pre-fix: el `me()` del arranque se propagaba como
+// SessionExpiredError aunque el refresh de 7d siguiera vivo).
 //
 // Requests a hosts distintos de `apiBaseUrl` pasan sin tocarse (dev server,
 // assets externos, integraciones futuras).
@@ -57,12 +62,16 @@ export const credentialsInterceptor: HttpInterceptorFn = (req, next) => {
   const refreshUseCase = inject(RefreshIdentityUseCase);
   const logoutUseCase = inject(LogoutUseCase);
   const cloned = req.clone({ withCredentials: true });
-  const isAuthEndpoint = req.url.includes('/auth/');
+  const path = req.url.split('?')[0];
+  const isRefreshLoop =
+    path.endsWith('/auth/refresh') ||
+    path.endsWith('/auth/login') ||
+    path.endsWith('/auth/logout');
 
   return next(cloned).pipe(
     catchError((err) => {
       const isUnauthorized = err instanceof HttpErrorResponse && err.status === 401;
-      if (!isUnauthorized || isAuthEndpoint) {
+      if (!isUnauthorized || isRefreshLoop) {
         return throwError(() => err);
       }
       return ensureRefreshed(refreshUseCase).pipe(
