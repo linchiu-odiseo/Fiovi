@@ -614,8 +614,8 @@ describe('HomePageViewModel', () => {
     });
   });
 
-  describe('polling cada 120s', () => {
-    it('después de 120s desde start(), invoca getTodaysExams.execute() una segunda vez', async () => {
+  describe('polling cada 180s', () => {
+    it('después de 180s desde start(), invoca getTodaysExams.execute() una segunda vez', async () => {
       fakeGetTodaysExams.willResolve([]);
       vi.useFakeTimers();
       setDocumentVisibility('visible');
@@ -624,7 +624,7 @@ describe('HomePageViewModel', () => {
       await vm.start();
       const callsAfterStart = fakeGetTodaysExams.callCount;
 
-      await vi.advanceTimersByTimeAsync(120_000);
+      await vi.advanceTimersByTimeAsync(180_000);
 
       expect(fakeGetTodaysExams.callCount).toBe(callsAfterStart + 1);
       vm.stop();

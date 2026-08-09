@@ -1,8 +1,10 @@
 // Tests del interceptor `credentialsInterceptor` — pieza central del nuevo
 // auth contra learnex. Cubre los scenarios del spec `http-client`:
 // `withCredentials: true` para `apiBaseUrl`, skip externos, refresh+retry
-// reactivo ante 401, lock `shareReplay(1)` con N=3 paralelos, skip para
-// URLs `/auth/*`, RefreshFailedError → LogoutUseCase fire-and-forget.
+// reactivo ante 401, lock `shareReplay(1)` con N=3 paralelos, skip SOLO
+// para `/auth/{login,refresh,logout}` (los demás `/auth/*` — `me`,
+// `me/password` — SÍ refrescan), RefreshFailedError → LogoutUseCase
+// fire-and-forget.
 //
 // El interceptor cachea el lock en una variable módulo-level
 // (`refreshInFlight$`). Para evitar contaminación entre tests, cada `it`
@@ -137,7 +139,7 @@ describe('credentialsInterceptor', () => {
     });
   });
 
-  describe('skip refresh para URLs /auth/*', () => {
+  describe('skip refresh SOLO para /auth/{login,refresh,logout}', () => {
     it('401 en /auth/login propaga el error sin llamar refresh', async () => {
       const url = `${environment.apiBaseUrl}/t/${TEST_SLUG}/auth/login`;
       const pending = firstValueFrom(http.post(url, { email: 'x', password: 'y' }));
@@ -172,9 +174,9 @@ describe('credentialsInterceptor', () => {
       expect(refreshUseCase.executeCalls).toBe(0);
     });
 
-    it('401 en /auth/me propaga el error sin refresh', async () => {
-      const url = `${environment.apiBaseUrl}/t/${TEST_SLUG}/auth/me`;
-      const pending = firstValueFrom(http.get(url));
+    it('401 en /auth/refresh con query string sigue skipeando (loop guard robusto a `?`)', async () => {
+      const url = `${environment.apiBaseUrl}/t/${TEST_SLUG}/auth/refresh?trace=1`;
+      const pending = firstValueFrom(http.post(url, {}));
       const req = httpMock.expectOne(url);
       req.flush(null, { status: 401, statusText: 'Unauthorized' });
       await expect(pending).rejects.toBeInstanceOf(HttpErrorResponse);
@@ -183,6 +185,50 @@ describe('credentialsInterceptor', () => {
   });
 
   describe('refresh + retry en endpoints protegidos', () => {
+    it('401 en /auth/me dispara refresh → retry exitoso (fix del boot post-idle)', async () => {
+      // Antes del fix el interceptor excluía todo `/auth/*` del retry, así
+      // que `me()` del boot se propagaba como SessionExpiredError aunque el
+      // refresh cookie de 7d siguiera vivo → login forzado. Este test
+      // asegura la conducta correcta.
+      refreshUseCase.willResolve(makeIdentity());
+      const url = `${environment.apiBaseUrl}/t/${TEST_SLUG}/auth/me`;
+      const pending = firstValueFrom(http.get<{ user: { id: string } }>(url));
+
+      const first = httpMock.expectOne(url);
+      first.flush(null, { status: 401, statusText: 'Unauthorized' });
+
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const retry = httpMock.expectOne(url);
+      retry.flush({ user: { id: 'user-id' } });
+
+      const result = await pending;
+      expect(result).toEqual({ user: { id: 'user-id' } });
+      expect(refreshUseCase.executeCalls).toBe(1);
+      expect(logoutUseCase.executeCalls).toBe(0);
+    });
+
+    it('401 en /auth/me/password dispara refresh → retry (endpoint protegido, no login)', async () => {
+      refreshUseCase.willResolve(makeIdentity());
+      const url = `${environment.apiBaseUrl}/t/${TEST_SLUG}/auth/me/password`;
+      const pending = firstValueFrom(
+        http.post<{ expiresAt: number }>(url, { currentPassword: 'x', newPassword: 'y' }),
+      );
+
+      const first = httpMock.expectOne(url);
+      first.flush(null, { status: 401, statusText: 'Unauthorized' });
+
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const retry = httpMock.expectOne(url);
+      retry.flush({ expiresAt: Date.now() + 900_000 });
+
+      await pending;
+      expect(refreshUseCase.executeCalls).toBe(1);
+    });
+
     it('401 en /student/me dispara refresh → retry exitoso devuelve el body del retry', async () => {
       refreshUseCase.willResolve(makeIdentity());
       const url = `${environment.apiBaseUrl}/t/${TEST_SLUG}/student/me`;
