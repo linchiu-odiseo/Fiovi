@@ -64,9 +64,7 @@ export const credentialsInterceptor: HttpInterceptorFn = (req, next) => {
   const cloned = req.clone({ withCredentials: true });
   const path = req.url.split('?')[0];
   const isRefreshLoop =
-    path.endsWith('/auth/refresh') ||
-    path.endsWith('/auth/login') ||
-    path.endsWith('/auth/logout');
+    path.endsWith('/auth/refresh') || path.endsWith('/auth/login') || path.endsWith('/auth/logout');
 
   return next(cloned).pipe(
     catchError((err) => {
