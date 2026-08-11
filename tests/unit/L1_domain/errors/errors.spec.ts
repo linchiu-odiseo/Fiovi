@@ -49,7 +49,7 @@ describe('Errores de dominio', () => {
 
     it('expone message por defecto en español', () => {
       expect(new AccountNotActiveError().message).toBe(
-        'Tu cuenta no está activa. Contacta a tu institución para reactivarla.',
+        'Tu cuenta no está activa. Contacta a tu institución para activarla.',
       );
     });
 

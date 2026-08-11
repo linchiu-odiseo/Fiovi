@@ -399,7 +399,7 @@ describe('LoginPage', () => {
       ['sso_no_matching_tenant', 'Ese correo no está registrado en ninguna academia.'],
       ['sso_email_not_verified', 'Verificá tu correo con Google antes de iniciar sesión.'],
       ['sso_hosted_domain_mismatch', 'Tu cuenta de Google no pertenece al dominio autorizado.'],
-      ['sso_user_inactive', 'Tu cuenta está desactivada. Contactá a tu academia.'],
+      ['sso_user_inactive', 'Tu cuenta no está activa. Contacta a tu institución para activarla.'],
       ['sso_multiple_tenants', 'Iniciá sesión con tu contraseña por ahora.'],
       ['google_error', 'Google no autorizó tu ingreso. Intentá de nuevo.'],
       ['missing_params', 'Hubo un problema con Google. Intentá de nuevo.'],
@@ -441,6 +441,89 @@ describe('LoginPage', () => {
         expect(errorEl?.textContent).toContain(expectedMessage);
       });
     }
+
+    // El banner de error SSO reemplaza al bloque Google+"Iniciar con email"
+    // por una tarjeta compacta (banner + botón "Volver al inicio"). El form
+    // password NO se renderiza — un user que entró por SSO no tiene
+    // credenciales tenant, mostrarle inputs sería ruido.
+    it('con ssoError renderiza tarjeta compacta en lugar del bloque Google + toggle', async () => {
+      TestBed.resetTestingModule();
+      await TestBed.configureTestingModule({
+        imports: [LoginPage],
+        providers: [
+          provideRouter([{ path: 'login', component: LoginPage }]),
+          { provide: LoginUseCase, useValue: fakeUseCase },
+          { provide: ListSsoProvidersUseCase, useValue: fakeSsoProviders },
+          { provide: CAPTCHA_PROVIDER, useValue: new DisabledCaptchaProvider() },
+          { provide: PwaUpdateService, useValue: new DisabledPwaUpdateService() },
+          {
+            provide: ActivatedRoute,
+            useValue: { snapshot: { queryParams: { ssoError: 'sso_user_inactive' } } },
+          },
+        ],
+      }).compileComponents();
+
+      const fixture = TestBed.createComponent(LoginPage);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('[data-testid="sso-error-banner"]')).not.toBeNull();
+      expect(el.querySelector('[data-testid="btn-dismiss-sso-error"]')).not.toBeNull();
+      expect(el.querySelector('[data-testid="btn-sso-google"]')).toBeNull();
+      expect(el.querySelector('[data-testid="btn-toggle-email"]')).toBeNull();
+      const section = el.querySelector('.login__email-collapse');
+      expect(section?.classList.contains('login__email-collapse--expanded')).toBe(false);
+    });
+
+    // "Volver al inicio" cierra el error state: la tarjeta desaparece y el
+    // menú normal (Google + "Iniciar con email") vuelve a renderizarse.
+    // También limpia `?ssoError=` de la URL vía history.replaceState — sin
+    // esto, un refresh del user re-mostraría la tarjeta y quedaría atrapado
+    // en el bucle. El retry queda a un click más (Google button del menú).
+    it('con ssoError, clic en "Volver al inicio" limpia el error y devuelve al menú normal', async () => {
+      TestBed.resetTestingModule();
+      await TestBed.configureTestingModule({
+        imports: [LoginPage],
+        providers: [
+          provideRouter([{ path: 'login', component: LoginPage }]),
+          { provide: LoginUseCase, useValue: fakeUseCase },
+          { provide: ListSsoProvidersUseCase, useValue: fakeSsoProviders },
+          { provide: CAPTCHA_PROVIDER, useValue: new DisabledCaptchaProvider() },
+          { provide: PwaUpdateService, useValue: new DisabledPwaUpdateService() },
+          {
+            provide: ActivatedRoute,
+            useValue: { snapshot: { queryParams: { ssoError: 'sso_user_inactive' } } },
+          },
+        ],
+      }).compileComponents();
+
+      const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
+
+      try {
+        const fixture = TestBed.createComponent(LoginPage);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+
+        const dismissBtn = fixture.nativeElement.querySelector(
+          '[data-testid="btn-dismiss-sso-error"]',
+        ) as HTMLButtonElement;
+        dismissBtn.click();
+        fixture.detectChanges();
+
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="sso-error-banner"]')).toBeNull();
+        expect(el.querySelector('[data-testid="btn-dismiss-sso-error"]')).toBeNull();
+        expect(el.querySelector('[data-testid="btn-sso-google"]')).not.toBeNull();
+        expect(el.querySelector('[data-testid="btn-toggle-email"]')).not.toBeNull();
+
+        expect(replaceStateSpy).toHaveBeenCalledWith({}, '', window.location.pathname);
+      } finally {
+        replaceStateSpy.mockRestore();
+      }
+    });
 
     it('sin ssoError en la ruta, el slot .error no aparece', async () => {
       TestBed.resetTestingModule();

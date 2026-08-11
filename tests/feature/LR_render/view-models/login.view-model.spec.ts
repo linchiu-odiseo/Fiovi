@@ -185,7 +185,7 @@ describe('LoginViewModel', () => {
 
       expect(outcome).toBe('account-not-active');
       expect(vm.errorMessage()).toBe(
-        'Tu cuenta no está activa. Contacta a tu institución para reactivarla.',
+        'Tu cuenta no está activa. Contacta a tu institución para activarla.',
       );
       expect(navigateSpy).not.toHaveBeenCalled();
     });

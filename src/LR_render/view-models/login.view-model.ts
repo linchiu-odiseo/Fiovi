@@ -70,7 +70,7 @@ export class LoginViewModel {
     } catch (err) {
       if (err instanceof AccountNotActiveError) {
         this.errorMessage.set(
-          'Tu cuenta no está activa. Contacta a tu institución para reactivarla.',
+          'Tu cuenta no está activa. Contacta a tu institución para activarla.',
         );
         return 'account-not-active';
       }
