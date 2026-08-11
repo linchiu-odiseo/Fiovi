@@ -7,6 +7,7 @@ import { SelectionChallenge } from '../../L1_domain/value-objects/selection-chal
 import { SsoProvider } from '../../L1_domain/value-objects/sso-provider';
 import { StudentProfile } from '../../L1_domain/value-objects/student-profile';
 import { TutorProfile } from '../../L1_domain/value-objects/tutor-profile';
+import { AccountNotActiveError } from '../../L1_domain/errors/account-not-active.error';
 import { InvalidCredentialsError } from '../../L1_domain/errors/invalid-credentials.error';
 import { NetworkError } from '../../L1_domain/errors/network.error';
 import { RateLimitError } from '../../L1_domain/errors/rate-limit.error';
@@ -111,6 +112,7 @@ interface ErrorBodyDto {
 // Códigos del zod del back. Sólo se leen estos campos del body de error;
 // `message` queda PROHIBIDO porque es texto humano volátil.
 const CODE_INVALID_CREDENTIALS = 'TENANT_AUTH_INVALID_CREDENTIALS';
+const CODE_ACCOUNT_NOT_ACTIVE = 'TENANT_AUTH_ACCOUNT_NOT_ACTIVE';
 const REFRESH_FAILURE_CODES: ReadonlySet<string> = new Set([
   'TENANT_AUTH_REFRESH_TOKEN_MISSING',
   'TENANT_AUTH_REFRESH_TOKEN_NOT_FOUND',
@@ -353,6 +355,7 @@ export class HttpAuthRepository implements AuthRepository {
     if (err.status === 429) return new RateLimitError();
     if (err.status === 401) {
       const code = this.extractCode(err);
+      if (code === CODE_ACCOUNT_NOT_ACTIVE) return new AccountNotActiveError();
       if (code === CODE_INVALID_CREDENTIALS) return new InvalidCredentialsError();
       // 401 sin code conocido en /login también lo tratamos como credenciales
       // inválidas (el back lo unifica anti-enumeration).

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { AccountNotActiveError } from '../../../../src/L1_domain/errors/account-not-active.error';
 import { InvalidCredentialsError } from '../../../../src/L1_domain/errors/invalid-credentials.error';
 import { NetworkError } from '../../../../src/L1_domain/errors/network.error';
 import { InvalidIdentityError } from '../../../../src/L1_domain/errors/invalid-identity.error';
@@ -32,6 +33,32 @@ describe('Errores de dominio', () => {
 
     it('acepta message custom', () => {
       expect(new InvalidCredentialsError('foo').message).toBe('foo');
+    });
+  });
+
+  describe('AccountNotActiveError', () => {
+    it('es instanceof Error y AccountNotActiveError', () => {
+      const err = new AccountNotActiveError();
+      expect(err).toBeInstanceOf(Error);
+      expect(err).toBeInstanceOf(AccountNotActiveError);
+    });
+
+    it('tiene name correcto', () => {
+      expect(new AccountNotActiveError().name).toBe('AccountNotActiveError');
+    });
+
+    it('expone message por defecto en español', () => {
+      expect(new AccountNotActiveError().message).toBe(
+        'Tu cuenta no está activa. Contacta a tu institución para reactivarla.',
+      );
+    });
+
+    it('acepta message custom', () => {
+      expect(new AccountNotActiveError('foo').message).toBe('foo');
+    });
+
+    it('NO es instanceof InvalidCredentialsError (discriminable por instanceof)', () => {
+      expect(new AccountNotActiveError()).not.toBeInstanceOf(InvalidCredentialsError);
     });
   });
 

@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { LoginUseCase } from '../../L2_application/use-cases/login.use-case';
 import { ListSsoProvidersUseCase } from '../../L2_application/use-cases/list-sso-providers.use-case';
 import { SsoProvider } from '../../L1_domain/value-objects/sso-provider';
+import { AccountNotActiveError } from '../../L1_domain/errors/account-not-active.error';
 import { InvalidCredentialsError } from '../../L1_domain/errors/invalid-credentials.error';
 import { NetworkError } from '../../L1_domain/errors/network.error';
 import { RateLimitError } from '../../L1_domain/errors/rate-limit.error';
@@ -10,16 +11,19 @@ import { UnsupportedRoleError } from '../../L1_domain/errors/unsupported-role.er
 import { FIOVI_PENDING_SELECTION_KEY } from '../../L3_periphery/http/sso-callback-bootstrap';
 
 // Outcome del submit visible desde la template:
-//   - 'ok'              → login directo (1 tenant), ya navega a /{role}/home.
-//   - 'selection'       → email en >1 tenant, ya navega a /login/select-tenant.
-//   - 'invalid'         → credenciales inválidas, mostrar banner.
-//   - 'network'         → error de red o 5xx, mostrar banner.
-//   - 'rate-limit'      → 429, mostrar banner.
-//   - 'unsupported-role'→ rol no soportado por Fiovi, banner + form reseteado.
+//   - 'ok'                → login directo (1 tenant), ya navega a /{role}/home.
+//   - 'selection'         → email en >1 tenant, ya navega a /login/select-tenant.
+//   - 'invalid'           → credenciales inválidas, mostrar banner.
+//   - 'account-not-active'→ password matcheó pero la cuenta está suspended/pending;
+//                            el user debe contactar a su institución.
+//   - 'network'           → error de red o 5xx, mostrar banner.
+//   - 'rate-limit'        → 429, mostrar banner.
+//   - 'unsupported-role'  → rol no soportado por Fiovi, banner + form reseteado.
 export type SubmitOutcome =
   | 'ok'
   | 'selection'
   | 'invalid'
+  | 'account-not-active'
   | 'network'
   | 'rate-limit'
   | 'unsupported-role';
@@ -64,6 +68,12 @@ export class LoginViewModel {
       await this.router.navigate([`/${outcome.role()}/home`]);
       return 'ok';
     } catch (err) {
+      if (err instanceof AccountNotActiveError) {
+        this.errorMessage.set(
+          'Tu cuenta no está activa. Contacta a tu institución para reactivarla.',
+        );
+        return 'account-not-active';
+      }
       if (err instanceof InvalidCredentialsError) {
         this.errorMessage.set('Credenciales inválidas');
         return 'invalid';
