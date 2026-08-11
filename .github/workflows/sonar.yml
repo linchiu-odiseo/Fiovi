@@ -1,0 +1,52 @@
+name: SonarQube
+
+# Análisis de SonarQube en PRs hacia testing (etapa de integración, ANTES de main).
+#
+# Ojo — límite de SonarQube Community Build: solo analiza UNA rama (la principal
+# del proyecto, aquí alineada a `testing` vía el default branch de GitHub). NO hay
+# análisis de PR real (ni decoración, ni "solo código nuevo del PR", ni aislamiento
+# por rama). Cada corrida sobrescribe el análisis único del proyecto: dos PRs a la
+# vez se pisan. El quality gate mide el proyecto completo, no solo el diff.
+# El gate por-PR real requeriría Developer Edition (de pago).
+#
+# El gate bloquea el merge si se marca este check como requerido en la branch
+# protection de `testing`.
+
+on:
+  pull_request:
+    branches: [testing]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sonar:
+    name: SonarQube Scan
+    # Runner self-hosted en learnex-dev: está en la misma LAN que el server de
+    # Sonar, así que llega directo por IP interna sin pasar por el túnel/Access.
+    runs-on: [self-hosted, learnex-dev]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          # Historia completa: SCM blame + baseline de "New Code" más preciso.
+          fetch-depth: 0
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: http://10.0.40.200:9000
+        with:
+          # projectKey/sources/exclusions viven en sonar-project.properties.
+          # -Dsonar.host.url por CLI (máxima precedencia) para forzar la IP
+          #  interna por encima del host.url del properties (que apunta al túnel,
+          #  usado en scans manuales desde laptop).
+          # qualitygate.wait: falla el job si el quality gate queda rojo.
+          args: >
+            -Dsonar.host.url=http://10.0.40.200:9000
+            -Dsonar.qualitygate.wait=true
