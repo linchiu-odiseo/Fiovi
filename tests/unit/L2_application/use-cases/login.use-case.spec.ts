@@ -8,6 +8,7 @@ import { NetworkError } from '../../../../src/L1_domain/errors/network.error';
 import { FakeAuthRepository } from '../../fixtures/auth-repository.fake';
 import { FakeIdentityStorage } from '../../fixtures/identity-storage.fake';
 import { FakeProfileStorage } from '../../fixtures/profile-storage.fake';
+import { FakePwaCookieModeStore } from '../../fixtures/pwa-cookie-mode-store.fake';
 import { FakeTenantSlugCache } from '../../fixtures/tenant-slug-cache.fake';
 import { GetProfileUseCase } from '../../../../src/L2_application/use-cases/get-profile.use-case';
 
@@ -59,6 +60,7 @@ describe('LoginUseCase', () => {
   let identityStorage: FakeIdentityStorage;
   let profileStorage: FakeProfileStorage;
   let slugCache: FakeTenantSlugCache;
+  let pwaCookieMode: FakePwaCookieModeStore;
   let getProfile: GetProfileUseCase;
   let useCase: LoginUseCase;
 
@@ -69,8 +71,9 @@ describe('LoginUseCase', () => {
     identityStorage = new FakeIdentityStorage();
     profileStorage = new FakeProfileStorage();
     slugCache = new FakeTenantSlugCache();
+    pwaCookieMode = new FakePwaCookieModeStore();
     getProfile = new GetProfileUseCase(profileStorage, repo);
-    useCase = new LoginUseCase(repo, identityStorage, slugCache, getProfile);
+    useCase = new LoginUseCase(repo, identityStorage, slugCache, getProfile, pwaCookieMode);
   });
 
   it('login de alumno exitoso devuelve Identity con role student', async () => {
@@ -190,5 +193,48 @@ describe('LoginUseCase', () => {
     expect(result).toBe(identity);
     expect(await identityStorage.read()).toBe(identity);
     await new Promise((r) => setTimeout(r, 0));
+  });
+
+  describe('PWA cookie mode flag', () => {
+    it('login exitoso (Identity) enciende el flag', async () => {
+      const identity = makeStudentIdentity();
+      repo.willResolveLogin(identity);
+      repo.willRejectProfile(new Error('no profile'));
+      expect(pwaCookieMode.isEnabled()).toBe(false);
+      await useCase.execute(credentials);
+      expect(pwaCookieMode.isEnabled()).toBe(true);
+      expect(pwaCookieMode.enableCalls).toBe(1);
+    });
+
+    it('login con SelectionChallenge NO enciende el flag (auth incompleta)', async () => {
+      repo.willResolveLogin(makeChallenge());
+      await useCase.execute(credentials);
+      // El flag se prenderá cuando SelectTenantUseCase complete la auth
+      // — no acá. Sesiones pre-migración que caen a selector no deben
+      // migrarse hasta terminar el flow.
+      expect(pwaCookieMode.isEnabled()).toBe(false);
+      expect(pwaCookieMode.enableCalls).toBe(0);
+    });
+
+    it('login fallido (InvalidCredentialsError) NO enciende el flag', async () => {
+      repo.willRejectLogin(new InvalidCredentialsError());
+      await expect(useCase.execute(credentials)).rejects.toThrow(InvalidCredentialsError);
+      // CRÍTICO: usuarios pre-migración que se equivocan la clave no
+      // deben quedarse en modo pwa sin cookies pwa — eso los desloguearía
+      // en el próximo request. El flag solo se prende con backend confirmando.
+      expect(pwaCookieMode.isEnabled()).toBe(false);
+    });
+
+    it('login fallido (RateLimitError) NO enciende el flag', async () => {
+      repo.willRejectLogin(new RateLimitError());
+      await expect(useCase.execute(credentials)).rejects.toThrow(RateLimitError);
+      expect(pwaCookieMode.isEnabled()).toBe(false);
+    });
+
+    it('login fallido (NetworkError) NO enciende el flag', async () => {
+      repo.willRejectLogin(new NetworkError());
+      await expect(useCase.execute(credentials)).rejects.toThrow(NetworkError);
+      expect(pwaCookieMode.isEnabled()).toBe(false);
+    });
   });
 });
