@@ -8,6 +8,7 @@ import { ListSsoProvidersUseCase } from '../../../../src/L2_application/use-case
 import { Identity } from '../../../../src/L1_domain/entities/identity';
 import { SelectionChallenge } from '../../../../src/L1_domain/value-objects/selection-challenge';
 import { SsoProvider } from '../../../../src/L1_domain/value-objects/sso-provider';
+import { AccountNotActiveError } from '../../../../src/L1_domain/errors/account-not-active.error';
 import { InvalidCredentialsError } from '../../../../src/L1_domain/errors/invalid-credentials.error';
 import { NetworkError } from '../../../../src/L1_domain/errors/network.error';
 import { RateLimitError } from '../../../../src/L1_domain/errors/rate-limit.error';
@@ -171,6 +172,21 @@ describe('LoginViewModel', () => {
 
       expect(outcome).toBe('invalid');
       expect(vm.errorMessage()).toBe('Credenciales inválidas');
+      expect(navigateSpy).not.toHaveBeenCalled();
+    });
+
+    it('AccountNotActiveError → errorMessage con copy accionable y devuelve "account-not-active"', async () => {
+      fakeUseCase.willRejectWith(new AccountNotActiveError());
+      const router = TestBed.inject(Router);
+      const navigateSpy = vi.spyOn(router, 'navigate');
+
+      const vm = createVm();
+      const outcome = await vm.submit(validCredentials);
+
+      expect(outcome).toBe('account-not-active');
+      expect(vm.errorMessage()).toBe(
+        'Tu cuenta no está activa. Contacta a tu institución para activarla.',
+      );
       expect(navigateSpy).not.toHaveBeenCalled();
     });
 
