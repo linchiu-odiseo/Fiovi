@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { ProcessSsoCallbackUseCase } from '../../L2_application/use-cases/process-sso-callback.use-case';
+import { PWA_COOKIE_MODE_STORE } from '../tokens';
 import { SlugStore } from './slug-store';
 
 // Clave donde `SelectTenantPage` lee el challenge que el bootstrap guardó
@@ -32,12 +33,20 @@ export const FIOVI_PENDING_SELECTION_KEY = 'fiovi.pending_selection';
 export class SsoCallbackBootstrap {
   private readonly process = new ProcessSsoCallbackUseCase();
   private readonly slugStore = inject(SlugStore);
+  private readonly pwaCookieMode = inject(PWA_COOKIE_MODE_STORE);
 
   run(): void {
     const outcome = this.process.execute(window.location.search);
     switch (outcome.kind) {
       case 'auto':
         this.slugStore.set(outcome.slug);
+        // Backend seteó cookies `learnex_pwa_*` (el SSO start siempre manda
+        // `?app=pwa` — ver api-paths.ts). Encendemos el flag para que
+        // InitializeSessionUseCase (APP_INITIALIZER #1, corre justo después)
+        // mande `X-Client-App: pwa` en el `me()` inicial y backend lea la
+        // cookie correcta. Sin esto, /me buscaría learnex_tenant_access
+        // (default) → 401 → refresh → 401 → logout inmediato.
+        this.pwaCookieMode.enable();
         this.cleanUrl();
         return;
       case 'selection':

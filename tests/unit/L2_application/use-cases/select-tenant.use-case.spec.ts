@@ -6,6 +6,7 @@ import { SelectionInvalidError } from '../../../../src/L1_domain/errors/selectio
 import { FakeAuthRepository } from '../../fixtures/auth-repository.fake';
 import { FakeIdentityStorage } from '../../fixtures/identity-storage.fake';
 import { FakeProfileStorage } from '../../fixtures/profile-storage.fake';
+import { FakePwaCookieModeStore } from '../../fixtures/pwa-cookie-mode-store.fake';
 import { FakeTenantSlugCache } from '../../fixtures/tenant-slug-cache.fake';
 import { GetProfileUseCase } from '../../../../src/L2_application/use-cases/get-profile.use-case';
 
@@ -28,6 +29,7 @@ describe('SelectTenantUseCase', () => {
   let identityStorage: FakeIdentityStorage;
   let profileStorage: FakeProfileStorage;
   let slugCache: FakeTenantSlugCache;
+  let pwaCookieMode: FakePwaCookieModeStore;
   let useCase: SelectTenantUseCase;
 
   const input = { selectionToken: 'jwt.token', slug: 'pitagoras' };
@@ -37,8 +39,15 @@ describe('SelectTenantUseCase', () => {
     identityStorage = new FakeIdentityStorage();
     profileStorage = new FakeProfileStorage();
     slugCache = new FakeTenantSlugCache();
+    pwaCookieMode = new FakePwaCookieModeStore();
     const getProfile = new GetProfileUseCase(profileStorage, repo);
-    useCase = new SelectTenantUseCase(repo, identityStorage, slugCache, getProfile);
+    useCase = new SelectTenantUseCase(
+      repo,
+      identityStorage,
+      slugCache,
+      getProfile,
+      pwaCookieMode,
+    );
   });
 
   it('selección exitosa persiste identity, hidrata slugCache con el slug elegido y devuelve Identity', async () => {
@@ -74,5 +83,28 @@ describe('SelectTenantUseCase', () => {
 
     const result = await useCase.execute(input);
     expect(result).toBe(identity);
+  });
+
+  describe('PWA cookie mode flag', () => {
+    it('selección exitosa enciende el flag', async () => {
+      repo.willResolveSelectTenant(makeIdentity());
+      repo.willRejectProfile(new Error('no profile'));
+      expect(pwaCookieMode.isEnabled()).toBe(false);
+      await useCase.execute(input);
+      expect(pwaCookieMode.isEnabled()).toBe(true);
+      expect(pwaCookieMode.enableCalls).toBe(1);
+    });
+
+    it('SelectionInvalidError NO enciende el flag', async () => {
+      repo.willRejectSelectTenant(new SelectionInvalidError());
+      await expect(useCase.execute(input)).rejects.toBeInstanceOf(SelectionInvalidError);
+      expect(pwaCookieMode.isEnabled()).toBe(false);
+    });
+
+    it('NetworkError NO enciende el flag', async () => {
+      repo.willRejectSelectTenant(new NetworkError());
+      await expect(useCase.execute(input)).rejects.toBeInstanceOf(NetworkError);
+      expect(pwaCookieMode.isEnabled()).toBe(false);
+    });
   });
 });
