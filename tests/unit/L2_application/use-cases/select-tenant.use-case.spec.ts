@@ -41,13 +41,7 @@ describe('SelectTenantUseCase', () => {
     slugCache = new FakeTenantSlugCache();
     pwaCookieMode = new FakePwaCookieModeStore();
     const getProfile = new GetProfileUseCase(profileStorage, repo);
-    useCase = new SelectTenantUseCase(
-      repo,
-      identityStorage,
-      slugCache,
-      getProfile,
-      pwaCookieMode,
-    );
+    useCase = new SelectTenantUseCase(repo, identityStorage, slugCache, getProfile, pwaCookieMode);
   });
 
   it('selección exitosa persiste identity, hidrata slugCache con el slug elegido y devuelve Identity', async () => {
