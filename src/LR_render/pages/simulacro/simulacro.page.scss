@@ -100,6 +100,182 @@
   }
 }
 
+// Panel de arranque en modo tarea. Aparece cuando el alumno abre una
+// tarea que nunca inició. Ocupa el lugar del header + grilla + footer,
+// centrado vertical (patrón iOS: hero screen con ícono + stat grande +
+// checklist + CTA). Bloquea todo hasta que el alumno confirme "Iniciar
+// actividad" — recién ahí se sella el myStartedAt y arranca el contador.
+.start-tarea {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-lg);
+  padding-block: var(--space-xl);
+  text-align: center;
+
+  // Ícono grande en pastilla accent-tinted. Ancla visual del hero,
+  // comunica "cronómetro/duración" antes de leer el texto.
+  &__icono {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 5rem;
+    height: 5rem;
+    border-radius: 50%;
+    background: rgb(0 36 83 / 0.08);
+    color: var(--color-primary);
+    font-size: 2.5rem;
+    line-height: 1;
+    // El Material Symbols hereda font-variation-settings del global; forzamos
+    // outlined + weight regular para consistencia con el resto de íconos.
+    font-variation-settings:
+      'FILL' 0,
+      'wght' 400,
+      'GRAD' 0,
+      'opsz' 40;
+  }
+
+  &__meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    align-items: center;
+    max-width: 22rem;
+  }
+
+  &__area {
+    margin: 0;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--color-on-surface-variant);
+  }
+
+  &__name {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.4rem;
+    line-height: 1.2;
+    font-weight: 700;
+    color: var(--color-on-surface);
+    letter-spacing: -0.02em;
+  }
+
+  // Card con el número de minutos como stat protagonista. Mono tabular para
+  // que el número respire y el "min" quede subordinado.
+  &__duracion {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: var(--space-md) var(--space-lg);
+    background: var(--color-surface-container-lowest);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius-lg);
+    min-width: 8rem;
+  }
+
+  &__duracion-numero {
+    font-family: var(--font-mono);
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__duracion-unidad {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--color-on-surface-variant);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  // Checklist alineada a la izquierda con bullets discretos en color primary.
+  // Reemplaza el ex bloque warning: acá el mensaje es informativo, no una
+  // alerta — bajamos ruido visual y subimos legibilidad.
+  &__lista {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    max-width: 20rem;
+    color: var(--color-on-surface-variant);
+    font-size: 0.9rem;
+    line-height: 1.4;
+    text-align: left;
+
+    li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.55rem;
+
+      &::before {
+        content: '';
+        flex-shrink: 0;
+        width: 6px;
+        height: 6px;
+        margin-top: 0.55rem;
+        border-radius: 50%;
+        background: var(--color-primary);
+      }
+    }
+
+    strong {
+      font-weight: 700;
+      color: var(--color-on-surface);
+    }
+  }
+
+  &__actions {
+    width: 100%;
+    max-width: 22rem;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-xs);
+    margin-top: var(--space-xs);
+  }
+
+  // CTA primaria full-width — patrón iOS de bottom-anchored primary action,
+  // aunque acá está centrada por el hero. El btn--primary hereda color/radius
+  // globales; solo forzamos ancho.
+  &__cta {
+    width: 100%;
+    padding-block: var(--space-md);
+    font-size: 1rem;
+  }
+
+  // Secundaria como link tipográfico (no botón outline) para no competir con
+  // la primaria. iOS pattern: "Cancel" siempre subordinado visualmente.
+  &__cancelar {
+    background: transparent;
+    border: none;
+    color: var(--color-primary);
+    font-size: 0.9rem;
+    font-weight: 600;
+    padding: var(--space-sm);
+    cursor: pointer;
+    border-radius: var(--radius);
+
+    &:hover {
+      background: var(--color-surface-container-low);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+    }
+  }
+}
+
 .grilla {
   flex: 1;
   display: flex;

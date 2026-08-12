@@ -137,6 +137,10 @@ export class SimulacroPage {
     this.vm.volver();
   }
 
+  protected onIniciarTareaClick(): void {
+    void this.vm.confirmHomeworkStart();
+  }
+
   protected onEnviarClick(): void {
     void this.vm.submit();
   }

@@ -1,130 +1,170 @@
 <main class="simulacro">
   @if (vm.exam(); as e) {
-    <header class="header">
-      <div class="header__meta">
-        <p class="header__area">{{ e.course ?? e.area ?? '—' }}</p>
-        <h1 class="header__name">{{ e.name }}</h1>
-      </div>
-      @if (!vm.examenNoIniciado() && !vm.examenTiempoCumplido()) {
-        <div class="header__countdown" role="timer" aria-live="polite">
-          <span class="header__cierre">Cierra a las {{ vm.cierreHHMM() }}</span>
-          <span class="header__restante">{{ vm.countdownRestante() }}</span>
+    @if (vm.awaitingHomeworkStart()) {
+      <section
+        class="start-tarea"
+        role="dialog"
+        aria-labelledby="start-tarea-titulo"
+        aria-describedby="start-tarea-lista"
+      >
+        <span class="start-tarea__icono material-symbols-outlined" aria-hidden="true"> timer </span>
+
+        <div class="start-tarea__meta">
+          <p class="start-tarea__area">{{ e.course ?? e.area ?? '—' }}</p>
+          <h1 id="start-tarea-titulo" class="start-tarea__name">{{ e.name }}</h1>
+        </div>
+
+        <div class="start-tarea__duracion" aria-label="Duración de la tarea">
+          <span class="start-tarea__duracion-numero">{{ vm.duracionMinutos() }}</span>
+          <span class="start-tarea__duracion-unidad">min</span>
+        </div>
+
+        <ul id="start-tarea-lista" class="start-tarea__lista">
+          <li>Tu contador arranca cuando toques <strong>Iniciar</strong>.</li>
+          <li>No se puede pausar ni reiniciar.</li>
+          <li>Al acabar el tiempo, tu tarea se envía sola.</li>
+        </ul>
+
+        <div class="start-tarea__actions">
+          <button
+            type="button"
+            class="btn btn--primary start-tarea__cta"
+            (click)="onIniciarTareaClick()"
+          >
+            Iniciar actividad
+          </button>
+          <button type="button" class="start-tarea__cancelar" (click)="onVolverClick()">
+            Volver a inicio
+          </button>
+        </div>
+      </section>
+    } @else {
+      <header class="header">
+        <div class="header__meta">
+          <p class="header__area">{{ e.course ?? e.area ?? '—' }}</p>
+          <h1 class="header__name">{{ e.name }}</h1>
+        </div>
+        @if (!vm.examenNoIniciado() && !vm.examenTiempoCumplido()) {
+          <div class="header__countdown" role="timer" aria-live="polite">
+            <span class="header__cierre">Cierra a las {{ vm.cierreHHMM() }}</span>
+            <span class="header__restante">{{ vm.countdownRestante() }}</span>
+          </div>
+        }
+      </header>
+
+      @if (vm.examenNoIniciado()) {
+        <div class="simulacro-banner" role="status" aria-live="polite">
+          <p class="simulacro-banner__msg">
+            ☕ El examen está tomando un café<br />
+            ¡espera la señal para empezar!
+          </p>
         </div>
       }
-    </header>
 
-    @if (vm.examenNoIniciado()) {
-      <div class="simulacro-banner" role="status" aria-live="polite">
-        <p class="simulacro-banner__msg">
-          ☕ El examen está tomando un café<br />
-          ¡espera la señal para empezar!
-        </p>
-      </div>
-    }
+      @if (vm.examenTiempoCumplido()) {
+        <div class="simulacro-banner" role="status" aria-live="polite">
+          <p class="simulacro-banner__msg">⏰ Tiempo agotado. Tus marcas quedaron guardadas.</p>
+        </div>
+      }
 
-    @if (vm.examenTiempoCumplido()) {
-      <div class="simulacro-banner" role="status" aria-live="polite">
-        <p class="simulacro-banner__msg">⏰ Tiempo agotado. Tus marcas quedaron guardadas.</p>
-      </div>
-    }
+      <app-admission-area-picker
+        [admissionArea]="vm.admissionArea()"
+        (seleccion)="onAdmissionAreaSeleccion($event)"
+      />
 
-    <app-admission-area-picker
-      [admissionArea]="vm.admissionArea()"
-      (seleccion)="onAdmissionAreaSeleccion($event)"
-    />
-
-    <section
-      class="grilla"
-      [class.grilla--disabled]="!vm.vigente()"
-      [attr.aria-disabled]="!vm.vigente() ? 'true' : null"
-      aria-label="Cartilla de marcaciones"
-    >
-      @for (pregunta of vm.preguntas(); track pregunta) {
-        <div
-          class="fila"
-          [class.fila--locked]="vm.rowState(pregunta) === 'locked'"
-          [class.fila--editing]="vm.rowState(pregunta) === 'editing'"
-          [attr.aria-label]="'Pregunta ' + pregunta"
-          role="radiogroup"
-          (pointerdown)="onRowPointerDown(pregunta, $event)"
-          (pointermove)="onRowPointerMove($event)"
-          (pointerup)="onRowPointerUpOrCancel()"
-          (pointercancel)="onRowPointerUpOrCancel()"
-        >
-          @if (vm.rowState(pregunta) === 'editing') {
-            <span class="row__chip" role="status" aria-live="polite">
-              <span class="material-symbols-outlined" aria-hidden="true">edit</span>
-              Toca para cambiar
-            </span>
-          }
-          <span class="fila__numero">{{ pregunta.toString().padStart(2, '0') }}</span>
-          <div class="fila__bubbles">
-            @for (letra of alternativas; track letra) {
-              <button
-                type="button"
-                class="bubble"
-                [class.bubble--marked]="isMarked(pregunta, letra)"
-                [attr.aria-checked]="isMarked(pregunta, letra)"
-                [attr.aria-label]="'Pregunta ' + pregunta + ', alternativa ' + letra"
-                role="radio"
-                (click)="onBubbleClick(pregunta, letra)"
-              >
-                {{ letra }}
-              </button>
+      <section
+        class="grilla"
+        [class.grilla--disabled]="!vm.vigente()"
+        [attr.aria-disabled]="!vm.vigente() ? 'true' : null"
+        aria-label="Cartilla de marcaciones"
+      >
+        @for (pregunta of vm.preguntas(); track pregunta) {
+          <div
+            class="fila"
+            [class.fila--locked]="vm.rowState(pregunta) === 'locked'"
+            [class.fila--editing]="vm.rowState(pregunta) === 'editing'"
+            [attr.aria-label]="'Pregunta ' + pregunta"
+            role="radiogroup"
+            (pointerdown)="onRowPointerDown(pregunta, $event)"
+            (pointermove)="onRowPointerMove($event)"
+            (pointerup)="onRowPointerUpOrCancel()"
+            (pointercancel)="onRowPointerUpOrCancel()"
+          >
+            @if (vm.rowState(pregunta) === 'editing') {
+              <span class="row__chip" role="status" aria-live="polite">
+                <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+                Toca para cambiar
+              </span>
             }
+            <span class="fila__numero">{{ pregunta.toString().padStart(2, '0') }}</span>
+            <div class="fila__bubbles">
+              @for (letra of alternativas; track letra) {
+                <button
+                  type="button"
+                  class="bubble"
+                  [class.bubble--marked]="isMarked(pregunta, letra)"
+                  [attr.aria-checked]="isMarked(pregunta, letra)"
+                  [attr.aria-label]="'Pregunta ' + pregunta + ', alternativa ' + letra"
+                  role="radio"
+                  (click)="onBubbleClick(pregunta, letra)"
+                >
+                  {{ letra }}
+                </button>
+              }
+            </div>
+          </div>
+        }
+      </section>
+
+      @if (vm.submissionState() === 'queued') {
+        <div class="queued-banner" role="status" aria-live="polite">
+          <span class="queued-banner__icon" aria-hidden="true">●</span>
+          <div class="queued-banner__copy">
+            <p class="queued-banner__title">Pendiente de envío</p>
+            <p class="queued-banner__detail">
+              Sin conexión. Tus respuestas se enviarán automáticamente cuando vuelva la red.
+            </p>
           </div>
         </div>
       }
-    </section>
 
-    @if (vm.submissionState() === 'queued') {
-      <div class="queued-banner" role="status" aria-live="polite">
-        <span class="queued-banner__icon" aria-hidden="true">●</span>
-        <div class="queued-banner__copy">
-          <p class="queued-banner__title">Pendiente de envío</p>
-          <p class="queued-banner__detail">
-            Sin conexión. Tus respuestas se enviarán automáticamente cuando vuelva la red.
-          </p>
-        </div>
-      </div>
+      <footer class="footer">
+        <button type="button" class="btn btn--secondary" (click)="onVolverClick()">
+          Volver a inicio
+        </button>
+        <button
+          type="button"
+          class="btn btn--primary"
+          [disabled]="
+            vm.isSubmitting() ||
+            vm.submissionState() === 'queued' ||
+            vm.examenNoIniciado() ||
+            vm.examenTiempoCumplido() ||
+            vm.lastAck() !== null
+          "
+          [attr.aria-disabled]="
+            vm.isSubmitting() ||
+            vm.submissionState() === 'queued' ||
+            vm.examenNoIniciado() ||
+            vm.examenTiempoCumplido() ||
+            vm.lastAck() !== null
+          "
+          (click)="onEnviarClick()"
+        >
+          @if (vm.isSubmitting()) {
+            Enviando…
+          } @else {
+            Enviar
+          }
+        </button>
+      </footer>
     }
-
-    <footer class="footer">
-      <button type="button" class="btn btn--secondary" (click)="onVolverClick()">
-        Volver a inicio
-      </button>
-      <button
-        type="button"
-        class="btn btn--primary"
-        [disabled]="
-          vm.isSubmitting() ||
-          vm.submissionState() === 'queued' ||
-          vm.examenNoIniciado() ||
-          vm.examenTiempoCumplido() ||
-          vm.lastAck() !== null
-        "
-        [attr.aria-disabled]="
-          vm.isSubmitting() ||
-          vm.submissionState() === 'queued' ||
-          vm.examenNoIniciado() ||
-          vm.examenTiempoCumplido() ||
-          vm.lastAck() !== null
-        "
-        (click)="onEnviarClick()"
-      >
-        @if (vm.isSubmitting()) {
-          Enviando…
-        } @else {
-          Enviar
-        }
-      </button>
-    </footer>
   } @else if (vm.isLoading()) {
     <p class="loading">Cargando simulacro…</p>
   }
 </main>
 
-@if (isDev && vm.vigente()) {
+@if (isDev && vm.vigente() && !vm.awaitingHomeworkStart()) {
   <button
     type="button"
     class="dev-fab"

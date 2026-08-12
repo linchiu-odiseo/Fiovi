@@ -241,12 +241,28 @@ export class SimulacroPageViewModel {
   // leer exam() (que puede ser null en edge cases de lifecycle).
   private sessionId = '';
 
-  // Modo "tarea": momento en que el alumno abrió la tarea localmente.
-  // Se persiste en localStorage con clave `homework:<sessionId>` para que si
-  // el alumno cierra y reabre Fiovi, el countdown de 10 min continúe donde
-  // estaba. Signal null hasta que start() lo hidrate o cree.
+  // Modo "tarea": momento en que el alumno arrancó la tarea localmente.
+  // Se persiste en localStorage con clave `homework:<sessionId>` SOLO al
+  // confirmar Iniciar — abrir la pantalla no lo sella. Si el alumno cierra
+  // y reabre Fiovi habiendo confirmado, el countdown continúa donde estaba.
+  // Signal null hasta que el alumno confirme Iniciar (primera vez) o hasta
+  // que start() hidrate un valor previo (siguientes visitas).
   readonly myStartedAt = signal<Date | null>(null);
   private static readonly HOMEWORK_START_KEY_PREFIX = 'homework:';
+
+  // Modo "tarea": true cuando el alumno abrió una tarea que nunca inició.
+  // Mientras esté en true la UI muestra el panel "Iniciar actividad" y no
+  // se arma ticker ni auto-envío — el contador arranca recién al confirmar.
+  // No aplica en modo simulacro tradicional.
+  readonly awaitingHomeworkStart = signal<boolean>(false);
+
+  // Duración de la tarea en minutos, para el mensaje del panel de inicio.
+  // `exam.duration` viene en segundos; redondeamos al minuto más cercano.
+  readonly duracionMinutos: Signal<number> = computed(() => {
+    const e = this.exam();
+    if (e === null) return 0;
+    return Math.max(1, Math.round(e.duration / 60));
+  });
 
   constructor() {
     // Observa la signal closedSessions del dispatcher. Si el back devuelve
@@ -322,10 +338,20 @@ export class SimulacroPageViewModel {
 
     this.sessionId = encontrado.id;
     this.exam.set(encontrado);
-    // Modo "tarea": hidratar / crear el myStartedAt local antes de programar
-    // countdown y auto-envio — ambos dependen de él.
+    // Modo "tarea": si ya hay un myStartedAt sellado en visitas previas,
+    // lo restauramos y seguimos el flujo normal. Si no lo hay, esta es la
+    // primera vez que el alumno abre la tarea (o volvió sin confirmar):
+    // dejamos el signal en null, encendemos `awaitingHomeworkStart` y
+    // NO armamos ticker ni auto-envío. El contador arranca recién cuando
+    // el alumno confirme el panel de Iniciar → confirmHomeworkStart().
     if (encontrado.esTarea()) {
-      this.hydrateHomeworkStartedAt(encontrado.id);
+      const existing = this.readExistingHomeworkStartedAt(encontrado.id);
+      if (existing !== null) {
+        this.myStartedAt.set(existing);
+      } else {
+        this.awaitingHomeworkStart.set(true);
+        return;
+      }
     }
     await this.loadMarcaciones(encontrado);
     this.startCountdownTicker();
@@ -333,34 +359,69 @@ export class SimulacroPageViewModel {
   }
 
   /**
-   * Modo "tarea": lee `homework:<sessionId>` de localStorage; si no existe,
-   * escribe `now` y setea la signal — así el countdown arranca desde el
-   * primer momento en que el alumno entra a la tarea. Si el alumno cierra
-   * Fiovi y reabre, el valor persistido continúa el countdown donde estaba.
+   * Modo "tarea": confirma el arranque del contador. Sella `myStartedAt`
+   * en localStorage, apaga el panel de espera, carga marcaciones (por si
+   * hubiera restos de una sesión anterior sin sellado), y programa ticker
+   * + auto-envío.
    *
-   * Falla silenciosa contra localStorage indisponible (SSR, safari private,
-   * quota exceeded) — el signal queda null y `personalCloseAt` cae al
-   * openUntil global. El alumno no queda bloqueado.
+   * Idempotente: si el flag ya está apagado, no hace nada. Guard también
+   * para modo no-tarea y para exam null (defensa contra clicks fuera de
+   * secuencia — el template ya protege pero no queremos depender de eso).
    */
-  private hydrateHomeworkStartedAt(sessionId: string): void {
+  async confirmHomeworkStart(): Promise<void> {
+    if (this.stopped) return;
+    if (!this.awaitingHomeworkStart()) return;
+    const exam = this.exam();
+    if (exam === null) return;
+    if (!exam.esTarea()) return;
+
+    this.sealHomeworkStartedAt(exam.id);
+    this.awaitingHomeworkStart.set(false);
+    await this.loadMarcaciones(exam);
+    this.startCountdownTicker();
+    this.scheduleAutoEnvio(exam);
+  }
+
+  /**
+   * Modo "tarea": lee `homework:<sessionId>` de localStorage sin escribir.
+   * Devuelve la fecha sellada si existe y es válida, o null si el alumno
+   * nunca confirmó Iniciar (o si localStorage no está disponible).
+   *
+   * Falla silenciosa contra localStorage indisponible (SSR, safari private):
+   * retorna null y el caller decide qué hacer.
+   */
+  private readExistingHomeworkStartedAt(sessionId: string): Date | null {
     const key = SimulacroPageViewModel.HOMEWORK_START_KEY_PREFIX + sessionId;
     try {
       const raw = localStorage.getItem(key);
-      if (raw !== null && raw.trim().length > 0) {
-        const d = new Date(raw);
-        if (!Number.isNaN(d.getTime())) {
-          this.myStartedAt.set(d);
-          return;
-        }
-      }
-      // Primera vez: sellar `now` en localStorage + signal.
-      const now = this.clock.now();
-      localStorage.setItem(key, now.toISOString());
-      this.myStartedAt.set(now);
+      if (raw === null || raw.trim().length === 0) return null;
+      const d = new Date(raw);
+      if (Number.isNaN(d.getTime())) return null;
+      return d;
     } catch {
-      // localStorage indisponible: queda null; personalCloseAt usará openUntil
-      // como fallback (cutoff hard del server). UX degradada pero no rota.
+      return null;
     }
+  }
+
+  /**
+   * Modo "tarea": sella `now` en localStorage y setea el signal.
+   * Solo se llama desde `confirmHomeworkStart()`, cuando el alumno confirma
+   * el botón Iniciar. Abrir la pantalla no dispara esto — esa es la regla
+   * que garantiza que el contador no corre hasta que el alumno decide.
+   *
+   * Falla silenciosa contra localStorage: si no puede persistir, igual setea
+   * el signal para que la sesión actual funcione. La próxima entrada volverá
+   * a mostrar el panel de Iniciar (efecto colateral aceptable en storage roto).
+   */
+  private sealHomeworkStartedAt(sessionId: string): void {
+    const key = SimulacroPageViewModel.HOMEWORK_START_KEY_PREFIX + sessionId;
+    const now = this.clock.now();
+    try {
+      localStorage.setItem(key, now.toISOString());
+    } catch {
+      // localStorage indisponible: seguimos con el signal en memoria.
+    }
+    this.myStartedAt.set(now);
   }
 
   stop(): void {
