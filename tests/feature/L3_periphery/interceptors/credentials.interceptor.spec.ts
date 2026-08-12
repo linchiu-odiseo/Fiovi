@@ -26,6 +26,8 @@ import { LogoutUseCase } from '../../../../src/L2_application/use-cases/logout.u
 import { RefreshFailedError } from '../../../../src/L1_domain/errors/refresh-failed.error';
 import { Identity } from '../../../../src/L1_domain/entities/identity';
 import { environment } from '../../../../src/environments/environment';
+import { PWA_COOKIE_MODE_STORE } from '../../../../src/L3_periphery/tokens';
+import type { PwaCookieModeStore } from '../../../../src/L1_domain/ports/pwa-cookie-mode-store';
 
 // Fakes de los use cases que el interceptor inyecta. NO usamos vi.fn() para
 // que el contrato del use case quede explícito en cada doble.
@@ -78,6 +80,23 @@ class FakeLogoutUseCase {
   }
 }
 
+class FakePwaCookieModeStore implements PwaCookieModeStore {
+  private enabled = false;
+  isEnabled(): boolean {
+    return this.enabled;
+  }
+  enable(): void {
+    this.enabled = true;
+  }
+  // Test-only helpers para setear el estado inicial en cada it.
+  reset(): void {
+    this.enabled = false;
+  }
+  forceEnabled(): void {
+    this.enabled = true;
+  }
+}
+
 const TEST_SLUG = 'vonex';
 
 function makeIdentity(): Identity {
@@ -98,16 +117,19 @@ describe('credentialsInterceptor', () => {
   let http: HttpClient;
   let refreshUseCase: FakeRefreshIdentityUseCase;
   let logoutUseCase: FakeLogoutUseCase;
+  let pwaCookieMode: FakePwaCookieModeStore;
 
   beforeEach(() => {
     refreshUseCase = new FakeRefreshIdentityUseCase();
     logoutUseCase = new FakeLogoutUseCase();
+    pwaCookieMode = new FakePwaCookieModeStore();
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(withInterceptors([credentialsInterceptor])),
         provideHttpClientTesting(),
         { provide: RefreshIdentityUseCase, useValue: refreshUseCase },
         { provide: LogoutUseCase, useValue: logoutUseCase },
+        { provide: PWA_COOKIE_MODE_STORE, useValue: pwaCookieMode },
       ],
     });
     httpMock = TestBed.inject(HttpTestingController);
@@ -326,6 +348,89 @@ describe('credentialsInterceptor', () => {
       expect(refreshUseCase.executeCalls).toBe(1);
     });
 
+    it('placeholder', () => undefined);
+  });
+
+  describe('header X-Client-App: pwa (split cookie mode)', () => {
+    it('flag OFF + endpoint autenticado → NO manda el header (pre-migración)', async () => {
+      const url = `${environment.apiBaseUrl}/t/${TEST_SLUG}/student/me`;
+      const pending = firstValueFrom(http.get(url));
+      const req = httpMock.expectOne(url);
+      expect(req.request.headers.has('X-Client-App')).toBe(false);
+      req.flush({ ok: true });
+      await pending;
+    });
+
+    it('flag ON + endpoint autenticado → manda X-Client-App: pwa', async () => {
+      pwaCookieMode.forceEnabled();
+      const url = `${environment.apiBaseUrl}/t/${TEST_SLUG}/student/me`;
+      const pending = firstValueFrom(http.get(url));
+      const req = httpMock.expectOne(url);
+      expect(req.request.headers.get('X-Client-App')).toBe('pwa');
+      req.flush({ ok: true });
+      await pending;
+    });
+
+    it('flag OFF + /auth/login → SIEMPRE manda el header (fresh-cookie endpoint)', async () => {
+      const url = `${environment.apiBaseUrl}/auth/login`;
+      const pending = firstValueFrom(http.post(url, { email: 'x', password: 'y' }));
+      const req = httpMock.expectOne(url);
+      expect(req.request.headers.get('X-Client-App')).toBe('pwa');
+      req.flush({ user: {}, expiresAt: 0 });
+      await pending;
+    });
+
+    it('flag OFF + /t/{slug}/auth/login → SIEMPRE manda el header (fresh-cookie endpoint)', async () => {
+      const url = `${environment.apiBaseUrl}/t/${TEST_SLUG}/auth/login`;
+      const pending = firstValueFrom(http.post(url, { email: 'x', password: 'y' }));
+      const req = httpMock.expectOne(url);
+      expect(req.request.headers.get('X-Client-App')).toBe('pwa');
+      req.flush({ user: {}, expiresAt: 0 });
+      await pending;
+    });
+
+    it('flag OFF + /auth/select-tenant → SIEMPRE manda el header (fresh-cookie endpoint)', async () => {
+      const url = `${environment.apiBaseUrl}/auth/select-tenant`;
+      const pending = firstValueFrom(http.post(url, { selectionToken: 't', slug: 'x' }));
+      const req = httpMock.expectOne(url);
+      expect(req.request.headers.get('X-Client-App')).toBe('pwa');
+      req.flush({ user: {}, expiresAt: 0 });
+      await pending;
+    });
+
+    it('flag OFF + /auth/refresh → NO manda el header (usa cookie que exista)', async () => {
+      // Sesiones pre-migración refrescan la cookie learnex_tenant_refresh —
+      // no queremos forzar pwa acá porque el user aún no logueó fresh.
+      const url = `${environment.apiBaseUrl}/t/${TEST_SLUG}/auth/refresh`;
+      const pending = firstValueFrom(http.post(url, {}));
+      const req = httpMock.expectOne(url);
+      expect(req.request.headers.has('X-Client-App')).toBe(false);
+      req.flush({ user: {}, expiresAt: 0 });
+      await pending;
+    });
+
+    it('flag ON + /auth/logout → manda el header (borra las cookies pwa correctas)', async () => {
+      pwaCookieMode.forceEnabled();
+      const url = `${environment.apiBaseUrl}/t/${TEST_SLUG}/auth/logout`;
+      const pending = firstValueFrom(http.post(url, {}));
+      const req = httpMock.expectOne(url);
+      expect(req.request.headers.get('X-Client-App')).toBe('pwa');
+      req.flush(null);
+      await pending;
+    });
+
+    it('request fuera de apiBaseUrl NUNCA recibe el header (aunque flag ON)', async () => {
+      pwaCookieMode.forceEnabled();
+      const externalUrl = 'https://otro-host.example.com/data';
+      const pending = firstValueFrom(http.get(externalUrl));
+      const req = httpMock.expectOne(externalUrl);
+      expect(req.request.headers.has('X-Client-App')).toBe(false);
+      req.flush({});
+      await pending;
+    });
+  });
+
+  describe('race condition — lock shareReplay(1) (parte 2)', () => {
     it('lock se libera tras finalize → un 401 posterior dispara OTRO refresh', async () => {
       // Primer ciclo: refresh exitoso.
       refreshUseCase.willResolve(makeIdentity());

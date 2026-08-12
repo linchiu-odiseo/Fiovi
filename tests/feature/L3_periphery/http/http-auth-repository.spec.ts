@@ -15,6 +15,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { HttpAuthRepository } from '../../../../src/L3_periphery/http/http-auth-repository';
 import { SlugStore } from '../../../../src/L3_periphery/http/slug-store';
 import { Identity } from '../../../../src/L1_domain/entities/identity';
+import { AccountNotActiveError } from '../../../../src/L1_domain/errors/account-not-active.error';
 import { InvalidCredentialsError } from '../../../../src/L1_domain/errors/invalid-credentials.error';
 import { NetworkError } from '../../../../src/L1_domain/errors/network.error';
 import { RateLimitError } from '../../../../src/L1_domain/errors/rate-limit.error';
@@ -201,6 +202,16 @@ describe('HttpAuthRepository', () => {
       const req = httpMock.expectOne(LOGIN_URL);
       req.flush({}, { status: 401, statusText: 'Unauthorized' });
       await expect(pending).rejects.toBeInstanceOf(InvalidCredentialsError);
+    });
+
+    it('mapea 401 con code TENANT_AUTH_ACCOUNT_NOT_ACTIVE a AccountNotActiveError', async () => {
+      const pending = repo.login(credentials);
+      const req = httpMock.expectOne(LOGIN_URL);
+      req.flush(
+        { code: 'TENANT_AUTH_ACCOUNT_NOT_ACTIVE', message: 'cualquier string del back' },
+        { status: 401, statusText: 'Unauthorized' },
+      );
+      await expect(pending).rejects.toBeInstanceOf(AccountNotActiveError);
     });
 
     it('mapea 429 a RateLimitError', async () => {

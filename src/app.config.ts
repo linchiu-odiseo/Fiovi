@@ -21,6 +21,7 @@ import { MarkingsStorage } from './L1_domain/ports/markings-storage';
 import { ExamsApi } from './L1_domain/ports/exams-api';
 import { IdentityStorage } from './L1_domain/ports/identity-storage';
 import { ProfileStorage } from './L1_domain/ports/profile-storage';
+import { PwaCookieModeStore } from './L1_domain/ports/pwa-cookie-mode-store';
 import { RouterPort } from './L1_domain/ports/router-port';
 import { TenantSlugCache } from './L1_domain/ports/tenant-slug-cache';
 
@@ -52,6 +53,7 @@ import { HttpExamsApi } from './L3_periphery/http/http-exams-api';
 import { HttpTutorExamsApi } from './L3_periphery/http/http-tutor-exams-api';
 import { HttpTutorNavigationApi } from './L3_periphery/http/http-tutor-navigation-api';
 import { LocalStorageIdentityStorage } from './L3_periphery/storage/local-storage-identity-storage';
+import { LocalStoragePwaCookieModeStore } from './L3_periphery/storage/local-storage-pwa-cookie-mode-store';
 import { IndexedDbProfileStorage } from './L3_periphery/storage/indexed-db-profile-storage';
 import { IndexedDbMarkingsStorage } from './L3_periphery/storage/indexed-db-markings-storage';
 import { ServerAnchoredClock } from './L3_periphery/clock/server-anchored-clock';
@@ -70,6 +72,7 @@ import {
   IDENTITY_STORAGE,
   PROFILE_STORAGE,
   OUTBOX_STORAGE,
+  PWA_COOKIE_MODE_STORE,
   TUTOR_EXAMS_API,
   TUTOR_NAVIGATION_API,
 } from './L3_periphery/tokens';
@@ -124,6 +127,7 @@ export const appConfig: ApplicationConfig = {
     // Bind puertos L1 → implementaciones L3.
     { provide: AUTH_REPOSITORY, useExisting: HttpAuthRepository },
     { provide: IDENTITY_STORAGE, useExisting: LocalStorageIdentityStorage },
+    { provide: PWA_COOKIE_MODE_STORE, useExisting: LocalStoragePwaCookieModeStore },
     { provide: TENANT_SLUG_CACHE, useExisting: SlugStore },
     { provide: PROFILE_STORAGE, useExisting: IndexedDbProfileStorage },
     // IndexedDbMarkingsStorage implementa MarkingsStorage Y OutboxStoragePort.
@@ -163,8 +167,15 @@ export const appConfig: ApplicationConfig = {
         storage: IdentityStorage,
         slugCache: TenantSlugCache,
         getProfile: GetProfileUseCase,
-      ) => new LoginUseCase(repo, storage, slugCache, getProfile),
-      deps: [AUTH_REPOSITORY, IDENTITY_STORAGE, TENANT_SLUG_CACHE, GetProfileUseCase],
+        pwaCookieMode: PwaCookieModeStore,
+      ) => new LoginUseCase(repo, storage, slugCache, getProfile, pwaCookieMode),
+      deps: [
+        AUTH_REPOSITORY,
+        IDENTITY_STORAGE,
+        TENANT_SLUG_CACHE,
+        GetProfileUseCase,
+        PWA_COOKIE_MODE_STORE,
+      ],
     },
     {
       provide: SelectTenantUseCase,
@@ -173,8 +184,15 @@ export const appConfig: ApplicationConfig = {
         storage: IdentityStorage,
         slugCache: TenantSlugCache,
         getProfile: GetProfileUseCase,
-      ) => new SelectTenantUseCase(repo, storage, slugCache, getProfile),
-      deps: [AUTH_REPOSITORY, IDENTITY_STORAGE, TENANT_SLUG_CACHE, GetProfileUseCase],
+        pwaCookieMode: PwaCookieModeStore,
+      ) => new SelectTenantUseCase(repo, storage, slugCache, getProfile, pwaCookieMode),
+      deps: [
+        AUTH_REPOSITORY,
+        IDENTITY_STORAGE,
+        TENANT_SLUG_CACHE,
+        GetProfileUseCase,
+        PWA_COOKIE_MODE_STORE,
+      ],
     },
     {
       provide: ListSsoProvidersUseCase,

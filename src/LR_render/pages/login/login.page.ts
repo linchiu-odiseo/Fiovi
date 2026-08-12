@@ -19,7 +19,7 @@ const SSO_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   sso_no_matching_tenant: 'Ese correo no está registrado en ninguna academia.',
   sso_email_not_verified: 'Verificá tu correo con Google antes de iniciar sesión.',
   sso_hosted_domain_mismatch: 'Tu cuenta de Google no pertenece al dominio autorizado.',
-  sso_user_inactive: 'Tu cuenta está desactivada. Contactá a tu academia.',
+  sso_user_inactive: 'Tu cuenta no está activa. Contacta a tu institución para activarla.',
   // Fallback defensivo: el backend post-cambio ya no lo emite, pero un cliente
   // con cache viejo podría verlo hasta el refresh de la PWA.
   sso_multiple_tenants: 'Iniciá sesión con tu contraseña por ahora.',
@@ -54,6 +54,13 @@ export class LoginPage implements OnInit {
   protected readonly captchaToken = signal<string | null>(null);
   protected readonly passwordVisible = signal(false);
 
+  // Mensaje del error SSO (copy es-PE mapeado desde `?ssoError=<code>`).
+  // Cuando NO es null, el bloque Google+"Iniciar con email" se reemplaza
+  // por una tarjeta que muestra el mensaje + botón para reintentar SSO.
+  // Signal separado de `vm.errorMessage` porque este último renderiza
+  // dentro del form password y ambos slots son visualmente distintos.
+  protected readonly ssoError = signal<string | null>(null);
+
   // Progressive disclosure del form de email. Cuando hay providers SSO, el
   // form arranca colapsado (la mayoría entra con Google) y se expande a
   // pedido con un link. Sin providers, el signal queda irrelevante — el
@@ -73,7 +80,10 @@ export class LoginPage implements OnInit {
     const raw = this.route.snapshot.queryParams['ssoError'] as string | undefined;
     const msg = this.mapSsoErrorToMessage(raw ?? null);
     if (msg !== null) {
-      this.vm.errorMessage.set(msg);
+      // Signal dedicado (no vm.errorMessage) — el banner SSO reemplaza al
+      // grupo Google+"Iniciar con email" con una tarjeta compacta; el
+      // errorMessage del vm sigue reservado para fallas del submit password.
+      this.ssoError.set(msg);
     }
     // Fetch dinámico de los providers habilitados en el SaaS. La UI decide
     // qué botones renderizar en base al signal `vm.ssoProviders()`. Sin
@@ -127,6 +137,15 @@ export class LoginPage implements OnInit {
     // `window.location.assign` en vez de `href = ...` porque es spy-friendly
     // desde tests jsdom sin gymnastics de `Object.defineProperty` en el setter.
     window.location.assign(apiPath.ssoStart(provider));
+  }
+
+  // Escape desde la tarjeta de error SSO al menú normal. Limpia el signal
+  // y también `?ssoError=` de la URL vía `history.replaceState` — sin esto,
+  // un refresh trae la tarjeta de vuelta y el user queda atrapado en el
+  // bucle. El retry queda a un click más (el botón Google del menú normal).
+  protected dismissSsoError(): void {
+    this.ssoError.set(null);
+    window.history.replaceState({}, '', window.location.pathname);
   }
 
   // Traduce el código de error del backend a copy es-PE. Cualquier código
