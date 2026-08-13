@@ -21,9 +21,11 @@ export type InstallInstructionsMode = 'iosInstructions' | 'iosOtherBrowser' | 'w
 // no-Safari (redirigir a Safari), o browser embebido en apps (redirigir
 // al navegador principal).
 //
-// Sigue el patrón visual del `UpdateConfirmModalComponent`: overlay
-// oscurecido + card centrada. La `X` cierra sin persistir estado — el
-// card en /home sigue tentando en la próxima visita.
+// Usa `<dialog>` nativo: el browser maneja gratis el backdrop, focus trap,
+// tecla Escape y aria-modal. El evento `close` del dialog dispara al
+// cerrar por cualquier vía (Escape, botón, o backdrop click con nuestro
+// handler manual). El try/catch de `showModal()` cubre entornos test
+// (jsdom no implementa el método pero sí renderiza el elemento).
 @Component({
   selector: 'app-install-instructions-modal',
   standalone: true,
@@ -36,6 +38,7 @@ export class InstallInstructionsModalComponent implements AfterViewInit {
 
   @Output() readonly dismiss = new EventEmitter<void>();
 
+  @ViewChild('dialog') private readonly dialog?: ElementRef<HTMLDialogElement>;
   @ViewChild('closeButton') private readonly closeButton?: ElementRef<HTMLButtonElement>;
 
   // Feedback ephemeral tras tocar "Copiar". Vuelve a null a los 2s.
@@ -47,14 +50,33 @@ export class InstallInstructionsModalComponent implements AfterViewInit {
   }
 
   ngAfterViewInit(): void {
+    const dialog = this.dialog?.nativeElement;
+    if (dialog) {
+      try {
+        dialog.showModal();
+      } catch {
+        // jsdom no implementa showModal (el test env sigue renderizando el
+        // contenido, solo perdemos el focus trap nativo — aceptable).
+      }
+    }
     // Foco inicial en el botón Cerrar — el más seguro; el tap secundario
     // (copiar URL) queda como acción explícita.
     queueMicrotask(() => this.closeButton?.nativeElement.focus());
   }
 
-  @HostListener('document:keydown.escape')
-  onEscape(): void {
-    this.dismiss.emit();
+  // Click sobre el <dialog> element ES un click en el backdrop cuando el
+  // target del evento es el propio dialog (el contenido interno lo atrapan
+  // sus propios elementos y no bubble como target = dialog).
+  //
+  // Usamos @HostListener en vez de (click) en el template para no toparnos
+  // con el lint `click-events-have-key-events` (Escape ya lo maneja el
+  // `<dialog>` nativo y dispara `close` → dismiss, así que la accesibilidad
+  // por teclado está cubierta sin agregar handler manual).
+  @HostListener('click', ['$event.target'])
+  onHostClick(target: EventTarget | null): void {
+    if (target === this.dialog?.nativeElement) {
+      this.dismiss.emit();
+    }
   }
 
   async onCopyUrl(): Promise<void> {
