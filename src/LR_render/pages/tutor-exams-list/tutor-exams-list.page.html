@@ -161,6 +161,12 @@
         </button>
       }
     }
+
+    <!-- Card de instalación PWA (mismo componente que el home del alumno).
+         Variant `tutor` cambia el hint al beneficio operativo del tutor.
+         Se auto-oculta en desktop — típico entorno del tutor — y solo tienta
+         en móvil. Ver `DecideInstallCardStateUseCase`. -->
+    <app-install-app-card variant="tutor" />
   </section>
 
   <app-version-footer class="tutor-exams-list__version-footer" />

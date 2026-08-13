@@ -1,5 +1,6 @@
 import { Component, DestroyRef, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
+import { InstallAppCardComponent } from '../../components/install-app-card/install-app-card.component';
 import { VersionFooterComponent } from '../../components/version-footer/version-footer.component';
 import { HomePageViewModel, SimulacroCard } from '../../view-models/home.view-model';
 
@@ -13,7 +14,7 @@ const PULL_MAX_VISUAL_PX = 120;
   selector: 'app-home-page',
   templateUrl: './home.page.html',
   styleUrl: './home.page.scss',
-  imports: [VersionFooterComponent],
+  imports: [VersionFooterComponent, InstallAppCardComponent],
   providers: [HomePageViewModel],
 })
 export class HomePage {

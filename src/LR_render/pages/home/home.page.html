@@ -130,6 +130,12 @@
         </button>
       }
     }
+
+    <!-- Card de instalación PWA. Aparece tentando al alumno a instalar Fiovi
+         como app; se auto-oculta si ya está instalada, en PC, en primera
+         visita o si Chromium no capturó `beforeinstallprompt`. Ver
+         `DecideInstallCardStateUseCase` para las reglas. -->
+    <app-install-app-card />
   </section>
 
   <app-version-footer class="home__version-footer" />

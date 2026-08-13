@@ -2,6 +2,7 @@ import { Component, DestroyRef, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { TutorExamsListViewModel } from '../../view-models/tutor-exams-list.view-model';
 import { ExamEnCurso } from '../../../L1_domain/entities/exam-en-curso';
+import { InstallAppCardComponent } from '../../components/install-app-card/install-app-card.component';
 import { VersionFooterComponent } from '../../components/version-footer/version-footer.component';
 
 // Home del tutor en /tutor/home. Muestra las aulas asignadas + una lista
@@ -12,7 +13,7 @@ import { VersionFooterComponent } from '../../components/version-footer/version-
   selector: 'app-tutor-exams-list-page',
   templateUrl: './tutor-exams-list.page.html',
   styleUrl: './tutor-exams-list.page.scss',
-  imports: [VersionFooterComponent],
+  imports: [VersionFooterComponent, InstallAppCardComponent],
   providers: [TutorExamsListViewModel],
 })
 export class TutorExamsListPage {

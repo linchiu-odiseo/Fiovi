@@ -1,0 +1,62 @@
+<div class="modal-overlay" (click)="dismiss.emit()" aria-hidden="true"></div>
+<div role="dialog" aria-modal="true" aria-labelledby="install-modal-title" class="modal">
+  @switch (mode) {
+    @case ('iosInstructions') {
+      <h2 id="install-modal-title" class="modal__title">Instala Fiovi en tu iPhone</h2>
+      <ol class="steps">
+        <li>
+          <span class="material-symbols-outlined steps__icon" aria-hidden="true">ios_share</span>
+          <span>Toca el botón <strong>Compartir</strong> en la barra de abajo</span>
+        </li>
+        <li>
+          <span class="material-symbols-outlined steps__icon" aria-hidden="true">add_box</span>
+          <span>Elige <strong>Añadir a pantalla de inicio</strong></span>
+        </li>
+        <li>
+          <span class="material-symbols-outlined steps__icon" aria-hidden="true">check_circle</span>
+          <span>Toca <strong>Añadir</strong> arriba a la derecha</span>
+        </li>
+      </ol>
+      <p class="modal__hint">
+        Asegúrate de tener Fiovi abierta en Safari — otros navegadores del iPhone no permiten
+        instalar.
+      </p>
+    }
+    @case ('iosOtherBrowser') {
+      <h2 id="install-modal-title" class="modal__title">Abre Fiovi en Safari</h2>
+      <p class="modal__explain">
+        Los otros navegadores del iPhone no permiten instalar apps en la pantalla de inicio. Copia
+        el enlace y ábrelo en Safari para instalar Fiovi.
+      </p>
+      <div class="url-box">
+        <code class="url-box__url">{{ currentUrl }}</code>
+        <button type="button" class="url-box__btn" (click)="onCopyUrl()">
+          {{ copied() ? 'Copiado ✓' : 'Copiar' }}
+        </button>
+      </div>
+    }
+    @case ('webviewFallback') {
+      <h2 id="install-modal-title" class="modal__title">Abre en tu navegador</h2>
+      <p class="modal__explain">
+        Estás dentro de una app que no permite instalar Fiovi. Copia el enlace y pégalo en Chrome,
+        Safari o el navegador de tu celular.
+      </p>
+      <div class="url-box">
+        <code class="url-box__url">{{ currentUrl }}</code>
+        <button type="button" class="url-box__btn" (click)="onCopyUrl()">
+          {{ copied() ? 'Copiado ✓' : 'Copiar' }}
+        </button>
+      </div>
+    }
+  }
+  <div class="modal__actions">
+    <button
+      #closeButton
+      type="button"
+      class="modal__btn modal__btn--primary"
+      (click)="dismiss.emit()"
+    >
+      Entendido
+    </button>
+  </div>
+</div>
