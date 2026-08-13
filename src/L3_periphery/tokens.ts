@@ -1,6 +1,9 @@
 import { InjectionToken } from '@angular/core';
 import { CaptchaProvider } from '../L1_domain/ports/captcha-provider';
 import { IdentityStorage } from '../L1_domain/ports/identity-storage';
+import { InstallEnvironmentProbe } from '../L1_domain/ports/install-environment-probe';
+import { InstallPromptStore } from '../L1_domain/ports/install-prompt-store';
+import { NativeInstallPrompt } from '../L1_domain/ports/native-install-prompt';
 import { ProfileStorage } from '../L1_domain/ports/profile-storage';
 import { OutboxStoragePort } from '../L1_domain/ports/outbox-storage.port';
 import { PwaCookieModeStore } from '../L1_domain/ports/pwa-cookie-mode-store';
@@ -45,3 +48,15 @@ export const CAPTCHA_PROVIDER = new InjectionToken<CaptchaProvider>('CaptchaProv
 // encendido) y por los use-cases de login/select-tenant/sso-callback (lo encienden
 // tras auth exitosa). Ver `PwaCookieModeStore` para el racional del flag.
 export const PWA_COOKIE_MODE_STORE = new InjectionToken<PwaCookieModeStore>('PwaCookieModeStore');
+
+// Tokens del card "Instala Fiovi como app" del /home. Los tres colaboran para
+// que el `DecideInstallCardStateUseCase` (L2) decida qué modalidad mostrar:
+//   - `INSTALL_ENV_PROBE`: capabilities del entorno (standalone, mobile, platform).
+//   - `INSTALL_PROMPT_STORE`: persistencia (visitCount, dismissedAt, installed).
+//   - `NATIVE_INSTALL_PROMPT`: wrapper del evento `beforeinstallprompt` de Chromium.
+// Bindings concretos y wiring del use case en `app.config.ts`.
+export const INSTALL_ENV_PROBE = new InjectionToken<InstallEnvironmentProbe>(
+  'InstallEnvironmentProbe',
+);
+export const INSTALL_PROMPT_STORE = new InjectionToken<InstallPromptStore>('InstallPromptStore');
+export const NATIVE_INSTALL_PROMPT = new InjectionToken<NativeInstallPrompt>('NativeInstallPrompt');
