@@ -11,6 +11,9 @@ import { PwaUpdateService } from '../../../../../src/L3_periphery/pwa/pwa-update
 import { PendingUpdate } from '../../../../../src/L3_periphery/pwa/pwa-update.types';
 import { environment } from '../../../../../src/environments/environment';
 import { CLOCK, MARKINGS_STORAGE } from '../../../../../src/app.config';
+import { INSTALL_PROMPT_STORE } from '../../../../../src/L3_periphery/tokens';
+import { BeforeInstallPromptAdapter } from '../../../../../src/L3_periphery/pwa/before-install-prompt.adapter';
+import { DecideInstallCardStateUseCase } from '../../../../../src/L2_application/use-cases/decide-install-card-state.use-case';
 import { Identity, Role } from '../../../../../src/L1_domain/entities/identity';
 import { StudentProfile } from '../../../../../src/L1_domain/value-objects/student-profile';
 import { TutorProfile } from '../../../../../src/L1_domain/value-objects/tutor-profile';
@@ -273,6 +276,29 @@ describe('HomePage', () => {
         { provide: CLOCK, useValue: fakeClock },
         { provide: MARKINGS_STORAGE, useValue: fakeMarkings },
         { provide: PwaUpdateService, useValue: fakePwa },
+        // Stubs mínimos para el `<app-install-app-card />` que ahora se monta
+        // dentro del home. El card queda en `hidden` — estos tests no
+        // ejercitan el flow de instalación (ver install-app-card.spec.ts).
+        {
+          provide: DecideInstallCardStateUseCase,
+          useValue: { execute: () => ({ kind: 'hidden' as const }) },
+        },
+        {
+          provide: BeforeInstallPromptAdapter,
+          useValue: {
+            available: signal(false),
+            isAvailable: () => false,
+            trigger: async () => 'unavailable' as const,
+            start: () => undefined,
+          },
+        },
+        {
+          provide: INSTALL_PROMPT_STORE,
+          useValue: {
+            isMarkedInstalled: () => false,
+            markInstalled: () => undefined,
+          },
+        },
       ],
     }).compileComponents();
   });

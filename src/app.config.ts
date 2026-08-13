@@ -17,9 +17,12 @@ import { routes } from './LR_render/app.routes';
 import { AuthRepository } from './L1_domain/ports/auth-repository';
 import { Clock } from './L1_domain/ports/clock';
 import { Connectivity } from './L1_domain/ports/connectivity';
+import { InstallEnvironmentProbe } from './L1_domain/ports/install-environment-probe';
+import { InstallPromptStore } from './L1_domain/ports/install-prompt-store';
 import { MarkingsStorage } from './L1_domain/ports/markings-storage';
 import { ExamsApi } from './L1_domain/ports/exams-api';
 import { IdentityStorage } from './L1_domain/ports/identity-storage';
+import { NativeInstallPrompt } from './L1_domain/ports/native-install-prompt';
 import { ProfileStorage } from './L1_domain/ports/profile-storage';
 import { PwaCookieModeStore } from './L1_domain/ports/pwa-cookie-mode-store';
 import { RouterPort } from './L1_domain/ports/router-port';
@@ -45,6 +48,7 @@ import { SeleccionarAdmissionAreaUseCase } from './L2_application/use-cases/sele
 import { GetHistorialUseCase } from './L2_application/use-cases/get-historial.use-case';
 import { GetHistorialEntryUseCase } from './L2_application/use-cases/get-historial-entry.use-case';
 import { GetMySubmissionUseCase } from './L2_application/use-cases/get-my-submission.use-case';
+import { DecideInstallCardStateUseCase } from './L2_application/use-cases/decide-install-card-state.use-case';
 
 // L3 implementaciones de los puertos.
 import { CloudflareTurnstileProvider } from './L3_periphery/captcha/cloudflare-turnstile-provider';
@@ -64,12 +68,18 @@ import {
   NoopDraftAutoSaveDispatcher,
 } from './L3_periphery/envio/draft-auto-save-dispatcher.service';
 import { credentialsInterceptor } from './L3_periphery/interceptors/credentials.interceptor';
+import { BeforeInstallPromptAdapter } from './L3_periphery/pwa/before-install-prompt.adapter';
+import { BrowserInstallEnvironmentProbe } from './L3_periphery/pwa/browser-install-environment-probe';
 import { PwaUpdateService } from './L3_periphery/pwa/pwa-update.service';
+import { LocalStorageInstallPromptStore } from './L3_periphery/storage/local-storage-install-prompt-store';
 import { SlugStore } from './L3_periphery/http/slug-store';
 import { SsoCallbackBootstrap } from './L3_periphery/http/sso-callback-bootstrap';
 import {
   CAPTCHA_PROVIDER,
   IDENTITY_STORAGE,
+  INSTALL_ENV_PROBE,
+  INSTALL_PROMPT_STORE,
+  NATIVE_INSTALL_PROMPT,
   PROFILE_STORAGE,
   OUTBOX_STORAGE,
   PWA_COOKIE_MODE_STORE,
@@ -128,6 +138,9 @@ export const appConfig: ApplicationConfig = {
     { provide: AUTH_REPOSITORY, useExisting: HttpAuthRepository },
     { provide: IDENTITY_STORAGE, useExisting: LocalStorageIdentityStorage },
     { provide: PWA_COOKIE_MODE_STORE, useExisting: LocalStoragePwaCookieModeStore },
+    { provide: INSTALL_ENV_PROBE, useExisting: BrowserInstallEnvironmentProbe },
+    { provide: INSTALL_PROMPT_STORE, useExisting: LocalStorageInstallPromptStore },
+    { provide: NATIVE_INSTALL_PROMPT, useExisting: BeforeInstallPromptAdapter },
     { provide: TENANT_SLUG_CACHE, useExisting: SlugStore },
     { provide: PROFILE_STORAGE, useExisting: IndexedDbProfileStorage },
     // IndexedDbMarkingsStorage implementa MarkingsStorage Y OutboxStoragePort.
@@ -321,6 +334,15 @@ export const appConfig: ApplicationConfig = {
       useFactory: (markings: MarkingsStorage) => new GetHistorialEntryUseCase(markings),
       deps: [MARKINGS_STORAGE],
     },
+    {
+      provide: DecideInstallCardStateUseCase,
+      useFactory: (
+        probe: InstallEnvironmentProbe,
+        store: InstallPromptStore,
+        native: NativeInstallPrompt,
+      ) => new DecideInstallCardStateUseCase(probe, store, native),
+      deps: [INSTALL_ENV_PROBE, INSTALL_PROMPT_STORE, NATIVE_INSTALL_PROMPT],
+    },
     // Use-cases del tutor: fábricas puras que inyectan el puerto via TUTOR_EXAMS_API.
     // PR1 los registra aquí pero ninguna VM los inyecta todavía (compila, runtime-inert).
     // PR2/PR3 añadirán las VM y páginas que los consumen. Ver design.md D7.
@@ -424,6 +446,14 @@ export const appConfig: ApplicationConfig = {
     // boot. En dev mode el servicio detecta isEnabled=false y no-op.
     provideAppInitializer(() => {
       inject(PwaUpdateService).start();
+    }),
+
+    // BeforeInstallPromptAdapter: registra listeners globales
+    // `beforeinstallprompt` (Chromium) y `appinstalled`. Sin arrancarlo,
+    // el card "Instala Fiovi como app" nunca capta el evento nativo y
+    // se queda en modo `hidden` en Android.
+    provideAppInitializer(() => {
+      inject(BeforeInstallPromptAdapter).start();
     }),
   ],
 };
