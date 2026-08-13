@@ -88,13 +88,6 @@ export class InstallAppCardComponent {
     }
   }
 
-  protected onCardKeydown(event: KeyboardEvent): void {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      void this.onCardClick();
-    }
-  }
-
   protected onModalClose(): void {
     this.modalMode.set(null);
   }

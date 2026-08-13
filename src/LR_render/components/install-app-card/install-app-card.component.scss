@@ -12,6 +12,16 @@
 // Angular ViewEncapsulation scopea esos estilos al árbol propio de HomePage.
 // La duplicación mínima es intencional.
 .install-card {
+  // Reset de defaults del <button>: OS appearance, alineación central, fuente
+  // propia — el card debe verse igual que las cards de simulacro (izquierda,
+  // fuente heredada del contenedor).
+  appearance: none;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  text-align: left;
+  width: 100%;
+
   position: relative;
   padding: var(--space-md) 1.1rem var(--space-md) 1.25rem;
   border-radius: var(--radius-md);

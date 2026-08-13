@@ -1,5 +1,4 @@
-<div class="modal-overlay" (click)="dismiss.emit()" aria-hidden="true"></div>
-<div role="dialog" aria-modal="true" aria-labelledby="install-modal-title" class="modal">
+<dialog #dialog class="modal" aria-labelledby="install-modal-title" (close)="dismiss.emit()">
   @switch (mode) {
     @case ('iosInstructions') {
       <h2 id="install-modal-title" class="modal__title">Instala Fiovi en tu iPhone</h2>
@@ -59,4 +58,4 @@
       Entendido
     </button>
   </div>
-</div>
+</dialog>

@@ -1,25 +1,23 @@
 @if (isVisible()) {
-  <div
+  <button
+    type="button"
     class="install-card"
-    role="button"
-    tabindex="0"
     data-testid="install-app-card"
     (click)="onCardClick()"
-    (keydown)="onCardKeydown($event)"
     aria-label="Instala Fiovi como app"
   >
     <span class="install-card__strip" aria-hidden="true"></span>
     <span class="material-symbols-outlined install-card__icon" aria-hidden="true">
       install_mobile
     </span>
-    <div class="install-card__body">
-      <h3 class="install-card__title">Instala Fiovi como app</h3>
-      <p class="install-card__hint">{{ hint() }}</p>
-    </div>
+    <span class="install-card__body">
+      <span class="install-card__title">Instala Fiovi como app</span>
+      <span class="install-card__hint">{{ hint() }}</span>
+    </span>
     <span class="material-symbols-outlined install-card__chevron" aria-hidden="true">
       chevron_right
     </span>
-  </div>
+  </button>
 }
 @if (modalMode(); as mode) {
   <app-install-instructions-modal [mode]="mode" (dismiss)="onModalClose()" />
