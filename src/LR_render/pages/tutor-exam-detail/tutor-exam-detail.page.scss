@@ -304,6 +304,82 @@
     }
   }
 
+  // Fila-buscador integrada al card. Es la primera <li> del <ul>, mismo estilo
+  // que las filas de alumno (altura, padding lateral) pero con un input de
+  // texto en lugar del label+checkbox. Divider inferior explícito porque el
+  // student-item que le sigue solo pinta border-top cuando otro student-item
+  // lo precede — no atrapa este caso.
+  &__student-search-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: 0.35rem var(--space-md);
+    min-height: 2.5rem;
+    box-sizing: border-box;
+    background: var(--color-surface-container-lowest);
+    border-bottom: 1px solid var(--color-outline-variant);
+  }
+
+  &__student-search-icon {
+    color: var(--color-on-surface-variant);
+    font-size: 1.15rem;
+    line-height: 1;
+    flex: 0 0 auto;
+  }
+
+  &__student-search-input {
+    flex: 1;
+    min-width: 0;
+    appearance: none;
+    background: transparent;
+    border: none;
+    outline: none;
+    padding: 0.35rem 0;
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    color: var(--color-on-surface);
+    letter-spacing: -0.01em;
+
+    &::placeholder {
+      color: var(--color-on-surface-variant);
+      opacity: 0.75;
+    }
+
+    // Cancel nativo del type=search (Chrome/Safari): lo ocultamos porque
+    // pintamos nuestro propio botón ✕ para conservar el estilo.
+    &::-webkit-search-cancel-button {
+      appearance: none;
+      display: none;
+    }
+  }
+
+  &__student-search-clear {
+    appearance: none;
+    background: transparent;
+    border: none;
+    padding: 0.25rem;
+    margin: -0.25rem;
+    border-radius: var(--radius-sm);
+    color: var(--color-on-surface-variant);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    transition: background 120ms ease;
+
+    &:hover,
+    &:focus-visible {
+      background: var(--color-surface-container);
+      color: var(--color-on-surface);
+    }
+
+    .material-symbols-outlined {
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+  }
+
   &__student-label {
     display: flex;
     align-items: center;

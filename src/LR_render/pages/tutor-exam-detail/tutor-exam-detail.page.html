@@ -412,7 +412,43 @@
            y el signal es la única fuente de verdad. -->
 
       <ul class="tutor-exam-detail__student-list">
-        @for (student of vm.students(); track student.studentId) {
+        <!-- Fila-buscador: integrada al mismo card como primera fila, con
+             divider inferior automático via `+ &` en SCSS. Solo aparece cuando
+             hay alumnos cargados — si el aula está vacía, no tiene sentido. -->
+        @if (vm.students().length > 0) {
+          <li class="tutor-exam-detail__student-search-row">
+            <span
+              class="material-symbols-outlined tutor-exam-detail__student-search-icon"
+              aria-hidden="true"
+            >
+              search
+            </span>
+            <input
+              type="search"
+              class="tutor-exam-detail__student-search-input"
+              data-testid="student-search-input"
+              placeholder="Buscar alumno..."
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="off"
+              spellcheck="false"
+              [value]="vm.searchQuery()"
+              (input)="onSearchInput($event)"
+            />
+            @if (vm.searchQuery().length > 0) {
+              <button
+                type="button"
+                class="tutor-exam-detail__student-search-clear"
+                data-testid="student-search-clear"
+                aria-label="Limpiar búsqueda"
+                (click)="onClearSearch()"
+              >
+                <span class="material-symbols-outlined" aria-hidden="true">close</span>
+              </button>
+            }
+          </li>
+        }
+        @for (student of vm.visibleStudents(); track student.studentId) {
           <li class="tutor-exam-detail__student-item" data-testid="student-item">
             <label class="tutor-exam-detail__student-label">
               <input
@@ -427,7 +463,7 @@
                 <span class="material-symbols-outlined">check</span>
               </span>
               <span class="tutor-exam-detail__student-name">
-                {{ student.firstName }} {{ student.lastName }}
+                {{ student.lastName }}, {{ student.firstName }}
               </span>
               @if (student.hasSubmitted) {
                 <span class="tutor-exam-detail__submitted-badge">
@@ -438,9 +474,15 @@
             </label>
           </li>
         } @empty {
-          <li class="tutor-exam-detail__no-students">
-            <p>No hay alumnos en el aula.</p>
-          </li>
+          @if (vm.hasNoSearchMatches()) {
+            <li class="tutor-exam-detail__no-students" data-testid="no-search-matches">
+              <p>No hay alumnos que coincidan con la búsqueda.</p>
+            </li>
+          } @else {
+            <li class="tutor-exam-detail__no-students">
+              <p>No hay alumnos en el aula.</p>
+            </li>
+          }
         }
       </ul>
     </section>

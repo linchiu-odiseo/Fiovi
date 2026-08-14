@@ -231,6 +231,15 @@ export class TutorExamDetailPage {
     this.vm.requestToggleStudent(studentId);
   }
 
+  protected onSearchInput(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    this.vm.setSearchQuery(target?.value ?? '');
+  }
+
+  protected onClearSearch(): void {
+    this.vm.clearSearchQuery();
+  }
+
   protected onConfirmDesactivar(): void {
     void this.vm.confirmDesactivarStudent();
   }
