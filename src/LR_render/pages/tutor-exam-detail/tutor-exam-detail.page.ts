@@ -60,12 +60,12 @@ export class TutorExamDetailPage {
    *
    * Cuando el día seleccionado es HOY (offset 0), filtramos las horas que ya
    * pasaron — el tutor no debería poder tapear "17h" a las 20h de HOY porque
-   * ese instante ya no existe. Para MAÑ+, todo 1..23 sigue disponible. El
-   * modal se abre en estado `scheduled` así que `nowTick` no está ticando: se
-   * lee `new Date()` en cada recompute. La recomputación se dispara al
-   * cambiar `pendingDeadlineDayOffset` (interacción real del usuario); la
-   * `confirmIniciarModal` sigue siendo la red final si el tutor deja el modal
-   * abierto minutos y una hora "borderline" se vuelve pasada.
+   * ese instante ya no existe. Para MAÑ+, el rango completo 1..23 sigue
+   * disponible. El modal se abre en estado `scheduled` así que `nowTick` no
+   * está ticando: se lee `new Date()` en cada recompute. La recomputación se
+   * dispara al cambiar `pendingDeadlineDayOffset` (interacción real del
+   * usuario); la `confirmIniciarModal` sigue siendo la red final si el tutor
+   * deja el modal abierto minutos y una hora "borderline" se vuelve pasada.
    */
   protected readonly hourChips = computed<readonly HWheelItem[]>(() => {
     const isToday = this.vm.pendingDeadlineDayOffset() === 0;
