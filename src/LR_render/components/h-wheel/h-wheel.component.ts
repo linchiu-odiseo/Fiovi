@@ -104,6 +104,20 @@ export class HWheelComponent implements AfterViewInit {
   }
 
   protected onItemClick(id: string): void {
+    // Emisión síncrona del nuevo id: `scrollToId` abre una ventana de guard
+    // de PROGRAMMATIC_SCROLL_WINDOW_MS durante la cual `emitCenteredItem` se
+    // ignora. Como el smooth-scroll de Chrome se estabiliza dentro de esa
+    // ventana, el último evento cae guarded y `selectedId` nunca se actualiza
+    // desde el tap. Resultado observado: el chip se centra visualmente pero
+    // el estado queda en el valor anterior (bug "elegí HOY y sale mañana" en
+    // el modal iniciar-tarea del tutor). Setear acá + lastEmittedId hace que
+    // el scroll sea puramente cosmético y el estado sea la fuente de verdad.
+    if (id === this.lastEmittedId) {
+      this.scrollToId(id, 'smooth');
+      return;
+    }
+    this.lastEmittedId = id;
+    this.selectedId.set(id);
     this.scrollToId(id, 'smooth');
   }
 

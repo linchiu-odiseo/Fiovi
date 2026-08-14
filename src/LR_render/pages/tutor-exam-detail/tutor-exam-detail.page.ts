@@ -55,10 +55,24 @@ export class TutorExamDetailPage {
     return items;
   });
 
-  /** Items de la rueda de horas: 1..23 (sin minutos, sin 0/24). */
+  /**
+   * Items de la rueda de horas: 1..23 (sin minutos, sin 0/24).
+   *
+   * Cuando el día seleccionado es HOY (offset 0), filtramos las horas que ya
+   * pasaron — el tutor no debería poder tapear "17h" a las 20h de HOY porque
+   * ese instante ya no existe. Para MAÑ+, todo 1..23 sigue disponible. El
+   * modal se abre en estado `scheduled` así que `nowTick` no está ticando: se
+   * lee `new Date()` en cada recompute. La recomputación se dispara al
+   * cambiar `pendingDeadlineDayOffset` (interacción real del usuario); la
+   * `confirmIniciarModal` sigue siendo la red final si el tutor deja el modal
+   * abierto minutos y una hora "borderline" se vuelve pasada.
+   */
   protected readonly hourChips = computed<readonly HWheelItem[]>(() => {
+    const isToday = this.vm.pendingDeadlineDayOffset() === 0;
+    const currentHour = new Date().getHours();
     const items: HWheelItem[] = [];
     for (let h = 1; h <= 23; h++) {
+      if (isToday && h <= currentHour) continue;
       items.push({ id: String(h), bottom: `${String(h).padStart(2, '0')}h` });
     }
     return items;
@@ -80,6 +94,22 @@ export class TutorExamDetailPage {
     if (!Number.isFinite(n) || !Number.isInteger(n)) return;
     this.vm.pendingDeadlineDayOffset.set(n);
     if (this.vm.openUntilError() !== null) this.vm.openUntilError.set(null);
+
+    // Si al cambiar de día la hora previamente seleccionada quedó fuera del
+    // rango válido (ej. venía MAÑ + 5h y se cambia a HOY a las 15h), snapear
+    // a la primera hora válida. Sin esto, `selectedHourId` apunta a un chip
+    // que ya no existe en `hourChips` → la rueda se queda sin highlight.
+    const currentHour = this.vm.pendingDeadlineHour();
+    const firstValid = TutorExamDetailViewModel.firstValidHour(n);
+    if (firstValid === null) {
+      // Caso extremo: HOY a las 23h+ → no queda ninguna hora válida para HOY.
+      // Cae al mensaje "elegí día y hora" de la validación de confirm.
+      this.vm.pendingDeadlineHour.set(null);
+      return;
+    }
+    if (currentHour === null || (n === 0 && currentHour <= new Date().getHours())) {
+      this.vm.pendingDeadlineHour.set(firstValid);
+    }
   }
 
   protected onHourIdChange(id: string | null): void {
