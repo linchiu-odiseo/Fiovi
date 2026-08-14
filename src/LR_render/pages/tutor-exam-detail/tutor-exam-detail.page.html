@@ -362,6 +362,15 @@
             }
           </section>
 
+          <!-- Preview del deadline: reactivo a los signals del modal. Cierra
+               visualmente el loop "elegí día/hora → esto va a pasar", así el
+               tutor confirma con contexto en lugar de descubrirlo al iniciar. -->
+          @if (vm.pendingMode() === 'tarea' && vm.pendingOpenUntilDate(); as openUntil) {
+            <p class="tutor-exam-detail__modal-hint" data-testid="deadline-preview">
+              Cierra el {{ formatDate(openUntil) }} a las {{ formatTime(openUntil) }}
+            </p>
+          }
+
           @if (vm.durationError()) {
             <p class="tutor-exam-detail__modal-error" role="alert">
               {{ vm.durationError() }}

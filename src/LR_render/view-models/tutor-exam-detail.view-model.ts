@@ -204,6 +204,29 @@ export class TutorExamDetailViewModel {
   static readonly HOMEWORK_MAX_DAY_OFFSET = 10;
 
   /**
+   * true cuando la hora entera dada (1..23) todavía no pasó hoy. Base para
+   * el default del modal y para el filtro de chips de hora en HOY. Lee
+   * `new Date()` directo — la rueda vive en interacción real del usuario,
+   * no en el reloj server-anchored (que solo aplica al countdown en vivo).
+   */
+  static isHourFutureToday(hour: number, now: Date = new Date()): boolean {
+    if (!Number.isInteger(hour) || hour < 1 || hour > 23) return false;
+    return hour > now.getHours();
+  }
+
+  /**
+   * Menor hora entera (1..23) que sigue siendo válida para el `dayOffset`
+   * dado. Para MAÑ+ siempre es 1. Para HOY es la primera hora estrictamente
+   * mayor a la hora actual, o null cuando ya no queda ninguna (≥23h).
+   */
+  static firstValidHour(dayOffset: number, now: Date = new Date()): number | null {
+    if (!Number.isInteger(dayOffset) || dayOffset < 0) return null;
+    if (dayOffset > 0) return 1;
+    const next = now.getHours() + 1;
+    return next > 23 ? null : next;
+  }
+
+  /**
    * Fecha absoluta de cierre derivada del día + hora seleccionados. Toma
    * `now`, avanza `dayOffset` días, y setea la hora entera con minuto/seg 0.
    * Retorna null cuando alguno de los signals es null.
@@ -434,11 +457,13 @@ export class TutorExamDetailViewModel {
     if (!d) return;
     this.pendingMinutes.set(Math.round(d.duration / 60));
     // Default modo "examen" — el comportamiento heredado no cambia si el tutor
-    // no toca el selector. Defaults del deadline: mañana (offset=1) a las 23h
-    // (fin del día). Cubre el caso típico "abro tarea hoy, cierra mañana a la
-    // noche".
+    // no toca el selector. Defaults del deadline: HOY a las 23h. La mayoría de
+    // las tareas cierran el mismo día — forzar "MAÑ 23h" empujaba al tutor a
+    // pelearse con la rueda para volver a HOY. Fallback a MAÑ 23h SOLO cuando
+    // el modal se abre a las 23h o después (HOY 23h sería un instante pasado).
     this.pendingMode.set('examen');
-    this.pendingDeadlineDayOffset.set(1);
+    const preferHoy = TutorExamDetailViewModel.isHourFutureToday(23);
+    this.pendingDeadlineDayOffset.set(preferHoy ? 0 : 1);
     this.pendingDeadlineHour.set(23);
     this.durationError.set(null);
     this.openUntilError.set(null);
