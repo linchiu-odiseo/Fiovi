@@ -106,6 +106,50 @@ export class TutorExamDetailViewModel {
   // Lista de alumnos del aula del examen.
   readonly students = signal<readonly ClassroomStudent[]>([]);
 
+  // Query de búsqueda del filtro en pantalla. Se aplica sobre `visibleStudents`
+  // (client-side, sin request al back). Vacío = sin filtro.
+  readonly searchQuery = signal<string>('');
+
+  /**
+   * Vista derivada de `students` — ordenada alfabéticamente por apellido
+   * (secundario por nombre) con collation es-PE case+accent-insensitive, y
+   * filtrada por `searchQuery` sobre apellido/nombre/código.
+   *
+   * `enabledStudentIds` NO se cruza acá — el contador "X habilitados de Y"
+   * sigue leyendo del total real. El filtro es solo visual.
+   */
+  readonly visibleStudents = computed<readonly ClassroomStudent[]>(() => {
+    const all = this.students();
+    const sorted = [...all].sort((a, b) => {
+      const byLast = a.lastName.localeCompare(b.lastName, 'es', { sensitivity: 'base' });
+      if (byLast !== 0) return byLast;
+      return a.firstName.localeCompare(b.firstName, 'es', { sensitivity: 'base' });
+    });
+    const query = normalizeForSearch(this.searchQuery());
+    if (query === '') return sorted;
+    return sorted.filter((s) => {
+      const haystack = normalizeForSearch(`${s.lastName} ${s.firstName} ${s.studentCode}`);
+      return haystack.includes(query);
+    });
+  });
+
+  /** true cuando hay query activa pero el filtro no matchea a ningún alumno. */
+  readonly hasNoSearchMatches = computed<boolean>(() => {
+    if (this.students().length === 0) return false;
+    if (this.searchQuery().trim() === '') return false;
+    return this.visibleStudents().length === 0;
+  });
+
+  /** Actualiza el query de búsqueda desde el input de la page. */
+  setSearchQuery(value: string): void {
+    this.searchQuery.set(value);
+  }
+
+  /** Limpia el buscador (botón ✕ del input). */
+  clearSearchQuery(): void {
+    this.searchQuery.set('');
+  }
+
   // true mientras la carga inicial esté en vuelo.
   readonly loading = signal(false);
 
@@ -875,4 +919,15 @@ function formatDDMM(d: Date): string {
   const dd = d.getDate().toString().padStart(2, '0');
   const mm = (d.getMonth() + 1).toString().padStart(2, '0');
   return `${dd}/${mm}`;
+}
+
+// Normaliza para búsqueda: lower + strip diacríticos. Así "garcia" matchea
+// "GARCÍA" y "muñoz" matchea "MUNOZ". NFD descompone acentos en base+combining,
+// después la regex \p{Diacritic} borra los combining marks.
+function normalizeForSearch(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '');
 }

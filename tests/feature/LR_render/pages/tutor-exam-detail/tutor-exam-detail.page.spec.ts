@@ -46,6 +46,12 @@ function buildStudent(overrides: Partial<ClassroomStudent> = {}): ClassroomStude
 class FakeTutorExamDetailViewModel {
   readonly detail: WritableSignal<TutorExamDetail | null> = signal(null);
   readonly students: WritableSignal<readonly ClassroomStudent[]> = signal([]);
+  // Buscador de alumnos (client-side). El fake replica el mismo shape que el
+  // VM real: `searchQuery` es writable, `visibleStudents` deriva de students
+  // sin sort/filter (para no acoplar los tests del page a la lógica de sort).
+  readonly searchQuery: WritableSignal<string> = signal('');
+  readonly visibleStudents = () => this.students();
+  readonly hasNoSearchMatches = () => false;
   readonly loading: WritableSignal<boolean> = signal(false);
   readonly error: WritableSignal<'network' | 'notFound' | 'forbidden' | null> = signal(null);
   readonly enabledStudentIds: WritableSignal<readonly string[]> = signal([]);
@@ -114,6 +120,12 @@ class FakeTutorExamDetailViewModel {
     this.archivarModalOpen.set(false);
   });
   requestToggleStudent = vi.fn();
+  setSearchQuery = vi.fn((value: string) => {
+    this.searchQuery.set(value);
+  });
+  clearSearchQuery = vi.fn(() => {
+    this.searchQuery.set('');
+  });
   confirmDesactivarStudent = vi.fn(async () => {
     this.desactivarModalOpen.set(false);
     this.desactivarPendingStudentId.set(null);
