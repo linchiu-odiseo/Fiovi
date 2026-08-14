@@ -364,10 +364,15 @@
 
           <!-- Preview del deadline: reactivo a los signals del modal. Cierra
                visualmente el loop "elegí día/hora → esto va a pasar", así el
-               tutor confirma con contexto en lugar de descubrirlo al iniciar. -->
+               tutor confirma con contexto en lugar de descubrirlo al iniciar.
+               Pill centrada con mono + tabular-nums para que los dígitos no
+               salten al recomputar. -->
           @if (vm.pendingMode() === 'tarea' && vm.pendingOpenUntilDate(); as openUntil) {
-            <p class="tutor-exam-detail__modal-hint" data-testid="deadline-preview">
-              Cierra el {{ formatDate(openUntil) }} a las {{ formatTime(openUntil) }}
+            <p class="tutor-exam-detail__deadline-preview" data-testid="deadline-preview">
+              <span class="tutor-exam-detail__deadline-preview-label">Cierra</span>
+              <span class="tutor-exam-detail__deadline-preview-value">
+                {{ formatDate(openUntil) }} · {{ formatTime(openUntil) }}
+              </span>
             </p>
           }
 

@@ -634,6 +634,45 @@
     line-height: 1.45;
   }
 
+  // Preview del deadline (modal iniciar-tarea): pill centrada, mono con
+  // tabular-nums para que los números no salten cuando el tutor cambia día
+  // u hora. Reusa los mismos tokens que el resto del modal (surface-container
+  // + outline-variant + radius-pill) para pertenecer visualmente al modal
+  // sin robarle atención al botón "Iniciar actividad" de abajo.
+  &__deadline-preview {
+    align-self: center;
+    margin: 0;
+    padding: 0.4rem 0.9rem;
+    background: var(--color-surface-container);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius-pill);
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.45rem;
+    max-width: 100%;
+    box-sizing: border-box;
+    text-align: center;
+  }
+
+  &__deadline-preview-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-mono, monospace);
+  }
+
+  &__deadline-preview-value {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--color-on-surface);
+    font-family: var(--font-mono, monospace);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.005em;
+    white-space: nowrap;
+  }
+
   // Modal iniciar-actividad — cajetín blueprint compacto: hereda de
   // `.__blueprint`. Padding vertical mayor en las celdas para acomodar
   // el value grande de la duración.
