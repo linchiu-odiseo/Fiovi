@@ -43,19 +43,21 @@ describe('SeleccionarAdmissionAreaUseCase', () => {
     });
   });
 
-  describe('input inválido — rechaza sin tocar storage', () => {
-    // Set cerrado de 16 valores; cualquier cosa fuera → InvalidAdmissionAreaError.
-    // "VI" es el caso natural (numeral romano válido semánticamente pero
-    // no incluido en el set) — probaría un typo del picker que no se atrapó.
-    it('area "VI" (fuera del set) → InvalidAdmissionAreaError sin persistir', async () => {
-      await expect(useCase.execute({ examId: 'X', area: 'VI' })).rejects.toBeInstanceOf(
-        InvalidAdmissionAreaError,
-      );
+  describe('strings arbitrarios del back — union abierto post exam-admission-areas-picker', () => {
+    // Con el union abierto (`AdmissionArea = KnownAdmissionArea | (string & {})`),
+    // cualquier string no vacío es válido — el back es autoridad sobre qué
+    // áreas existen. "VI" ya NO es rechazado; se persiste como cualquier otro
+    // label. La única validación de dominio queda en shape mínimo (no null,
+    // no número, no string vacío).
+    it('area "VI" (label arbitrario) → se acepta y persiste', async () => {
+      await useCase.execute({ examId: 'X', area: 'VI' });
 
-      expect(await storage.getAdmissionArea('X')).toBeNull();
-      expect(storage.getOpsLog()).not.toContain('markings.setAdmissionArea');
+      expect(await storage.getAdmissionArea('X')).toBe('VI');
+      expect(storage.getOpsLog()).toContain('markings.setAdmissionArea');
     });
+  });
 
+  describe('input inválido — rechaza sin tocar storage', () => {
     it('area === null → InvalidAdmissionAreaError sin persistir', async () => {
       await expect(useCase.execute({ examId: 'X', area: null })).rejects.toBeInstanceOf(
         InvalidAdmissionAreaError,
