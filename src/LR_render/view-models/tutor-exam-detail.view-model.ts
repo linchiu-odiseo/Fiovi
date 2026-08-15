@@ -272,9 +272,11 @@ export class TutorExamDetailViewModel {
   readonly desactivarModalOpen = signal(false);
   readonly desactivarPendingStudentId = signal<string | null>(null);
 
-  // Cuenta de alumnos habilitados en tiempo real (lo que el tutor ve en la
-  // lista con checkboxes). Total = alumnos del aula.
-  readonly enabledCount = computed(() => this.enabledStudentIds().length);
+  // Cuenta de alumnos ACTUALES del aula que están habilitados. Filtra por
+  // `s.enabled` (flag del back) en vez de `enabledStudentIds.length` para
+  // evitar contar IDs stale (alumnos que ya salieron del aula pero siguen
+  // registrados en el examen — el refresh add-only no los quita).
+  readonly enabledCount = computed(() => this.students().filter((s) => s.enabled).length);
   readonly totalStudents = computed(() => this.students().length);
 
   // ── Countdown (mismo cómputo que el simulacro del alumno) ───────────────────

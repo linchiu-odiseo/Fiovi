@@ -179,10 +179,6 @@
          card nunca renderiza. Ver design.md D4, D6, D9. -->
     @if (!vm.showRoster() && detail.status.value === 'scheduled') {
       <section class="tutor-exam-detail__gate-card" data-testid="gate-card">
-        <h3 class="tutor-exam-detail__gate-card-title">Actualizar lista antes de iniciar</h3>
-        <p class="tutor-exam-detail__gate-card-hint">
-          Verificá que los alumnos matriculados desde que se programó el examen queden incluidos.
-        </p>
         @switch (vm.gateState()) {
           @case ('idle') {
             <button
@@ -207,6 +203,9 @@
           <!-- No hay @case ('ready'): cuando gateState pasa a 'ready',
                showRoster() retorna true y el outer @if cierra este card. -->
         }
+        <p class="tutor-exam-detail__gate-card-caption">
+          Actualizar lista de alumnos antes de iniciar
+        </p>
       </section>
     }
 
