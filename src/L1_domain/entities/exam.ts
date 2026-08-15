@@ -1,6 +1,15 @@
 import { ExamServerStatus } from '../value-objects/exam-server-status';
 import { InvalidExamError } from '../errors/invalid-exam.error';
 
+function normalizeAllowedAreas(raw: readonly string[] | null): readonly string[] | null {
+  if (raw === null) return null;
+  const cleaned = raw
+    .filter((s): s is string => typeof s === 'string')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  return cleaned.length === 0 ? null : cleaned;
+}
+
 // Entidad Exam. El `serverStatus` lo deriva learnex en cada GET y el
 // cliente nunca lo recomputa. La entidad acepta `area`, `course`,
 // `started` y `finished` como nullable porque learnex los emite null en
@@ -33,6 +42,17 @@ export class Exam {
    * es responsabilidad del cliente.
    */
   public readonly openUntil: Date | null;
+  /**
+   * Snapshot al CREATE del examen desde `ExamStructureArea.name` ordenado por
+   * `order asc`. `null` = sin restricción (FICHAS y exámenes legacy); el
+   * picker en LR renderiza las 16 conocidas por default. Array non-null =
+   * subset elegible; el picker renderiza EXACTAMENTE esos strings en ese
+   * orden. Puede contener labels que no están en `KnownAdmissionArea` — el
+   * back es la autoridad.
+   *
+   * Invariante: nunca `[]` (el constructor normaliza array vacío a null).
+   */
+  public readonly allowedAdmissionAreas: readonly string[] | null;
 
   constructor(params: {
     id: string;
@@ -47,6 +67,10 @@ export class Exam {
     started: Date | null;
     finished: Date | null;
     openUntil: Date | null;
+    // Opcional para no romper factories/tests históricos que no lo pasan.
+    // Undefined se trata como null (comportamiento por default: sin
+    // restricción, picker muestra los 16 conocidos).
+    allowedAdmissionAreas?: readonly string[] | null;
   }) {
     const id = (params.id ?? '').trim();
     if (id.length === 0) {
@@ -92,6 +116,13 @@ export class Exam {
     if (!(params.serverStatus instanceof ExamServerStatus)) {
       throw new InvalidExamError('Exam requiere un ExamServerStatus válido.');
     }
+    if (
+      params.allowedAdmissionAreas !== null &&
+      params.allowedAdmissionAreas !== undefined &&
+      !Array.isArray(params.allowedAdmissionAreas)
+    ) {
+      throw new InvalidExamError('Exam allowedAdmissionAreas debe ser null o array de strings.');
+    }
 
     this.id = id;
     this.area = params.area !== null ? params.area.trim() || null : null;
@@ -105,6 +136,11 @@ export class Exam {
     this.started = params.started;
     this.finished = params.finished;
     this.openUntil = params.openUntil;
+    // Normalización invariante: `[]` o array con solo strings vacíos/whitespace
+    // → `null` (semánticamente equivalente a "sin restricción"). Preservamos
+    // el orden del back sin re-ordenar contra el VO — learnex ya ordena por
+    // ExamStructureArea.order. Undefined en el input se trata como null.
+    this.allowedAdmissionAreas = normalizeAllowedAreas(params.allowedAdmissionAreas ?? null);
   }
 
   // Cierre efectivo de la vigencia. Prioridad:
