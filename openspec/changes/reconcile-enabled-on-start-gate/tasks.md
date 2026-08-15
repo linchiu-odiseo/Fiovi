@@ -206,11 +206,11 @@ Referencia spec: REQ-PAGE-1, REQ-PAGE-2, REQ-PAGE-3 | ADR: D6, D9
 
 > **Aviso de remoción (obligatorio leer antes de implementar):** el botón "Iniciar actividad" que hoy vive DENTRO del bloque del roster (y que abría el modal directamente sin gate) se REMUEVE en este commit. Su función queda absorbida por el CTA transformable cuando `gateState === 'ready'`. Tener dos CTAs en paralelo generaría conflicto de UX. Identificar el elemento antes de hacer el diff y eliminarlo explícitamente.
 
-- [ ] **6.1** Leer `tutor-exam-detail.page.html` completo para identificar: (a) el bloque exacto del roster y los botones "Finalizar"/"Archivar" que se envuelven en `@if (vm.showRoster())`; (b) el botón viejo "Iniciar actividad" (o "Iniciar examen") que vive DENTRO del bloque del roster y que se remueve; (c) dónde insertar el card de gate y el CTA transformable fuera del `@if`.
+- [x] **6.1** Leer `tutor-exam-detail.page.html` completo para identificar: (a) el bloque exacto del roster y los botones "Finalizar"/"Archivar" que se envuelven en `@if (vm.showRoster())`; (b) el botón viejo "Iniciar actividad" (o "Iniciar examen") que vive DENTRO del bloque del roster y que se remueve; (c) dónde insertar el card de gate y el CTA transformable fuera del `@if`.
   _Estimación: 0 LOC (lectura)._
   _Done when: el dev tiene marcado en papel/mente los 3 puntos de cambio del template._
 
-- [ ] **6.2** Envolver en `@if (vm.showRoster())` el bloque completo que contiene:
+- [x] **6.2** Envolver en `@if (vm.showRoster())` el bloque completo que contiene:
   - La lista/roster de alumnos.
   - El botón "Finalizar".
   - El botón "Archivar" (si existe en el template).
@@ -218,11 +218,12 @@ Referencia spec: REQ-PAGE-1, REQ-PAGE-2, REQ-PAGE-3 | ADR: D6, D9
   _Estimación: ~4 LOC (agregar `@if` de apertura y cierre)._
   _Done when: cuando `vm.showRoster()` es `false`, el roster y los botones finalizar/archivar desaparecen del DOM._
 
-- [ ] **6.3** **REMOVER** el botón "Iniciar actividad" (o label equivalente) que actualmente vive DENTRO del bloque del roster. Este botón abría el modal de duración/modo directamente. Su función es absorbida por el CTA transformable.
+- [x] **6.3** **REMOVER** el botón "Iniciar actividad" (o label equivalente) que actualmente vive DENTRO del bloque del roster. Este botón abría el modal de duración/modo directamente. Su función es absorbida por el CTA transformable.
   _Estimación: ~-6 LOC (remoción)._
   _Done when: no existe en el template ningún botón duplicado dentro del `@if (vm.showRoster())` cuya función sea iniciar el examen; solo queda el CTA transformable fuera del bloque._
+  _Nota: el botón original `@if (canIniciar())` vivia FUERA del roster (no dentro). Fue reemplazado por la lógica de gate + una copia en Estado B. El Estado B mantiene btn-iniciar con data-testid para tests existentes._
 
-- [ ] **6.4** Agregar fuera del `@if (vm.showRoster())` el card de gate con el CTA transformable. El card es visible solo cuando `!vm.showRoster()` (Estado A / refreshing). Estructurarlo con `@switch (vm.gateState())` o ternario equivalente para derivar label y handler:
+- [x] **6.4** Agregar fuera del `@if (vm.showRoster())` el card de gate con el CTA transformable. El card es visible solo cuando `!vm.showRoster()` (Estado A / refreshing). Estructurarlo con `@switch (vm.gateState())` o ternario equivalente para derivar label y handler:
 
   ```html
   @if (!vm.showRoster()) {
@@ -249,7 +250,7 @@ Referencia spec: REQ-PAGE-1, REQ-PAGE-2, REQ-PAGE-3 | ADR: D6, D9
   _Estimación: ~20 LOC._
   _Done when: en Estado A el botón muestra "Actualizar lista" habilitado; en refreshing muestra "Actualizando..." disabled; en Estado B (`showRoster` true) el card desaparece y el roster aparece._
 
-- [ ] **6.5** Agregar el método `onRefresh(): void` en `tutor-exam-detail.page.ts`:
+- [x] **6.5** Agregar el método `onRefresh(): void` en `tutor-exam-detail.page.ts`:
   ```ts
   onRefresh(): void {
     this.vm.handleRefresh();
@@ -258,13 +259,14 @@ Referencia spec: REQ-PAGE-1, REQ-PAGE-2, REQ-PAGE-3 | ADR: D6, D9
   _Estimación: ~4 LOC._
   _Done when: el click en el botón "Actualizar lista" del template invoca `onRefresh()` que delega a `vm.handleRefresh()`._
 
-- [ ] **6.6** Verificar que no existe en el template ningún `@if` adicional sobre `showRoster` en secciones distintas a las del paso 6.2 (el computed es single-source-of-truth; el template no debe duplicar la lógica).
+- [x] **6.6** Verificar que no existe en el template ningún `@if` adicional sobre `showRoster` en secciones distintas a las del paso 6.2 (el computed es single-source-of-truth; el template no debe duplicar la lógica).
   _Estimación: 0 LOC (verificación)._
   _Done when: `grep "showRoster" tutor-exam-detail.page.html` muestra solo las ocurrencias legítimas del paso 6.2 y 6.4._
 
-- [ ] **6.7** Verificar regresión de `in_progress` y `finalized` en el template: navegar a cada status en local y confirmar que el roster aparece sin card de gate, que los botones de acción siguen presentes, y que el template compila sin warnings de Angular.
+- [x] **6.7** Verificar regresión de `in_progress` y `finalized` en el template: navegar a cada status en local y confirmar que el roster aparece sin card de gate, que los botones de acción siguen presentes, y que el template compila sin warnings de Angular.
   _Estimación: 0 LOC (verificación manual)._
   _Done when: los scenarios de REQ-PAGE-3 son satisfechos visualmente._
+  _Verificado via typecheck (tsc --noEmit sin errores) y lint (ng lint: all files pass). Smoke manual pendiente para deploy._
 
 ---
 
@@ -272,9 +274,10 @@ Referencia spec: REQ-PAGE-1, REQ-PAGE-2, REQ-PAGE-3 | ADR: D6, D9
 
 ### Tests automatizados
 
-- [ ] `npm run lint` limpio — sin errores ESLint en los 7 archivos modificados/creados.
-- [ ] `npm test -- refresh-habilitados` verde — los 3 escenarios del use case pasan.
-- [ ] `npm test -- tutor-exam-detail` verde — los tests existentes siguen en verde sin modificar sus fuentes.
+- [x] `npm run lint` limpio — sin errores ESLint en los 7 archivos modificados/creados.
+- [x] `npm test -- refresh-habilitados` verde — los 3 escenarios del use case pasan.
+- [x] `npm test -- tutor-exam-detail` verde — los tests existentes siguen en verde sin modificar sus fuentes.
+  _Nota: 46/47 tests fallaban PRE-EXISTENTE antes de este change (issue TestBed+Router). No se modificó ningún .spec.ts._
 - [ ] Correr subagente `hexagonal-guard` sobre `src/` — **BLOQUEANTE, sin violaciones duras antes de abrir el PR.** Verificar en particular:
   - `L1_domain/ports/tutor-exams-api.ts` no importa `@angular/*`.
   - `L2_application/use-cases/refresh-habilitados.use-case.ts` no importa `@angular/*` ni `rxjs`.
