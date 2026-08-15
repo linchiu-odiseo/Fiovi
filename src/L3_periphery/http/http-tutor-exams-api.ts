@@ -99,6 +99,11 @@ interface FinalizeResponseDto {
   jobId?: string;
 }
 
+interface RefreshEnabledResponseDto {
+  addedCount: number;
+  totalEnabledCount: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class HttpTutorExamsApi implements TutorExamsApi {
   private readonly http = inject(HttpClient);
@@ -246,6 +251,31 @@ export class HttpTutorExamsApi implements TutorExamsApi {
           .post<void>(apiPath.virtualExamArchive(this.requireSlug(), recordId), null)
           .pipe(timeout(10_000)),
       );
+    } catch (err) {
+      throw this.classifyTutorError(err);
+    }
+  }
+
+  // POST /t/:slug/virtual-exams/:recordId/refresh-enabled — sin body.
+  // Reconcilia la lista de alumnos habilitados con las matrículas actuales del aula.
+  // Timeout: 10s. `withCredentials` lo agrega el credentials.interceptor global.
+  // Errores clasificados por status puro via classifyTutorError (design.md D2 + D8).
+  async refreshEnabled(
+    recordId: string,
+  ): Promise<{ addedCount: number; totalEnabledCount: number }> {
+    try {
+      const dto = await firstValueFrom(
+        this.http
+          .post<RefreshEnabledResponseDto>(
+            apiPath.virtualExamRefreshEnabled(this.requireSlug(), recordId),
+            null,
+          )
+          .pipe(timeout(10_000)),
+      );
+      return {
+        addedCount: dto.addedCount,
+        totalEnabledCount: dto.totalEnabledCount,
+      };
     } catch (err) {
       throw this.classifyTutorError(err);
     }

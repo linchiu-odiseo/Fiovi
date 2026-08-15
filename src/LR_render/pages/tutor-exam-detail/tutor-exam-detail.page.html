@@ -170,11 +170,50 @@
       </section>
     }
 
-    <!-- Botón principal: solo "Iniciar" acá (D5 guard). "Finalizar" es un
-         escape hatch discreto al final de la pantalla — el flujo esperado
-         es que el examen termine solo cuando venza el countdown, no que el
-         tutor lo corte manualmente. -->
-    @if (canIniciar()) {
+    <!-- Gate de reconciliación (reconcile-enabled-on-start-gate):
+         Card visible solo cuando el examen está programado (scheduled) y el
+         gate aún no fue superado (gateState !== 'ready'). Contiene el CTA
+         transformable que va de "Actualizar lista" → "Actualizando..." →
+         desaparece cuando el roster toma el control (showRoster=true).
+         Para exámenes in_progress / finalized: showRoster siempre true, este
+         card nunca renderiza. Ver design.md D4, D6, D9. -->
+    @if (!vm.showRoster() && detail.status.value === 'scheduled') {
+      <section class="tutor-exam-detail__gate-card" data-testid="gate-card">
+        @switch (vm.gateState()) {
+          @case ('idle') {
+            <button
+              type="button"
+              class="tutor-exam-detail__btn-iniciar"
+              data-testid="btn-actualizar-lista"
+              (click)="onRefresh()"
+            >
+              Actualizar lista
+            </button>
+          }
+          @case ('refreshing') {
+            <button
+              type="button"
+              class="tutor-exam-detail__btn-iniciar"
+              data-testid="btn-actualizando"
+              disabled
+            >
+              Actualizando...
+            </button>
+          }
+          <!-- No hay @case ('ready'): cuando gateState pasa a 'ready',
+               showRoster() retorna true y el outer @if cierra este card. -->
+        }
+        <p class="tutor-exam-detail__gate-card-caption">
+          Actualizar lista de alumnos antes de iniciar
+        </p>
+      </section>
+    }
+
+    <!-- Botón "Iniciar examen" en Estado B (gate superado, showRoster=true).
+         Solo aplica cuando status=scheduled y el gate ya fue completado.
+         Para in_progress/finalized: el guard canIniciar() devuelve false
+         y este bloque tampoco renderiza. -->
+    @if (vm.showRoster() && canIniciar()) {
       <section class="tutor-exam-detail__actions">
         <button
           type="button"
@@ -401,6 +440,11 @@
       </div>
     }
 
+    <!-- Roster de alumnos, botones Finalizar y Archivar: visibles solo cuando
+         vm.showRoster() es true. Para exámenes scheduled con gate activo
+         (gateState !== 'ready'), el roster está oculto y el card de gate
+         muestra el CTA de reconciliación. Ver design.md D5, D7. -->
+    @if (vm.showRoster()) {
     <!-- Lista de alumnos con checkboxes (D5: hasSubmitted + finalized → disabled) -->
     <section class="tutor-exam-detail__students">
       <div class="tutor-exam-detail__students-header">
@@ -542,6 +586,7 @@
         </button>
       </section>
     }
+    } <!-- cierre @if (vm.showRoster()) -->
 
     <!-- Modal: confirmar deshabilitar alumno mientras el examen está en curso.
          El alumno queda fuera del set de habilitados; al finalizar el grader

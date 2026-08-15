@@ -291,6 +291,12 @@ export class TutorExamDetailPage {
     void this.vm.retry();
   }
 
+  // Delega al VM la reconciliación del gate de habilitados.
+  // Invocado por el botón "Actualizar lista" en el card de gate (Estado A).
+  protected onRefresh(): void {
+    void this.vm.handleRefresh();
+  }
+
   // Duración en minutos redondeados — el back guarda segundos.
   protected durationMinutes(detail: TutorExamDetail): number {
     return Math.round(detail.duration / 60);

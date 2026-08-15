@@ -97,6 +97,7 @@ import { IniciarExamenUseCase } from './L2_application/use-cases/iniciar-examen.
 import { FinalizarExamenUseCase } from './L2_application/use-cases/finalizar-examen.use-case';
 import { ArchivarExamenUseCase } from './L2_application/use-cases/archivar-examen.use-case';
 import { ActualizarAlumnosHabilitadosUseCase } from './L2_application/use-cases/actualizar-alumnos-habilitados.use-case';
+import { RefreshHabilitadosUseCase } from './L2_application/use-cases/refresh-habilitados.use-case';
 import { GetAulaSemanasUseCase } from './L2_application/use-cases/get-aula-semanas.use-case';
 import { GetAulaSemanaExamenesUseCase } from './L2_application/use-cases/get-aula-semana-examenes.use-case';
 import { GetExamsEnCursoUseCase } from './L2_application/use-cases/get-exams-en-curso.use-case';
@@ -384,6 +385,11 @@ export const appConfig: ApplicationConfig = {
     {
       provide: ActualizarAlumnosHabilitadosUseCase,
       useFactory: (api: TutorExamsApi) => new ActualizarAlumnosHabilitadosUseCase(api),
+      deps: [TUTOR_EXAMS_API],
+    },
+    {
+      provide: RefreshHabilitadosUseCase,
+      useFactory: (api: TutorExamsApi) => new RefreshHabilitadosUseCase(api),
       deps: [TUTOR_EXAMS_API],
     },
     // Use-cases del nav mobile del tutor (change tutor-aulas-semanas-view).
