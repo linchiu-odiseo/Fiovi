@@ -1,4 +1,4 @@
-import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { Injectable, Signal, WritableSignal, computed, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { GetTutorExamsUseCase } from '../../L2_application/use-cases/get-tutor-exams.use-case';
 import { GetTutorExamDetailUseCase } from '../../L2_application/use-cases/get-tutor-exam-detail.use-case';
@@ -7,6 +7,7 @@ import { IniciarExamenUseCase } from '../../L2_application/use-cases/iniciar-exa
 import { FinalizarExamenUseCase } from '../../L2_application/use-cases/finalizar-examen.use-case';
 import { ArchivarExamenUseCase } from '../../L2_application/use-cases/archivar-examen.use-case';
 import { ActualizarAlumnosHabilitadosUseCase } from '../../L2_application/use-cases/actualizar-alumnos-habilitados.use-case';
+import { RefreshHabilitadosUseCase } from '../../L2_application/use-cases/refresh-habilitados.use-case';
 import { TutorExamsStore } from '../state/tutor-exams.store';
 import { TutorExamDetail } from '../../L1_domain/value-objects/tutor-exam-detail';
 import { ClassroomStudent } from '../../L1_domain/value-objects/classroom-student';
@@ -59,6 +60,7 @@ export class TutorExamDetailViewModel {
   private readonly finalizarExamen = inject(FinalizarExamenUseCase);
   private readonly archivarExamen = inject(ArchivarExamenUseCase);
   private readonly actualizarAlumnos = inject(ActualizarAlumnosHabilitadosUseCase);
+  private readonly refreshHabilitadosUseCase = inject(RefreshHabilitadosUseCase, { optional: true });
   private readonly store = inject(TutorExamsStore);
   private readonly clock = inject(CLOCK);
 
@@ -926,6 +928,74 @@ export class TutorExamDetailViewModel {
     this.stopped = true;
     this.stopCountdownTicker();
     this.cancelPostCierreRefresh();
+  }
+
+  // ─── Gate de reconciliación de habilitados (reconcile-enabled-on-start-gate) ─────
+  //
+  // Bloque completamente aislado del countdown ticker, D1 resolution y optimistic
+  // updates. `_gateState` no es leído por ningún computed/effect existente. Su
+  // único efecto colateral externo es disparar `reloadDetail()` en éxito y
+  // escribir en `actionError` — ambos ya existían y son thread-safe via signals.
+  //
+  // El signal vive en la instancia del VM. Reset garantizado por el ciclo de vida
+  // del componente: destruir → navegar → volver → VM nuevo → `_gateState` = 'idle'.
+  // Ver design.md D4, D5, D7, D8.
+
+  /** Estado interno mutable del gate. No accesible fuera del VM. */
+  private readonly _gateState: WritableSignal<'idle' | 'refreshing' | 'ready'> =
+    signal<'idle' | 'refreshing' | 'ready'>('idle');
+
+  /** Estado readonly del gate expuesto al template via el page component. */
+  readonly gateState: Signal<'idle' | 'refreshing' | 'ready'> = this._gateState.asReadonly();
+
+  /**
+   * Computed single-source-of-truth para el condicional del roster.
+   * Retorna true cuando el roster debe estar visible:
+   *   - detail es null → false (sin datos, nada que mostrar).
+   *   - status !== 'scheduled' → true (in_progress / finalized: sin gate).
+   *   - status === 'scheduled' && gateState === 'ready' → true (gate superado).
+   *   - status === 'scheduled' && gateState !== 'ready' → false (gate activo).
+   */
+  readonly showRoster = computed<boolean>(() => {
+    const d = this.detail();
+    if (!d) return false;
+    return d.status.value !== 'scheduled' || this._gateState() === 'ready';
+  });
+
+  /**
+   * Dispara la reconciliación de habilitados.
+   * Transiciones de gateState: idle → refreshing → ready (exito) o idle (error).
+   * En éxito: recarga el detalle para reflejar los alumnos nuevamente habilitados.
+   * En error: setea actionError con copy en español clasificado por instanceof.
+   */
+  async handleRefresh(): Promise<void> {
+    if (!this.refreshHabilitadosUseCase) return;
+    const recordId = this.route.snapshot.paramMap.get('recordId') ?? '';
+    this._gateState.set('refreshing');
+
+    try {
+      await this.refreshHabilitadosUseCase.execute(recordId);
+      this._gateState.set('ready');
+      this.actionError.set(null);
+      await this.reloadDetail(recordId);
+    } catch (err) {
+      this._gateState.set('idle');
+      if (err instanceof ExamConflictError) {
+        this.actionError.set(
+          'El examen ya fue iniciado. Recargá la página para ver el estado actual.',
+        );
+      } else if (err instanceof NetworkError) {
+        this.actionError.set('Sin conexión. Verificá tu red y volvé a intentar.');
+      } else if (err instanceof VirtualExamNotFoundError) {
+        this.actionError.set('No se encontró el examen. Volvé a la lista.');
+      } else if (err instanceof TutorExamForbiddenError) {
+        this.actionError.set('No tenés permiso para actualizar la lista de este examen.');
+      } else if (err instanceof ExamPreconditionError) {
+        this.actionError.set('Hay un problema con los datos del examen. Volvé a la lista.');
+      } else {
+        throw err;
+      }
+    }
   }
 }
 

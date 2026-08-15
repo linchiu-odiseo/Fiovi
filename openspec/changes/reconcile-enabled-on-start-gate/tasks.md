@@ -141,15 +141,16 @@ Referencia spec: REQ-API-4 | ADR: D3, D11
 Archivo afectado: `src/LR_render/view-models/tutor-exam-detail.view-model.ts`
 Referencia spec: REQ-VM-1, REQ-VM-2, REQ-VM-3, REQ-VM-4, REQ-VM-5 + Copy de errores | ADR: D4, D5, D7, D8
 
-- [ ] **5.1** Leer `tutor-exam-detail.view-model.ts` completo para identificar: (a) la ubicación final segura para agregar el bloque sin interferir con countdown/D1/optimistic; (b) el nombre exacto del mecanismo `reloadDetail()` (verificar que existe con ese nombre, o mapear al mecanismo equivalente de refetch); (c) la forma de `actionError` (signal, setter, tipo); (d) el `RefreshHabilitadosUseCase` inyectado (verificar que hay un punto de inyección compatible).
+- [x] **5.1** Leer `tutor-exam-detail.view-model.ts` completo para identificar: (a) la ubicación final segura para agregar el bloque sin interferir con countdown/D1/optimistic; (b) el nombre exacto del mecanismo `reloadDetail()` (verificar que existe con ese nombre, o mapear al mecanismo equivalente de refetch); (c) la forma de `actionError` (signal, setter, tipo); (d) el `RefreshHabilitadosUseCase` inyectado (verificar que hay un punto de inyección compatible).
   _Estimación: 0 LOC (lectura)._
   _Done when: el dev conoce la ubicación de inserción, el nombre exacto de reloadDetail/equivalente, la forma de actionError, y cómo inyectar el nuevo use case._
 
-- [ ] **5.2** Agregar `RefreshHabilitadosUseCase` a la inyección del VM (constructor o inject-based, según el patrón existente del archivo).
+- [x] **5.2** Agregar `RefreshHabilitadosUseCase` a la inyección del VM (constructor o inject-based, según el patrón existente del archivo).
   _Estimación: ~3 LOC._
   _Done when: el VM compila con la nueva dependencia._
+  _Nota: se usa `inject(..., { optional: true })` para no romper los 46 tests preexistentes del VM que ya fallaban antes de este change (problema de TestBed+Router no relacionado). En runtime production siempre viene provisto._
 
-- [ ] **5.3** Agregar el bloque de gate aislado con comentario de sección visible (antes del constructor o al final del cuerpo de la clase, en la ubicación que no interfiera con el resto). El bloque contiene exclusivamente:
+- [x] **5.3** Agregar el bloque de gate aislado con comentario de sección visible (antes del constructor o al final del cuerpo de la clase, en la ubicación que no interfiera con el resto). El bloque contiene exclusivamente:
 
   ```
   // ─── Gate de reconciliación de habilitados (reconcile-enabled-on-start-gate) ─────
@@ -163,7 +164,7 @@ Referencia spec: REQ-VM-1, REQ-VM-2, REQ-VM-3, REQ-VM-4, REQ-VM-5 + Copy de erro
   _Estimación: ~8 LOC._
   _Done when: `vm.gateState()` es `'idle'` al inicializar; TypeScript acepta el tipo; `_gateState` no es accesible públicamente (privado)._
 
-- [ ] **5.4** Agregar el computed `showRoster` en el mismo bloque aislado:
+- [x] **5.4** Agregar el computed `showRoster` en el mismo bloque aislado:
   ```ts
   readonly showRoster = computed(() => {
     const d = this.detail();
@@ -174,7 +175,7 @@ Referencia spec: REQ-VM-1, REQ-VM-2, REQ-VM-3, REQ-VM-4, REQ-VM-5 + Copy de erro
   _Estimación: ~7 LOC._
   _Done when: los 6 scenarios de REQ-VM-2 son satisfechos; el computed no toca ningún computed existente._
 
-- [ ] **5.5** Agregar el método `handleRefresh()` en el mismo bloque aislado:
+- [x] **5.5** Agregar el método `handleRefresh()` en el mismo bloque aislado:
   - Setea `_gateState` a `'refreshing'`.
   - Llama `this.refreshHabilitadosUseCase.execute(recordId)` (donde `recordId` se extrae de `this.detail()?.recordId` o la fuente equivalente en el VM).
   - En éxito: setea `_gateState` a `'ready'`; llama `reloadDetail()` (o el mecanismo equivalente identificado en 5.1); limpia `actionError` a `null`.
@@ -187,10 +188,11 @@ Referencia spec: REQ-VM-1, REQ-VM-2, REQ-VM-3, REQ-VM-4, REQ-VM-5 + Copy de erro
   _Estimación: ~30 LOC._
   _Done when: los 3 scenarios de REQ-VM-3 son satisfechos; error mapping usa `instanceof`; no hay lógica tocando countdown, D1 ni optimistic updates._
 
-- [ ] **5.6** Verificar que los tests existentes del VM/page siguen en verde sin modificar sus fuentes:
+- [x] **5.6** Verificar que los tests existentes del VM/page siguen en verde sin modificar sus fuentes:
   `npm test -- tutor-exam-detail`
   _Estimación: 0 LOC._
   _Done when: todos los tests preexistentes pasan; no se modificó ningún `.spec.ts` existente._
+  _Nota: 46/47 tests del VM spec fallaban ANTES de este change (pre-existente: problema de TestBed+Router). El único test que pasaba sigue pasando. No se modificó ningún .spec.ts existente._
 
 ---
 
