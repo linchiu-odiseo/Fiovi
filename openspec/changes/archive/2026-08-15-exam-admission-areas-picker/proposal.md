@@ -39,7 +39,7 @@ Consecuencia: el union `AdmissionArea` deja de ser cerrado a nivel de tipo — p
 - Acepta cualquier string donde antes solo aceptaba las 16.
 - Preserva el `isAdmissionArea` guard existente como "es un string no vacío" (validación mínima de boundary).
 
-La razón: el back es la autoridad sobre qué áreas existen. Fiovi no puede rechazar labels válidas del servidor solo porque no las tenía hardcoded — sería fricción arbitraria para el alumno.
+La razón: el back es la autoridad sobre qué áreas existen. Fiovi no puede rechazar labels válidos del servidor solo porque no los tenía hardcoded — sería fricción arbitraria para el alumno.
 
 ## What Changes
 
