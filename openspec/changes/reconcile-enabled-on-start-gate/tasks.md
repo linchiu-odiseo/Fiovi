@@ -69,11 +69,11 @@ Referencia spec: REQ-API-3 | ADR: D1
 Archivo afectado: `src/L3_periphery/http/http-tutor-exams-api.ts`
 Referencia spec: REQ-API-2 | ADR: D2, D8
 
-- [ ] **3.1** Leer el método `iniciar()` en `http-tutor-exams-api.ts` para extraer el patrón exacto: cómo se lee el slug del `SlugStore` de forma síncrona, cómo se emite el POST sin body, cómo se aplica el timeout de 10s, cómo se valida con Zod y cómo se mapean errores con `classifyTutorError`.
+- [x] **3.1** Leer el método `iniciar()` en `http-tutor-exams-api.ts` para extraer el patrón exacto: cómo se lee el slug del `SlugStore` de forma síncrona, cómo se emite el POST sin body, cómo se aplica el timeout de 10s, cómo se valida con Zod y cómo se mapean errores con `classifyTutorError`.
   _Estimación: 0 LOC (lectura)._
   _Done when: el dev tiene el patrón de `iniciar` como plantilla para `refreshEnabled`._
 
-- [ ] **3.2** Implementar el método `refreshEnabled(recordId: string)` copiando el patrón de `iniciar()`, con las siguientes variaciones:
+- [x] **3.2** Implementar el método `refreshEnabled(recordId: string)` copiando el patrón de `iniciar()`, con las siguientes variaciones:
   - URL construida por `apiPaths.virtualExamRefreshEnabled(slug, recordId)`.
   - Body: `null` (POST sin body).
   - Timeout: 10 s (misma constante que los otros métodos).
