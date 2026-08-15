@@ -613,6 +613,38 @@ export class FakeTutorExamsApi implements TutorExamsApi {
     }
     if (this.nextArchivar.kind === 'reject') throw this.nextArchivar.error;
   }
+
+  // --- refreshEnabled ---
+  private nextRefreshEnabled:
+    | { kind: 'resolve'; result: { addedCount: number; totalEnabledCount: number } }
+    | { kind: 'reject'; error: Error }
+    | null = null;
+  private refreshEnabledCalls: string[] = [];
+
+  willResolveRefreshEnabled(result: { addedCount: number; totalEnabledCount: number }): void {
+    this.nextRefreshEnabled = { kind: 'resolve', result };
+  }
+
+  willRejectRefreshEnabled(error: Error): void {
+    this.nextRefreshEnabled = { kind: 'reject', error };
+  }
+
+  getRefreshEnabledCalls(): readonly string[] {
+    return this.refreshEnabledCalls;
+  }
+
+  async refreshEnabled(
+    recordId: string,
+  ): Promise<{ addedCount: number; totalEnabledCount: number }> {
+    this.refreshEnabledCalls.push(recordId);
+    if (!this.nextRefreshEnabled) {
+      throw new Error(
+        'FakeTutorExamsApi: configurar willResolveRefreshEnabled o willRejectRefreshEnabled antes de llamar refreshEnabled()',
+      );
+    }
+    if (this.nextRefreshEnabled.kind === 'reject') throw this.nextRefreshEnabled.error;
+    return this.nextRefreshEnabled.result;
+  }
 }
 
 // ---------------------------------------------------------------------------
