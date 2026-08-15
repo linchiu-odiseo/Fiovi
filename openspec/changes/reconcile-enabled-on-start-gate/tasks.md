@@ -106,11 +106,11 @@ Archivos nuevos:
 
 Referencia spec: REQ-API-4 | ADR: D3, D11
 
-- [ ] **4.1** Leer `src/L2_application/use-cases/iniciar-examen.use-case.ts` (~28 LOC) para extraer el patrón de clase pura sin `@Injectable`, constructor con inyección por token, y delegación directa al port.
+- [x] **4.1** Leer `src/L2_application/use-cases/iniciar-examen.use-case.ts` (~28 LOC) para extraer el patrón de clase pura sin `@Injectable`, constructor con inyección por token, y delegación directa al port.
   _Estimación: 0 LOC (lectura)._
   _Done when: el dev tiene el patrón de `IniciarExamenUseCase` como plantilla._
 
-- [ ] **4.2** Crear `refresh-habilitados.use-case.ts` siguiendo el patrón de `IniciarExamenUseCase`:
+- [x] **4.2** Crear `refresh-habilitados.use-case.ts` siguiendo el patrón de `IniciarExamenUseCase`:
   - Clase pura sin decorador Angular (`@Injectable` prohibido).
   - Constructor recibe `TutorExamsApi` (token `TUTOR_EXAMS_API`).
   - Método `execute(recordId: string): Promise<{ addedCount: number; totalEnabledCount: number }>`.
@@ -120,14 +120,14 @@ Referencia spec: REQ-API-4 | ADR: D3, D11
   _Estimación: ~14 LOC._
   _Done when: el archivo es TypeScript puro (sin `@angular/*`, sin `rxjs`, sin browser APIs); `execute` delega directamente al port; errores propagados tal cual._
 
-- [ ] **4.3** Registrar factory provider en `app.config.ts`:
+- [x] **4.3** Registrar factory provider en `app.config.ts`:
   ```ts
   { provide: RefreshHabilitadosUseCase, useFactory: (api: TutorExamsApi) => new RefreshHabilitadosUseCase(api), deps: [TUTOR_EXAMS_API] }
   ```
   _Estimación: ~4 LOC._
   _Done when: `app.config.ts` tiene el factory provider; TypeScript compila._
 
-- [ ] **4.4** Crear `refresh-habilitados.use-case.spec.ts` con 3 escenarios usando Vitest puro (sin Angular, sin browser APIs). Mock del port como objeto con función que retorna una Promise controlada:
+- [x] **4.4** Crear `refresh-habilitados.use-case.spec.ts` con 3 escenarios usando Vitest puro (sin Angular, sin browser APIs). Mock del port como objeto con función que retorna una Promise controlada:
   - **Escenario 1 — happy path**: mock devuelve `{ addedCount: 3, totalEnabledCount: 12 }` → `execute("rec-1")` resuelve con los mismos valores sin transformación.
   - **Escenario 2 — ConflictError**: mock rechaza con `ExamConflictError` → `execute("rec-1")` rechaza con `ExamConflictError` directamente (no envuelto).
   - **Escenario 3 — NetworkError**: mock rechaza con `NetworkError` → `execute("rec-1")` rechaza con `NetworkError` directamente.
