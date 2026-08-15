@@ -48,11 +48,11 @@ Referencia spec: REQ-API-1 | ADR: D1, D2
 Archivo afectado: `src/L3_periphery/http/api-paths.ts`
 Referencia spec: REQ-API-3 | ADR: D1
 
-- [ ] **2.1** Leer `src/L3_periphery/http/api-paths.ts` (líneas 64–92 según design) para identificar el patrón exacto de los helpers existentes (prefijo `apiBaseUrl`, interpolación de slug y parámetros).
+- [x] **2.1** Leer `src/L3_periphery/http/api-paths.ts` (líneas 64–92 según design) para identificar el patrón exacto de los helpers existentes (prefijo `apiBaseUrl`, interpolación de slug y parámetros).
   _Estimación: 0 LOC (lectura)._
   _Done when: el dev conoce si los helpers reciben `apiBaseUrl` o lo leen de un closure, y cómo arman la URL._
 
-- [ ] **2.2** Agregar el helper `virtualExamRefreshEnabled` siguiendo el patrón existente:
+- [x] **2.2** Agregar el helper `virtualExamRefreshEnabled` siguiendo el patrón existente:
   ```ts
   virtualExamRefreshEnabled(slug: string, recordId: string): string {
     return `${this.apiBaseUrl}/t/${slug}/virtual-exams/${recordId}/refresh-enabled`;

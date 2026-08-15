@@ -90,4 +90,9 @@ export const apiPath = {
   // Transición finalized → archived. Response 204 No Content, sin body.
   virtualExamArchive: (slug: string, recordId: string): string =>
     `${tenantBase(slug)}/virtual-exams/${encodeURIComponent(recordId)}/archive`,
+  // Reconcilia la lista de alumnos habilitados con las matrículas actuales del
+  // aula. POST sin body. Response 200 con { addedCount, totalEnabledCount }.
+  // Solo válido cuando status === 'scheduled'; 409 si el examen ya arrancó.
+  virtualExamRefreshEnabled: (slug: string, recordId: string): string =>
+    `${tenantBase(slug)}/virtual-exams/${encodeURIComponent(recordId)}/refresh-enabled`,
 };
