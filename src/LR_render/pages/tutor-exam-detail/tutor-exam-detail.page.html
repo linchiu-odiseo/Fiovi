@@ -204,19 +204,8 @@
               Actualizando...
             </button>
           }
-          @case ('ready') {
-            <!-- Safety net: si showRoster es true, este @if no renderiza.
-                 Este case existe como defensa por si el computed tuviera lag. -->
-            <button
-              type="button"
-              class="tutor-exam-detail__btn-iniciar"
-              data-testid="btn-iniciar"
-              [disabled]="vm.isSaving() || !canIniciar()"
-              (click)="onIniciar()"
-            >
-              Iniciar examen
-            </button>
-          }
+          <!-- No hay @case ('ready'): cuando gateState pasa a 'ready',
+               showRoster() retorna true y el outer @if cierra este card. -->
         }
       </section>
     }

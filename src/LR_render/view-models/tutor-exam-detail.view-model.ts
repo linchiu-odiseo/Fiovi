@@ -60,7 +60,7 @@ export class TutorExamDetailViewModel {
   private readonly finalizarExamen = inject(FinalizarExamenUseCase);
   private readonly archivarExamen = inject(ArchivarExamenUseCase);
   private readonly actualizarAlumnos = inject(ActualizarAlumnosHabilitadosUseCase);
-  private readonly refreshHabilitadosUseCase = inject(RefreshHabilitadosUseCase, { optional: true });
+  private readonly refreshHabilitadosUseCase = inject(RefreshHabilitadosUseCase);
   private readonly store = inject(TutorExamsStore);
   private readonly clock = inject(CLOCK);
 
@@ -969,7 +969,6 @@ export class TutorExamDetailViewModel {
    * En error: setea actionError con copy en español clasificado por instanceof.
    */
   async handleRefresh(): Promise<void> {
-    if (!this.refreshHabilitadosUseCase) return;
     const recordId = this.route.snapshot.paramMap.get('recordId') ?? '';
     this._gateState.set('refreshing');
 
@@ -978,6 +977,20 @@ export class TutorExamDetailViewModel {
       this._gateState.set('ready');
       this.actionError.set(null);
       await this.reloadDetail(recordId);
+
+      // Refetch del roster: reloadDetail() actualiza `detail.enabledStudentIds`
+      // (contador X/Y) pero NO refresca `this.students` (lista visual con nombre,
+      // apellido, hasSubmitted). Sin este refetch, los alumnos recién habilitados
+      // aparecen en el contador pero no en la lista — el gate visualmente miente.
+      const currentDetail = this.detail();
+      const currentExam = this.store.findByRecordId(recordId);
+      if (currentDetail && currentExam) {
+        const students = await this.listClassroomStudents.execute({
+          classroomId: currentExam.classroomId,
+          virtualExamDetailId: currentDetail.id,
+        });
+        this.students.set(students);
+      }
     } catch (err) {
       this._gateState.set('idle');
       if (err instanceof ExamConflictError) {
