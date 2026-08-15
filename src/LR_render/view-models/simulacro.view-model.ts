@@ -125,6 +125,14 @@ export class SimulacroPageViewModel {
   // NO confundir con `Exam.area` (curso: Letras/Ciencias/Números).
   readonly admissionArea = signal<AdmissionArea>(DEFAULT_ADMISSION_AREA);
 
+  // Subset del back para el picker (learnex PR #816 snapshot desde
+  // ExamStructureArea.name). `null` = sin restricción → picker muestra los
+  // 16 defaults. Array = subset elegible → picker muestra solo esos strings
+  // en ese orden. Puro derivado del examen actual; no hay estado propio.
+  readonly allowedAdmissionAreas: Signal<readonly string[] | null> = computed(
+    () => this.exam()?.allowedAdmissionAreas ?? null,
+  );
+
   // Signal opcional para UI futura. Hoy queda en 'idle' — el dispatcher no
   // expone ganchos para actualizarla. Change posterior los agregará cuando
   // UX pida render visible del estado del auto-save.

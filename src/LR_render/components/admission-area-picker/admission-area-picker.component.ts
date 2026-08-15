@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   EventEmitter,
   Input,
   Output,
@@ -45,15 +46,34 @@ const LONG_PRESS_MOVE_THRESHOLD_PX = 10;
 export class AdmissionAreaPickerComponent {
   @Input({ required: true }) admissionArea!: AdmissionArea;
 
+  // Subset opcional del back (snapshot al CREATE del examen desde learnex).
+  // `null`/`undefined` (FICHAS y legacy) → picker renderiza las 16 conocidas
+  // por default. Array → picker renderiza EXACTAMENTE esos strings en ese
+  // orden (learnex ordena por `ExamStructureArea.order asc`). Los strings
+  // pueden estar fuera del set `KnownAdmissionArea` — el back es autoridad.
+  // Se usa setter para poder disparar el computed sin depender de signals
+  // en el input (mantiene contrato del componente).
+  private readonly _allowedAreas = signal<readonly string[] | null>(null);
+  @Input()
+  set allowedAreas(value: readonly string[] | null | undefined) {
+    this._allowedAreas.set(value ?? null);
+  }
+
   @Output() readonly seleccion = new EventEmitter<AdmissionArea>();
 
   // false = colapsado (pill), true = expandido (grid 3×6).
   readonly expanded = signal(false);
 
-  // Lista estable para el @for del grid. Orden de renderizado definido
-  // por el VO (fila 1: A A1 B C D E; fila 2: I II III IV V G; fila 3:
-  // APT CIE MAT GENERAL[span-3]).
-  protected readonly areas: readonly AdmissionArea[] = ADMISSION_AREAS;
+  // Lista efectiva para el @for del grid:
+  //   - Sin restricción del back → `ADMISSION_AREAS` (16 conocidas, orden VO,
+  //     GENERAL con span-3). Comportamiento heredado.
+  //   - Con restricción → el array del back tal cual (orden respetado). Si
+  //     `GENERAL` no está en el subset, ningún chip aplica span-3 y el grid
+  //     se adapta natural.
+  protected readonly visibleAreas = computed<readonly string[]>(() => {
+    const allowed = this._allowedAreas();
+    return allowed === null ? ADMISSION_AREAS : allowed;
+  });
 
   // Estado del long-press en curso. Vivimos acá (no en signals) porque son
   // coordenadas puramente DOM y un timer imperativo — no hay razón para
@@ -92,7 +112,7 @@ export class AdmissionAreaPickerComponent {
     }
   }
 
-  protected onChipClick(area: AdmissionArea): void {
+  protected onChipClick(area: string): void {
     this.seleccion.emit(area);
     this.expanded.set(false);
   }

@@ -555,12 +555,13 @@ describe('IndexedDbMarkingsStorage', () => {
       expect(await adapter.getAdmissionArea('exam-Y')).toBeNull();
     });
 
-    // Guard defensivo del adapter: si IDB devuelve una entry con `area`
-    // fuera del set (stale de una versión previa o corrupción), el getter
-    // retorna null en vez de propagar el valor inválido al dominio.
-    it('guard defensivo: entry con area stale ("VI" fuera del set) → getAdmissionArea retorna null', async () => {
-      // Escribimos directo en IDB con un shape stale, sin pasar por el setter.
-      const rawKey = `cartilla.alumno-a@vonex.edu.pe.admission-area.exam-stale`;
+    // Post `exam-admission-areas-picker`: el union es abierto — labels del
+    // back (learnex snapshot) pueden estar fuera de las 16 conocidas. El
+    // storage acepta cualquier string no vacío (el back es autoridad).
+    // El guard defensivo ahora solo rechaza shapes NO-string (corrupción real
+    // de la entry: número, objeto, null en area). "VI" ya es válido.
+    it('acepta "VI" como area persistida (label arbitrario post union abierto)', async () => {
+      const rawKey = `cartilla.alumno-a@vonex.edu.pe.admission-area.exam-arbitrary`;
       await new Promise<void>((resolve, reject) => {
         const openReq = indexedDB.open(DB_NAME);
         openReq.onsuccess = () => {
@@ -579,7 +580,7 @@ describe('IndexedDbMarkingsStorage', () => {
         openReq.onerror = () => reject(openReq.error);
       });
 
-      expect(await adapter.getAdmissionArea('exam-stale')).toBeNull();
+      expect(await adapter.getAdmissionArea('exam-arbitrary')).toBe('VI');
     });
   });
 

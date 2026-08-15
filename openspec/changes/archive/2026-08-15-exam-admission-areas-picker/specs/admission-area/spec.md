@@ -1,13 +1,21 @@
-# admission-area Specification
+# admission-area — Delta Spec
 
-## Purpose
-Allows students to select their admission area (the career they are applying to) in the exam marking interface. The selection is persisted locally and transmitted with draft progress snapshots and exam submissions.
+> **Tipo de delta:** MINOR no-breaking.
+> **Change:** `exam-admission-areas-picker`
+> **Base:** `openspec/specs/admission-area/spec.md` (change `add-admission-area`, archivado 2026-07-08).
+> **Referencia de propuesta:** `openspec/changes/exam-admission-areas-picker/proposal.md`
 
-## Requirements
+Este delta describe los requisitos que se AGREGAN o MODIFICAN respecto a la spec base. Todos los requisitos no mencionados aquí siguen vigentes sin cambios.
 
-### Requirement: `AdmissionArea` VO — union abierto en L1
+---
 
-**Modificación sobre cambio anterior:** El union pasó de cerrado (16 valores fijos) a abierto (conocidos + strings arbitrarios del back).
+## MODIFIED Requirements
+
+### Requirement MODIFIED: `AdmissionArea` VO — union abierto en L1
+
+**Requisito base:** `AdmissionArea` VO cerrado de 16 valores en L1
+
+**Modificaciones sobre la spec base:**
 
 El módulo `src/L1_domain/value-objects/admission-area.ts` SHALL:
 
@@ -67,49 +75,13 @@ El módulo sigue siendo TypeScript puro — cero `@angular/*`, cero `rxjs`, cero
 - **AND** el orden es `['A', 'A1', 'B', 'C', 'D', 'E', 'I', 'II', 'III', 'IV', 'V', 'G', 'APT', 'CIE', 'MAT', 'GENERAL']`
 - **AND** el tipo inferido de cada elemento es `KnownAdmissionArea`, no `AdmissionArea` abierto
 
-### Requirement: `InvalidAdmissionAreaError` de dominio en L1
+---
 
-`src/L1_domain/errors/invalid-admission-area.error.ts` SHALL exponer una clase `InvalidAdmissionAreaError extends Error` con `name = 'InvalidAdmissionAreaError'`. Se lanza cuando un input externo (payload del back con `INVALID_ADMISSION_AREA`, o un input inválido del UI que no pasó el guard) llega al dominio.
+### Requirement MODIFIED: `SeleccionarAdmissionAreaUseCase` — firma relajada
 
-#### Scenario: Instancia expone name correcto
+**Requisito base:** `SeleccionarAdmissionAreaUseCase` puro en L2
 
-- **WHEN** se crea `new InvalidAdmissionAreaError()`
-- **THEN** `instance.name === 'InvalidAdmissionAreaError'`
-- **AND** `instance instanceof Error === true`
-
-### Requirement: `MarkingsStorage` extendido con `getAdmissionArea` / `setAdmissionArea`
-
-El puerto `MarkingsStorage` (L1) SHALL exponer dos métodos nuevos:
-- `getAdmissionArea(examId: string): Promise<AdmissionArea | null>` — retorna el `AdmissionArea` persistido para ese `examId`, o `null` si nunca se persistió.
-- `setAdmissionArea(examId: string, area: AdmissionArea): Promise<void>` — persiste el `area` en el mismo IDB store que las marcaciones, key derivada del `examId`. Idempotente (última llamada gana).
-
-El método existente `clearMarcaciones(examId)` SHALL también borrar el `admissionArea` guardado para ese `examId`. Esto garantiza que tras un envío exitoso no queda estado stale de un examen anterior.
-
-#### Scenario: `getAdmissionArea` retorna `null` si no hay persistencia previa
-
-- **GIVEN** el store IDB no tiene entrada de `admissionArea` para `examId="X"`
-- **WHEN** se invoca `getAdmissionArea("X")`
-- **THEN** resuelve con `null`
-
-#### Scenario: `setAdmissionArea` seguido de `getAdmissionArea` retorna el valor
-
-- **WHEN** se invoca `setAdmissionArea("X", "MAT")` y luego `getAdmissionArea("X")`
-- **THEN** el segundo resuelve con `"MAT"`
-
-#### Scenario: `setAdmissionArea` es idempotente (última gana)
-
-- **WHEN** se invoca `setAdmissionArea("X", "A")` y luego `setAdmissionArea("X", "B")` y luego `getAdmissionArea("X")`
-- **THEN** el último resuelve con `"B"`
-
-#### Scenario: `clearMarcaciones` borra también el admissionArea
-
-- **GIVEN** `setAdmissionArea("X", "MAT")` fue invocado
-- **WHEN** se invoca `clearMarcaciones("X")` y luego `getAdmissionArea("X")`
-- **THEN** el segundo resuelve con `null`
-
-### Requirement: `SeleccionarAdmissionAreaUseCase` — firma relajada
-
-**Modificación sobre cambio anterior:** La firma ahora acepta cualquier string válido (union abierto), no solo los 16 conocidos.
+**Modificaciones:**
 
 El parámetro `area` en `execute({ examId, area }: { examId: string; area: unknown })` sigue siendo `unknown` en el source — sin cambio estructural. El cambio es que la validación interna llama a `isAdmissionArea` cuyo contrato ya fue relajado: ahora acepta cualquier string no vacío. Por tanto:
 
@@ -130,9 +102,13 @@ El parámetro `area` en `execute({ examId, area }: { examId: string; area: unkno
 - **THEN** rechaza con `InvalidAdmissionAreaError`
 - **AND** `setAdmissionArea` NUNCA fue invocado
 
-### Requirement: `AdmissionAreaPickerComponent` — input `allowedAreas` y `visibleAreas`
+---
 
-**Modificación sobre cambio anterior:** El componente ahora soporta un subset opcional de áreas elegibles desde el back.
+### Requirement MODIFIED: `AdmissionAreaPickerComponent` — input `allowedAreas` y `visibleAreas`
+
+**Requisito base:** `AdmissionAreaPickerComponent` en LR con dos estados
+
+**Modificaciones:**
 
 El componente `AdmissionAreaPickerComponent` en `src/LR_render/components/admission-area-picker/` SHALL incorporar:
 
@@ -141,10 +117,8 @@ El componente `AdmissionAreaPickerComponent` en `src/LR_render/components/admiss
    - Si `allowedAreas` es `null` o `undefined` → `visibleAreas === ADMISSION_AREAS` (los 16 defaults, orden del VO).
    - Si `allowedAreas` es un array → `visibleAreas === allowedAreas` — orden del back respetado uno a uno, sin reordenamiento ni filtrado adicional.
 3. El template SHALL iterar `visibleAreas` en lugar del `ADMISSION_AREAS` hardcodeado.
-4. El input existente `admissionArea` cambia de tipo de `AdmissionArea` (union cerrado de la spec anterior) al nuevo `AdmissionArea` (union abierto) para aceptar strings arbitrarios del back.
+4. El input existente `admissionArea` cambia de tipo de `KnownAdmissionArea` (union cerrado) a `AdmissionArea` (union abierto) para aceptar strings arbitrarios del back.
 5. La clase CSS `area-chip--wide-3` (que produce `grid-column: span 3`) SHALL aplicarse al chip cuyo label es exactamente `'GENERAL'`. Si `'GENERAL'` no aparece en `visibleAreas`, ningún chip recibe `area-chip--wide-3` y la grilla se adapta naturalmente.
-
-El componente mantiene los dos estados mutuamente excluyentes (colapsado/expandido) con long-press ≥500ms sobre el pill, sin cambios en la mecánica de gesto. NO tener estado interno para el `admissionArea` — sólo refleja el input.
 
 #### Scenario: `allowedAreas` null → 16 chips en orden VO
 
@@ -184,7 +158,7 @@ El componente mantiene los dos estados mutuamente excluyentes (colapsado/expandi
 
 ---
 
-## ADDED Requirements (exam-admission-areas-picker, 2026-08-15)
+## ADDED Requirements
 
 ### Requirement ADDED: `Exam.allowedAdmissionAreas` — snapshot del servidor
 
