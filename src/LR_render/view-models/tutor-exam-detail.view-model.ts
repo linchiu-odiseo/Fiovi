@@ -1,4 +1,12 @@
-import { Injectable, Signal, WritableSignal, computed, effect, inject, signal } from '@angular/core';
+import {
+  Injectable,
+  Signal,
+  WritableSignal,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { GetTutorExamsUseCase } from '../../L2_application/use-cases/get-tutor-exams.use-case';
 import { GetTutorExamDetailUseCase } from '../../L2_application/use-cases/get-tutor-exam-detail.use-case';
@@ -25,6 +33,15 @@ import { formatRestante, formatRestanteTarea } from '../utils/countdown-format';
 // derivados (countdownRestante) recomputen. Idéntico al del simulacro del
 // alumno — la referencia es el `Clock` server-anchored, nunca Date.now().
 const COUNTDOWN_TICK_MS = 1_000;
+
+// Ventana de tolerancia hacia el pasado para `startedAt` programado.
+// El tutor puede seleccionar hasta 5 min atrás sin error; el server valida
+// la misma ventana. Se usa como guarda client-side, no como fuente de verdad.
+const CLOCK_SKEW_MS = 5 * 60 * 1_000;
+
+// Ventana máxima hacia el futuro para `openUntil` en modo tarea.
+// 15 días en ms — el server también rechaza ventanas mayores.
+const HOMEWORK_MAX_WINDOW_MS = 15 * 24 * 60 * 60 * 1_000;
 
 // El countdown del tutor siempre corre en formato digital (MM:SS o HH:MM:SS
 // según duración) — a diferencia del simulacro del alumno, que arriba de 5
@@ -197,6 +214,58 @@ export class TutorExamDetailViewModel {
   readonly pendingDeadlineDayOffset = signal<number | null>(null);
   readonly pendingDeadlineHour = signal<number | null>(null);
   readonly openUntilError = signal<string | null>(null);
+
+  // ── Señales para la programación de apertura (startedAt) ─────────────────
+  // Cuando el modal está en modo "tarea", el tutor puede opcionalmente
+  // ingresar una fecha/hora de inicio. Valor null = usar "ahora" (default:
+  // el server arranca el examen inmediatamente al confirmar).
+  //
+  // La granularidad es por string ISO local (datetime-local input del DOM),
+  // no por Date — el input nativo emite strings; la conversión a Date ocurre
+  // en confirmIniciarModal() al armar el payload.
+  readonly pendingStartedAt = signal<string | null>(null);
+
+  // Error de validación client-side para startedAt.
+  readonly startedAtError = computed<string | null>(() => {
+    const raw = this.pendingStartedAt();
+    if (raw === null) return null;
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return null;
+    const now = new Date();
+    // Validación 1: no puede ser en el pasado más allá de CLOCK_SKEW_MS.
+    if (d.getTime() < now.getTime() - CLOCK_SKEW_MS) {
+      return 'No puede ser en el pasado';
+    }
+    // Validación 2: debe ser antes del cierre (openUntil derivado).
+    const openUntil = this.pendingOpenUntilDate();
+    if (openUntil !== null && d.getTime() >= openUntil.getTime()) {
+      return 'Debe ser antes del cierre';
+    }
+    return null;
+  });
+
+  // `isScheduledSubmitDisabled` es true cuando hay error en startedAt o en openUntilError.
+  // El botón "Iniciar actividad" en modo tarea usa este computed para el [disabled].
+  readonly isScheduledSubmitDisabled = computed<boolean>(() => {
+    return this.startedAtError() !== null || this.openUntilError() !== null;
+  });
+
+  // Fecha absoluta de apertura derivada del input datetime-local. Null cuando
+  // el tutor no eligió (usa default "ahora") o el string no parsea. Consumido
+  // por la pill preview "Abre" del modal, análogo a pendingOpenUntilDate.
+  readonly pendingStartedAtDate = computed<Date | null>(() => {
+    const raw = this.pendingStartedAt();
+    if (raw === null) return null;
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return null;
+    return d;
+  });
+
+  // `showHwheels` controla si las ruedas de día/hora legacy se muestran.
+  // En modo "tarea" siempre se ocultan en favor de los inputs datetime-local.
+  // Se expone como computed reactivo al modo del modal.
+  readonly showHwheels = computed<boolean>(() => this.pendingMode() !== 'tarea');
+
   /**
    * Offset máximo (inclusivo) para el chip de día más lejano ofrecido.
    * 10 = "hoy + 10 días" → 11 chips totales (offsets 0..10). El server
@@ -469,6 +538,7 @@ export class TutorExamDetailViewModel {
     const preferHoy = TutorExamDetailViewModel.isHourFutureToday(23);
     this.pendingDeadlineDayOffset.set(preferHoy ? 0 : 1);
     this.pendingDeadlineHour.set(23);
+    this.pendingStartedAt.set(null);
     this.durationError.set(null);
     this.openUntilError.set(null);
     this.editingDuration.set(false);
@@ -481,6 +551,7 @@ export class TutorExamDetailViewModel {
     this.pendingMode.set('examen');
     this.pendingDeadlineDayOffset.set(null);
     this.pendingDeadlineHour.set(null);
+    this.pendingStartedAt.set(null);
     this.durationError.set(null);
     this.openUntilError.set(null);
     this.editingDuration.set(false);
@@ -516,6 +587,7 @@ export class TutorExamDetailViewModel {
     // son ruedas discretas: offset de días (0..MAX-1) y hora entera (1..23).
     // La única corner case que puede fallar: día=hoy + hora ya pasada.
     let openUntil: Date | undefined;
+    let startedAt: Date | undefined;
     if (this.pendingMode() === 'tarea') {
       const parsed = this.pendingOpenUntilDate();
       if (parsed === null) {
@@ -526,7 +598,25 @@ export class TutorExamDetailViewModel {
         this.openUntilError.set('La hora ya pasó. Elegí otro día u otra hora.');
         return;
       }
+      // Validación cliente: openUntil no puede superar now + 15 días.
+      if (parsed.getTime() > Date.now() + HOMEWORK_MAX_WINDOW_MS) {
+        this.openUntilError.set('Tope 15 días');
+        return;
+      }
       openUntil = parsed;
+
+      // Procesar startedAt si el tutor lo ingresó.
+      // Si hay un error de validación (computed) no continuamos.
+      if (this.startedAtError() !== null) {
+        return;
+      }
+      const rawStartedAt = this.pendingStartedAt();
+      if (rawStartedAt !== null) {
+        const parsedStartedAt = new Date(rawStartedAt);
+        if (!Number.isNaN(parsedStartedAt.getTime())) {
+          startedAt = parsedStartedAt;
+        }
+      }
     }
 
     const currentDuration = this.detail()?.duration ?? null;
@@ -538,16 +628,18 @@ export class TutorExamDetailViewModel {
     this.pendingMinutes.set(null);
     this.pendingDeadlineDayOffset.set(null);
     this.pendingDeadlineHour.set(null);
+    this.pendingStartedAt.set(null);
     this.editingDuration.set(false);
 
-    await this.iniciar(override, openUntil);
+    await this.iniciar(override, openUntil, startedAt);
   }
 
   // Inicia el examen (scheduled → in_progress). Guard D5: solo si canIniciar().
   // `newDuration` opcional en segundos (60..7200). Cuando viene, el back lo
   // persiste atómicamente junto con la transición de estado.
   // `openUntil` opcional. Cuando viene, el examen arranca en modo "tarea".
-  async iniciar(newDuration?: number, openUntil?: Date): Promise<void> {
+  // `startedAt` opcional. Cuando viene, programa la apertura a futuro.
+  async iniciar(newDuration?: number, openUntil?: Date, startedAt?: Date): Promise<void> {
     if (!this.canIniciar()) return;
 
     const recordId = this.route.snapshot.paramMap.get('recordId') ?? '';
@@ -555,7 +647,7 @@ export class TutorExamDetailViewModel {
     this.isSaving.set(true);
 
     try {
-      await this.iniciarExamen.execute({ recordId, duration: newDuration, openUntil });
+      await this.iniciarExamen.execute({ recordId, duration: newDuration, openUntil, startedAt });
       // Reload detail y upsert store (R4: list reflects new status immediately).
       await this.reloadDetail(recordId);
     } catch (err) {
@@ -944,8 +1036,9 @@ export class TutorExamDetailViewModel {
   // Ver design.md D4, D5, D7, D8.
 
   /** Estado interno mutable del gate. No accesible fuera del VM. */
-  private readonly _gateState: WritableSignal<'idle' | 'refreshing' | 'ready'> =
-    signal<'idle' | 'refreshing' | 'ready'>('idle');
+  private readonly _gateState: WritableSignal<'idle' | 'refreshing' | 'ready'> = signal<
+    'idle' | 'refreshing' | 'ready'
+  >('idle');
 
   /** Estado readonly del gate expuesto al template via el page component. */
   readonly gateState: Signal<'idle' | 'refreshing' | 'ready'> = this._gateState.asReadonly();

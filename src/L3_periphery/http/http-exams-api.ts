@@ -16,6 +16,7 @@ import { ServerTime } from '../../L1_domain/value-objects/server-time';
 import { SubmissionAck } from '../../L1_domain/value-objects/submission-ack';
 import { AlternativaValue, AnswersMap } from '../../L1_domain/ports/markings-storage';
 import { isAdmissionArea } from '../../L1_domain/value-objects/admission-area';
+import { ExamNotOpenYetError } from '../../L1_domain/errors/exam-not-open-yet.error';
 import { InvalidAdmissionAreaError } from '../../L1_domain/errors/invalid-admission-area.error';
 import { InvalidExamError } from '../../L1_domain/errors/invalid-exam.error';
 import { InvalidPayloadError } from '../../L1_domain/errors/invalid-payload.error';
@@ -298,9 +299,7 @@ export class HttpExamsApi implements ExamsApi {
     // idéntico a FICHAS: picker renderiza los 16 conocidos por default).
     // Array de cualquier string se pasa tal cual — la entity normaliza `[]`
     // y strings vacíos a `null`.
-    const allowedAdmissionAreas = Array.isArray(dto.admission_areas)
-      ? dto.admission_areas
-      : null;
+    const allowedAdmissionAreas = Array.isArray(dto.admission_areas) ? dto.admission_areas : null;
     return new Exam({
       id: dto.id,
       area: dto.area,
@@ -350,7 +349,13 @@ export class HttpExamsApi implements ExamsApi {
   // 401 lo absorbe el credentials.interceptor (refresh + redirect login).
   private classifyDraftError(err: unknown): Error {
     if (err instanceof HttpErrorResponse) {
-      const body = (err.error ?? {}) as { message?: string };
+      // D5: Clasificación por body.code ANTES de la clasificación por body.message.
+      // `exam_not_open_yet` es el único code documentado para draft (REQ-PA-03-DRAFT).
+      const body = (err.error ?? {}) as { message?: string; code?: string; startedAt?: string };
+      if (err.status === 422 && body.code === 'exam_not_open_yet') {
+        const d = new Date(body.startedAt as string);
+        return new ExamNotOpenYetError({ startedAt: Number.isNaN(d.getTime()) ? null : d });
+      }
       const message = body.message;
       const knownMessage =
         typeof message === 'string' && DRAFT_ERROR_MESSAGES.has(message as DraftErrorMessage)
@@ -399,7 +404,13 @@ export class HttpExamsApi implements ExamsApi {
   // 401 lo absorbe el credentials.interceptor.
   private classifySubmitError(err: unknown): Error {
     if (err instanceof HttpErrorResponse) {
-      const body = (err.error ?? {}) as { message?: string };
+      // D5: Clasificación por body.code ANTES de la clasificación por body.message.
+      // `exam_not_open_yet` es el único code documentado para submit (REQ-PA-03-SUBMIT).
+      const body = (err.error ?? {}) as { message?: string; code?: string; startedAt?: string };
+      if (err.status === 422 && body.code === 'exam_not_open_yet') {
+        const d = new Date(body.startedAt as string);
+        return new ExamNotOpenYetError({ startedAt: Number.isNaN(d.getTime()) ? null : d });
+      }
       const message = body.message;
       const knownMessage =
         typeof message === 'string' && SUBMIT_ERROR_MESSAGES.has(message as SubmitErrorMessage)

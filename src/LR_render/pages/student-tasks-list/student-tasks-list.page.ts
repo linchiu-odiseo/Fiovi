@@ -34,6 +34,16 @@ export class StudentTasksListPage {
     void this.vm.refresh();
   }
 
+  // Formatea la fecha de apertura programada con Intl.DateTimeFormat es-PE.
+  // Formato: "20/08/2026, 08:00 a. m." (dateStyle: 'short', timeStyle: 'short').
+  // Usado por el bloque de estado 'programada' en la card del alumno.
+  protected formatOpensAt(date: Date): string {
+    return new Intl.DateTimeFormat('es-PE', {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    }).format(date);
+  }
+
   // Formatea la fecha del deadline como "28 jul · 00:00" — evita depender de
   // Intl para no traer polyfills; el idioma es-PE es hardcoded en el resto
   // del proyecto (fase 1+).
