@@ -10,6 +10,7 @@ import { IniciarExamenUseCase } from '../../../../src/L2_application/use-cases/i
 import { FinalizarExamenUseCase } from '../../../../src/L2_application/use-cases/finalizar-examen.use-case';
 import { ArchivarExamenUseCase } from '../../../../src/L2_application/use-cases/archivar-examen.use-case';
 import { ActualizarAlumnosHabilitadosUseCase } from '../../../../src/L2_application/use-cases/actualizar-alumnos-habilitados.use-case';
+import { RefreshHabilitadosUseCase } from '../../../../src/L2_application/use-cases/refresh-habilitados.use-case';
 import { TutorExam } from '../../../../src/L1_domain/entities/tutor-exam';
 import { TutorExamDetail } from '../../../../src/L1_domain/value-objects/tutor-exam-detail';
 import { ClassroomStudent } from '../../../../src/L1_domain/value-objects/classroom-student';
@@ -157,6 +158,8 @@ class FakeListClassroomStudentsUseCase {
 
 class FakeIniciarExamenUseCase {
   callCount = 0;
+  lastReq: { recordId: string; duration?: number; openUntil?: Date; startedAt?: Date } | null =
+    null;
   private _next: { kind: 'resolve' } | { kind: 'reject'; error: Error } = {
     kind: 'resolve',
   };
@@ -167,8 +170,14 @@ class FakeIniciarExamenUseCase {
   willReject(error: Error) {
     this._next = { kind: 'reject', error };
   }
-  async execute(_req: { recordId: string }): Promise<void> {
+  async execute(req: {
+    recordId: string;
+    duration?: number;
+    openUntil?: Date;
+    startedAt?: Date;
+  }): Promise<void> {
     this.callCount++;
+    this.lastReq = req;
     if (this._next.kind === 'reject') throw this._next.error;
   }
 }
@@ -231,6 +240,35 @@ class FakeActualizarAlumnosHabilitadosUseCase {
   }
 }
 
+class FakeRefreshHabilitadosUseCase {
+  callCount = 0;
+  lastRecordId: string | null = null;
+  private _next:
+    | { kind: 'resolve'; result: { addedCount: number; totalEnabledCount: number } }
+    | { kind: 'reject'; error: Error } = {
+    kind: 'resolve',
+    result: { addedCount: 0, totalEnabledCount: 0 },
+  };
+
+  willResolve(
+    result: { addedCount: number; totalEnabledCount: number } = {
+      addedCount: 0,
+      totalEnabledCount: 0,
+    },
+  ) {
+    this._next = { kind: 'resolve', result };
+  }
+  willReject(error: Error) {
+    this._next = { kind: 'reject', error };
+  }
+  async execute(recordId: string): Promise<{ addedCount: number; totalEnabledCount: number }> {
+    this.callCount++;
+    this.lastRecordId = recordId;
+    if (this._next.kind === 'reject') throw this._next.error;
+    return this._next.result;
+  }
+}
+
 // ─── test setup ──────────────────────────────────────────────────────────────
 
 function setup(recordId = 'rec-1', from: string | null = null) {
@@ -241,6 +279,7 @@ function setup(recordId = 'rec-1', from: string | null = null) {
   const fakeFinalizar = new FakeFinalizarExamenUseCase();
   const fakeArchivar = new FakeArchivarExamenUseCase();
   const fakeActualizar = new FakeActualizarAlumnosHabilitadosUseCase();
+  const fakeRefresh = new FakeRefreshHabilitadosUseCase();
 
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
@@ -253,6 +292,7 @@ function setup(recordId = 'rec-1', from: string | null = null) {
       { provide: FinalizarExamenUseCase, useValue: fakeFinalizar },
       { provide: ArchivarExamenUseCase, useValue: fakeArchivar },
       { provide: ActualizarAlumnosHabilitadosUseCase, useValue: fakeActualizar },
+      { provide: RefreshHabilitadosUseCase, useValue: fakeRefresh },
       { provide: CLOCK, useValue: new FakeClock() },
       {
         provide: ActivatedRoute,
@@ -279,6 +319,7 @@ function setup(recordId = 'rec-1', from: string | null = null) {
     fakeFinalizar,
     fakeArchivar,
     fakeActualizar,
+    fakeRefresh,
   };
 }
 
@@ -1248,6 +1289,105 @@ describe('TutorExamDetailViewModel', () => {
       await vm.archivar();
 
       expect(routerSpy).toHaveBeenCalledWith(['/tutor/actividad']);
+    });
+  });
+
+  // ── REQ-PA-01: startedAt programado (modal tarea) ──────────────────────────
+
+  describe('Scenario: startedAt >= openUntil → startedAtError + isScheduledSubmitDisabled', () => {
+    it('startedAtError es "Debe ser antes del cierre" cuando startedAt >= openUntil', () => {
+      const { vm, store, fakeGetDetail, fakeListStudents } = setup('rec-1');
+      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1' })]);
+      fakeGetDetail.willResolve(buildDetail({ enabledStudentIds: ['s-1'] }));
+      fakeListStudents.willResolve([buildStudent()]);
+
+      // Simular modo tarea con openUntil via rueda (día+1, hora=23)
+      vm.pendingMode.set('tarea');
+      vm.pendingDeadlineDayOffset.set(1);
+      vm.pendingDeadlineHour.set(23);
+
+      // Calcular un startedAt posterior a openUntil derivado
+      const openUntil = vm.pendingOpenUntilDate();
+      expect(openUntil).not.toBeNull();
+      // startedAt = openUntil + 1h (violación: debe ser ANTES del cierre)
+      const laterThanOpen = new Date(openUntil!.getTime() + 60 * 60 * 1000);
+      const isoString = laterThanOpen.toISOString().slice(0, 16); // datetime-local format
+      vm.pendingStartedAt.set(isoString);
+
+      expect(vm.startedAtError()).toBe('Debe ser antes del cierre');
+      expect(vm.isScheduledSubmitDisabled()).toBe(true);
+    });
+  });
+
+  describe('Scenario: startedAt en el pasado (> 5 min) → startedAtError', () => {
+    it('startedAtError es "No puede ser en el pasado" cuando startedAt < now - 5min', () => {
+      const { vm } = setup('rec-1');
+      vm.pendingMode.set('tarea');
+
+      // startedAt = 10 min en el pasado (más allá de la ventana CLOCK_SKEW_MS).
+      // El valor de un <input type="datetime-local"> está en hora LOCAL, sin
+      // sufijo de zona. Construimos el string en hora local para que
+      // `new Date(raw)` en el VM lo interprete igual que lo haría el browser.
+      const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000);
+      // Pad helper local (evita importar funciones de prod solo para tests).
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const localIso =
+        `${tenMinAgo.getFullYear()}-${pad(tenMinAgo.getMonth() + 1)}-${pad(tenMinAgo.getDate())}` +
+        `T${pad(tenMinAgo.getHours())}:${pad(tenMinAgo.getMinutes())}`;
+      vm.pendingStartedAt.set(localIso);
+
+      expect(vm.startedAtError()).toBe('No puede ser en el pasado');
+      expect(vm.isScheduledSubmitDisabled()).toBe(true);
+    });
+  });
+
+  describe('Scenario: openUntil > now+15d → openUntilError "Tope 15 días"', () => {
+    it('confirmIniciarModal setea openUntilError cuando openUntil excede 15 días', async () => {
+      const { vm, store, fakeGetDetail, fakeListStudents, fakeIniciar } = setup('rec-1');
+      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1' })]);
+      fakeGetDetail.willResolve(buildDetail({ enabledStudentIds: ['s-1'] }));
+      fakeListStudents.willResolve([buildStudent()]);
+      fakeIniciar.willResolve();
+
+      await vm.load();
+      vm.openIniciarModal();
+      vm.pendingMode.set('tarea');
+      // Día offset 10 (max es 10), hora 23 = 10 días hacia el futuro
+      // Pero 10 días < 15 días — para exceder 15 días usamos 16 días calculando
+      // el offset directamente en el pendingOpenUntilDate override.
+      // Como la rueda solo permite hasta offset 10, inyectamos directamente
+      // una fecha > 15d en el futuro seteando offset 16 (out of UI range) y hora 23.
+      vm.pendingDeadlineDayOffset.set(16);
+      vm.pendingDeadlineHour.set(23);
+      vm.pendingMinutes.set(60);
+
+      await vm.confirmIniciarModal();
+
+      expect(vm.openUntilError()).toBe('Tope 15 días');
+      expect(fakeIniciar.callCount).toBe(0);
+    });
+  });
+
+  describe('Scenario: Tutor no modifica startedAt → use case NO recibe startedAt', () => {
+    it('confirmIniciarModal sin pendingStartedAt → execute sin startedAt', async () => {
+      const { vm, store, fakeGetDetail, fakeListStudents, fakeIniciar } = setup('rec-1');
+      store.setExams([buildTutorExam({ recordId: 'rec-1', classroomId: 'cls-1' })]);
+      fakeGetDetail.willResolve(buildDetail({ enabledStudentIds: ['s-1'] }));
+      fakeListStudents.willResolve([buildStudent()]);
+      fakeIniciar.willResolve();
+
+      await vm.load();
+      vm.openIniciarModal();
+      vm.pendingMode.set('tarea');
+      vm.pendingDeadlineDayOffset.set(1);
+      vm.pendingDeadlineHour.set(23);
+      vm.pendingMinutes.set(60);
+      // NO setear pendingStartedAt → debe permanecer null
+
+      await vm.confirmIniciarModal();
+
+      expect(fakeIniciar.callCount).toBe(1);
+      expect(fakeIniciar.lastReq?.startedAt).toBeUndefined();
     });
   });
 });
