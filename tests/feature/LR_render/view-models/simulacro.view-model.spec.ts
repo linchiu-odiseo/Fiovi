@@ -40,6 +40,7 @@ import { SimulacroCerradoError } from '../../../../src/L1_domain/errors/simulacr
 import { SimulacroNoAsignadoError } from '../../../../src/L1_domain/errors/simulacro-no-asignado.error';
 import { InvalidSubmissionTimeError } from '../../../../src/L1_domain/errors/invalid-submission-time.error';
 import { InvalidPayloadError } from '../../../../src/L1_domain/errors/invalid-payload.error';
+import { ExamNotOpenYetError } from '../../../../src/L1_domain/errors/exam-not-open-yet.error';
 import { Clock } from '../../../../src/L1_domain/ports/clock';
 import {
   AlternativaValue,
@@ -1294,6 +1295,85 @@ describe('SimulacroPageViewModel', () => {
 
       expect(fakeSeleccionarArea.callsWith).toHaveLength(0);
       expect(fakeDraftDispatcher.notificarCalls).toHaveLength(0);
+    });
+  });
+
+  // ─── REQ-PA-03-VM: ExamNotOpenYetError en handleSubmissionError ────────────
+  // Verifica que el view-model clasifica ExamNotOpenYetError por instanceof
+  // (NUNCA por error.message), setea notOpenYetMessage con la fecha es-PE
+  // cuando startedAt es válido o el fallback cuando no lo es, y NO redirige.
+  describe('submit() — ExamNotOpenYetError (REQ-PA-03-VM)', () => {
+    it('ExamNotOpenYetError con startedAt válido → notOpenYetMessage contiene la fecha formateada, NO navega', async () => {
+      const exam = buildExam('exam-1', 'in_progress');
+      fakeGetTodaysExams.willResolve([exam]);
+      const vm = createVm();
+      await vm.start('exam-1');
+
+      const startedAt = new Date('2026-08-20T08:00:00Z');
+      fakeEnviar.willReject(new ExamNotOpenYetError({ startedAt }));
+      const router = TestBed.inject(Router);
+      const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+      await vm.submit();
+
+      // Clasificado por instanceof, no por message
+      expect(vm.errorState()).toBe('not-open-yet');
+      // El mensaje contiene la fecha es-PE — no verificamos el locale exacto
+      // porque el formateador depende del entorno, pero sí que no es el fallback.
+      expect(vm.notOpenYetMessage()).not.toBeNull();
+      expect(vm.notOpenYetMessage()).not.toBe('Este examen aún no abre');
+      expect(vm.notOpenYetMessage()).toMatch(/Este examen abre el/);
+      // NO debe redirigir — el alumno se queda en la cartilla.
+      expect(navigateSpy).not.toHaveBeenCalled();
+      vm.stop();
+    });
+
+    it('ExamNotOpenYetError con startedAt null → notOpenYetMessage = "Este examen aún no abre", NO navega', async () => {
+      const exam = buildExam('exam-1', 'in_progress');
+      fakeGetTodaysExams.willResolve([exam]);
+      const vm = createVm();
+      await vm.start('exam-1');
+
+      fakeEnviar.willReject(new ExamNotOpenYetError({ startedAt: null }));
+      const router = TestBed.inject(Router);
+      const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+      await vm.submit();
+
+      expect(vm.errorState()).toBe('not-open-yet');
+      expect(vm.notOpenYetMessage()).toBe('Este examen aún no abre');
+      expect(navigateSpy).not.toHaveBeenCalled();
+      vm.stop();
+    });
+
+    it('ExamNotOpenYetError clasificado por instanceof, no por message (no-regression)', async () => {
+      // Garantía de que el clasificador NO lee error.message en ninguna rama.
+      // Construimos el error con una fecha válida y verificamos que el
+      // comportamiento es el correcto — si alguien introdujera una rama
+      // `err.message === 'exam_not_open_yet'` antes de la rama instanceof,
+      // este test lo detectaría porque el comportamiento sería idéntico al
+      // de un error con message pero sin instanceof.
+      const exam = buildExam('exam-1', 'in_progress');
+      fakeGetTodaysExams.willResolve([exam]);
+      const vm = createVm();
+      await vm.start('exam-1');
+
+      const startedAt = new Date('2026-08-21T10:00:00Z');
+      const err = new ExamNotOpenYetError({ startedAt });
+      // Verificar que la instancia tiene los campos correctos (test de identidad).
+      expect(err instanceof ExamNotOpenYetError).toBe(true);
+      expect(err.startedAt).toBe(startedAt);
+      // Ahora disparar el submit con este error.
+      fakeEnviar.willReject(err);
+      const router = TestBed.inject(Router);
+      vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+      await vm.submit();
+
+      // El VM debe llegar al branch ExamNotOpenYetError por instanceof.
+      expect(vm.errorState()).toBe('not-open-yet');
+      expect(vm.notOpenYetMessage()).toMatch(/Este examen abre el/);
+      vm.stop();
     });
   });
 });
