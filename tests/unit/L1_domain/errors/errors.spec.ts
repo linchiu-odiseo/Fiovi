@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { ExamNotOpenYetError } from '../../../../src/L1_domain/errors/exam-not-open-yet.error';
 import { AccountNotActiveError } from '../../../../src/L1_domain/errors/account-not-active.error';
 import { InvalidCredentialsError } from '../../../../src/L1_domain/errors/invalid-credentials.error';
 import { NetworkError } from '../../../../src/L1_domain/errors/network.error';
@@ -219,6 +220,37 @@ describe('Errores de dominio', () => {
 
     it('tiene name correcto', () => {
       expect(new InvalidAdmissionAreaError().name).toBe('InvalidAdmissionAreaError');
+    });
+  });
+
+  describe('ExamNotOpenYetError', () => {
+    it('es instanceof Error y ExamNotOpenYetError', () => {
+      const err = new ExamNotOpenYetError({ startedAt: new Date('2026-08-20T08:00:00.000Z') });
+      expect(err).toBeInstanceOf(Error);
+      expect(err).toBeInstanceOf(ExamNotOpenYetError);
+    });
+
+    it('tiene name correcto', () => {
+      expect(
+        new ExamNotOpenYetError({ startedAt: new Date('2026-08-20T08:00:00.000Z') }).name,
+      ).toBe('ExamNotOpenYetError');
+    });
+
+    it('expone startedAt como Date válido cuando se pasa una fecha válida', () => {
+      const d = new Date('2026-08-20T08:00:00.000Z');
+      const err = new ExamNotOpenYetError({ startedAt: d });
+      expect(err.startedAt).toEqual(d);
+      expect(err.startedAt).not.toBeNull();
+      expect(Number.isNaN((err.startedAt as Date).getTime())).toBe(false);
+    });
+
+    it('expone startedAt como null cuando se pasa null', () => {
+      const err = new ExamNotOpenYetError({ startedAt: null });
+      expect(err.startedAt).toBeNull();
+    });
+
+    it('NO es instanceof NetworkError (discriminable por instanceof)', () => {
+      expect(new ExamNotOpenYetError({ startedAt: null })).not.toBeInstanceOf(NetworkError);
     });
   });
 

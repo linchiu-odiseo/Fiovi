@@ -14,6 +14,7 @@ import { SimulacroNoAsignadoError } from '../../../../src/L1_domain/errors/simul
 import { StudentNotEnrolledError } from '../../../../src/L1_domain/errors/student-not-enrolled.error';
 import { StudentNotLinkedError } from '../../../../src/L1_domain/errors/student-not-linked.error';
 import { InvalidAdmissionAreaError } from '../../../../src/L1_domain/errors/invalid-admission-area.error';
+import { ExamNotOpenYetError } from '../../../../src/L1_domain/errors/exam-not-open-yet.error';
 import { environment } from '../../../../src/environments/environment';
 
 // Cubre `HttpExamsApi.guardarDraft()` (L3) según los scenarios del spec
@@ -261,6 +262,32 @@ describe('HttpExamsApi.guardarDraft (POST /draft)', () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+  });
+
+  describe('REQ-PA-03-DRAFT: 422 exam_not_open_yet', () => {
+    it('422 + code=exam_not_open_yet + startedAt → ExamNotOpenYetError con Date válido', async () => {
+      const pending = adapter.guardarDraft(validRequest());
+      const req = httpMock.expectOne(DRAFT_URL);
+      req.flush(
+        { code: 'exam_not_open_yet', startedAt: '2026-08-20T08:00:00.000Z' },
+        { status: 422, statusText: 'Unprocessable Entity' },
+      );
+      const err = await pending.catch((e) => e as Error);
+      expect(err).toBeInstanceOf(ExamNotOpenYetError);
+      const notOpen = err as ExamNotOpenYetError;
+      expect(notOpen.startedAt).not.toBeNull();
+      expect(notOpen.startedAt?.getTime()).toBe(new Date('2026-08-20T08:00:00.000Z').getTime());
+    });
+
+    it('422 + code=exam_not_open_yet sin startedAt → ExamNotOpenYetError con startedAt null', async () => {
+      const pending = adapter.guardarDraft(validRequest());
+      const req = httpMock.expectOne(DRAFT_URL);
+      req.flush({ code: 'exam_not_open_yet' }, { status: 422, statusText: 'Unprocessable Entity' });
+      const err = await pending.catch((e) => e as Error);
+      expect(err).toBeInstanceOf(ExamNotOpenYetError);
+      const notOpen = err as ExamNotOpenYetError;
+      expect(notOpen.startedAt).toBeNull();
     });
   });
 

@@ -73,7 +73,10 @@ export interface TutorExamsApi {
   //                   ExamPreconditionError (422 — 0 alumnos habilitados,
   //                     claves no configuradas, o openUntil fuera de rango),
   //                   NetworkError.
-  iniciar(recordId: string, opts?: { duration?: number; openUntil?: Date }): Promise<void>;
+  iniciar(
+    recordId: string,
+    opts?: { duration?: number; openUntil?: Date; startedAt?: Date },
+  ): Promise<void>;
 
   // POST /t/:slug/virtual-exams/:recordId/finalize — sin body.
   // Respuesta: 200 (NO 202 ni 204) con body { transitioned, jobId? } — ver design.md R2.

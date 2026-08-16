@@ -521,7 +521,12 @@ export class FakeTutorExamsApi implements TutorExamsApi {
   // los tests existentes; `iniciarCallsFull` registra también duration + openUntil
   // para los tests nuevos del override al iniciar y modo tarea.
   private iniciarCalls: string[] = [];
-  private iniciarCallsFull: { recordId: string; duration?: number; openUntil?: Date }[] = [];
+  private iniciarCallsFull: {
+    recordId: string;
+    duration?: number;
+    openUntil?: Date;
+    startedAt?: Date;
+  }[] = [];
 
   willResolveIniciar(): void {
     this.nextIniciar = { kind: 'resolve' };
@@ -539,16 +544,21 @@ export class FakeTutorExamsApi implements TutorExamsApi {
     recordId: string;
     duration?: number;
     openUntil?: Date;
+    startedAt?: Date;
   }[] {
     return this.iniciarCallsFull;
   }
 
-  async iniciar(recordId: string, opts?: { duration?: number; openUntil?: Date }): Promise<void> {
+  async iniciar(
+    recordId: string,
+    opts?: { duration?: number; openUntil?: Date; startedAt?: Date },
+  ): Promise<void> {
     this.iniciarCalls.push(recordId);
     this.iniciarCallsFull.push({
       recordId,
       duration: opts?.duration,
       openUntil: opts?.openUntil,
+      startedAt: opts?.startedAt,
     });
     if (!this.nextIniciar) {
       throw new Error(
