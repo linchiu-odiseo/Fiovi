@@ -288,3 +288,104 @@ El método `ExamsApi.enviar` en el adapter `HttpExamsApi` SHALL emitir HTTP POST
 - **GIVEN** `EnvioRequest = { examId, code: "30303011", responses: {"P1": "A"}, clientFinishedAt: "2026-06-17T15:29:54.531Z" }`
 - **WHEN** `enviar()` emite el POST
 - **THEN** el body es `{ "code": "30303011", "responses": {"P1": "A"}, "client_finished_at": "2026-06-17T15:29:54.531Z" }`
+
+### Requirement: REQ-PA-03-L1 — ExamNotOpenYetError con startedAt
+
+L1 SHALL define `ExamNotOpenYetError` as a domain error class (TypeScript only, no `@angular/*`)
+with a required field `startedAt: Date`. The class MUST extend the project's base domain error
+convention. No other layers may construct this error — it is instantiated exclusively in the L3
+adapter before crossing the boundary into L1.
+
+#### Scenario: ExamNotOpenYetError instanciado con startedAt
+
+- GIVEN `body = { code: 'exam_not_open_yet', startedAt: '2026-08-20T08:00:00.000Z' }`
+- WHEN el adapter construye `new ExamNotOpenYetError({ startedAt: new Date(body.startedAt) })`
+- THEN `error.startedAt` es un `Date` con valor `2026-08-20T08:00:00.000Z`
+
+### Requirement: REQ-PA-03-SUBMIT — Clasificación 422 exam_not_open_yet en submit
+
+`HttpExamsApi.classifySubmitError` SHALL handle the case where `status === 422` AND
+`body.code === 'exam_not_open_yet'`. In this case it SHALL return
+`new ExamNotOpenYetError({ startedAt: new Date(body.startedAt) })`.
+
+Classification MUST use `body.code` (strict equality) — NEVER `body.message` or any string
+pattern match. This follows CLAUDE.md rule #3: classify by `(status, endpoint, code)`.
+
+If `body.startedAt` is absent or unparseable, the adapter SHALL still construct
+`ExamNotOpenYetError` with `startedAt: undefined` cast to `Date` (i.e., `new Date(undefined)` →
+Invalid Date). The VM handles the fallback display (see REQ-PA-03-VM).
+
+Any other 422 with a different `body.code` SHALL fall through to the existing classification
+logic (e.g., `InvalidSubmissionTimeError`).
+
+#### Scenario: POST submit 422 code=exam_not_open_yet → ExamNotOpenYetError con startedAt
+
+- GIVEN el backend responde HTTP 422 con `body = { code: 'exam_not_open_yet', startedAt: '2026-08-20T08:00:00.000Z' }`
+- WHEN `classifySubmitError` procesa la respuesta
+- THEN retorna `ExamNotOpenYetError` con `startedAt = new Date('2026-08-20T08:00:00.000Z')`
+
+#### Scenario: POST submit 422 body sin startedAt → ExamNotOpenYetError con Date inválido
+
+- GIVEN el backend responde HTTP 422 con `body = { code: 'exam_not_open_yet' }` (sin `startedAt`)
+- WHEN `classifySubmitError` procesa la respuesta
+- THEN retorna `ExamNotOpenYetError` con `startedAt` siendo un `Invalid Date`
+
+#### Scenario: POST submit 422 con code diferente → NO clasifica como ExamNotOpenYetError
+
+- GIVEN el backend responde HTTP 422 con `body = { message: 'CLOCK_SKEW_BEFORE_START' }` (sin `code`)
+- WHEN `classifySubmitError` procesa la respuesta
+- THEN NO retorna `ExamNotOpenYetError`
+- AND aplica la clasificación existente (`InvalidSubmissionTimeError`)
+
+### Requirement: REQ-PA-03-DRAFT — Clasificación 422 exam_not_open_yet en draft
+
+`HttpExamsApi.classifyDraftError` SHALL apply the identical classification rule as
+REQ-PA-03-SUBMIT: HTTP 422 with `body.code === 'exam_not_open_yet'` returns
+`new ExamNotOpenYetError({ startedAt: new Date(body.startedAt) })`.
+
+All other draft error classification rules from `submit-progress-snapshot` spec remain unchanged.
+
+#### Scenario: POST draft 422 code=exam_not_open_yet → ExamNotOpenYetError
+
+- GIVEN el backend responde HTTP 422 con `body = { code: 'exam_not_open_yet', startedAt: '2026-08-20T08:00:00.000Z' }`
+- WHEN `classifyDraftError` procesa la respuesta
+- THEN retorna `ExamNotOpenYetError` con `startedAt` parseado como `Date`
+
+#### Scenario: POST draft 422 code=exam_not_open_yet sin startedAt → fallback
+
+- GIVEN el backend responde HTTP 422 con `body = { code: 'exam_not_open_yet' }` (sin `startedAt`)
+- WHEN `classifyDraftError` procesa la respuesta
+- THEN retorna `ExamNotOpenYetError` con `startedAt` siendo un `Invalid Date`
+
+### Requirement: REQ-PA-03-VM — SimulacroPageViewModel maneja ExamNotOpenYetError
+
+`SimulacroPageViewModel` SHALL catch `ExamNotOpenYetError` in both the submit handler and the
+draft-error path. On catching it, the VM SHALL display a toast (or inline error message) in
+Spanish:
+
+- When `error.startedAt` is a valid `Date`: toast text is
+  `"Este examen abre el {fecha formateada es-PE corta}"` using
+  `Intl.DateTimeFormat('es-PE', { dateStyle: 'short', timeStyle: 'short' })` or equivalent.
+- When `error.startedAt` is `undefined`, `null`, or an `Invalid Date`: fallback toast text is
+  `"Este examen aún no abre"` (no date appended).
+
+The VM MUST NOT inspect `error.message` to decide the toast text. It MUST check `error.startedAt`
+directly (type-guard or validity check via `isNaN(error.startedAt.getTime())`).
+
+#### Scenario: VM captura ExamNotOpenYetError con startedAt → toast con fecha
+
+- GIVEN `EnviarSimulacroUseCase.execute` rechaza con `ExamNotOpenYetError({ startedAt: new Date('2026-08-20T08:00:00.000Z') })`
+- WHEN el VM procesa el error
+- THEN muestra toast con texto que contiene la fecha formateada en es-PE
+
+#### Scenario: VM captura ExamNotOpenYetError sin startedAt → toast fallback
+
+- GIVEN el error es `ExamNotOpenYetError({ startedAt: new Date(undefined) })` (Invalid Date)
+- WHEN el VM procesa el error
+- THEN muestra toast `"Este examen aún no abre"` (sin fecha)
+
+#### Scenario: Clasificación por tipo, no por message
+
+- WHEN se inspecciona el catch del submit en `SimulacroPageViewModel`
+- THEN la rama de `ExamNotOpenYetError` se identifica por `instanceof ExamNotOpenYetError`
+- AND no hay comparaciones de strings sobre `error.message` ni `body.code`
