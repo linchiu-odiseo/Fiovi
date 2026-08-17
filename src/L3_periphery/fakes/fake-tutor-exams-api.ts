@@ -53,6 +53,6 @@ export class FakeTutorExamsApi implements TutorExamsApi {
   async refreshEnabled(
     _recordId: string,
   ): Promise<{ addedCount: number; totalEnabledCount: number }> {
-    return Promise.resolve({ addedCount: 0, totalEnabledCount: 0 });
+    return { addedCount: 0, totalEnabledCount: 0 };
   }
 }
