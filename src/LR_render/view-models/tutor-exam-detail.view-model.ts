@@ -20,7 +20,6 @@ import { TutorExamsStore } from '../state/tutor-exams.store';
 import { TutorExamDetail } from '../../L1_domain/value-objects/tutor-exam-detail';
 import { ClassroomStudent } from '../../L1_domain/value-objects/classroom-student';
 import { TutorExam } from '../../L1_domain/entities/tutor-exam';
-import { ExamServerStatus } from '../../L1_domain/value-objects/exam-server-status';
 import { CLOCK } from '../../app.config';
 import { NetworkError } from '../../L1_domain/errors/network.error';
 import { ExamConflictError } from '../../L1_domain/errors/exam-conflict.error';
@@ -1069,7 +1068,7 @@ export class TutorExamDetailViewModel {
    */
   private syncCountdownTicker(): void {
     const d = this.detail();
-    if (d && d.status.is('in_progress')) {
+    if (d?.status.is('in_progress')) {
       this.startCountdownTicker();
     } else {
       this.stopCountdownTicker();
@@ -1117,7 +1116,7 @@ export class TutorExamDetailViewModel {
       try {
         await this.reloadDetail(recordId);
         const d = this.detail();
-        if (d && d.status.is('in_progress')) {
+        if (d?.status.is('in_progress')) {
           // Back aún no finalizó (lag del auto-finalize). Liberá el guard
           // para permitir un segundo intento en el próximo tick.
           this.postCierreRefreshDone.delete(recordId);
@@ -1233,7 +1232,7 @@ export class TutorExamDetailViewModel {
 }
 
 // Re-export ExamServerStatus for template usage (avoids extra imports in page).
-export { ExamServerStatus };
+export { ExamServerStatus } from '../../L1_domain/value-objects/exam-server-status';
 
 // ── Formatting helpers locales (los de countdown viven en utils/) ───────────
 

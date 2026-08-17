@@ -338,8 +338,8 @@ export class SimulacroPageViewModel {
       // Mapea status servidor → razón de redirect. `scheduled` → 'pendiente';
       // `finalized` → 'cerrado'. La traducción a copy concreta vive en /home.
       const status = encontrado.serverStatus.value;
-      const reason: SimulacroErrorState =
-        status === 'scheduled' ? 'pendiente' : status === 'finalized' ? 'cerrado' : 'unknown';
+      const fallbackReason: SimulacroErrorState = status === 'finalized' ? 'cerrado' : 'unknown';
+      const reason: SimulacroErrorState = status === 'scheduled' ? 'pendiente' : fallbackReason;
       this.errorState.set(reason);
       void this.router.navigate(['/home']);
       return;

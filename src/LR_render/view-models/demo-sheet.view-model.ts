@@ -1,6 +1,5 @@
-import { Injectable, Signal, computed, signal } from '@angular/core';
+import { Injectable, Signal, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { inject } from '@angular/core';
 import { AlternativaValue, AnswersMap } from '../../L1_domain/ports/markings-storage';
 import {
   AdmissionArea,

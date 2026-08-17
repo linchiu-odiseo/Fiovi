@@ -121,7 +121,7 @@ export class HWheelComponent implements AfterViewInit {
     this.scrollToId(id, 'smooth');
   }
 
-  private handleScroll = (): void => {
+  private readonly handleScroll = (): void => {
     if (this.scrollRafPending) return;
     this.scrollRafPending = true;
     requestAnimationFrame(() => {

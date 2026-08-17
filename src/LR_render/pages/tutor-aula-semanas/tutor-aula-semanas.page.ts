@@ -293,7 +293,7 @@ export class TutorAulaSemanasPage {
     viewportEl.addEventListener('scroll', this.handleScroll, { passive: true });
   }
 
-  private handleScroll = (): void => {
+  private readonly handleScroll = (): void => {
     if (this.scrollRafPending) return;
     this.scrollRafPending = true;
     requestAnimationFrame(() => {
