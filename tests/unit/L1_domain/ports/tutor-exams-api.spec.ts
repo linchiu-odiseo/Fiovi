@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 // Type-only smoke test: verifica que el puerto TutorExamsApi expone exactamente
-// 8 métodos y que el archivo no importa nada de Angular.
+// 9 métodos y que el archivo no importa nada de Angular.
 //
 // NO HAY Angular imports en src/L1_domain/ports/tutor-exams-api.ts:
 //   - no import from '@angular/core'
@@ -18,9 +18,9 @@ describe('TutorExamsApi port — smoke de tipos', () => {
     expect(module).toBeTruthy();
   });
 
-  it('una implementación mínima satisface los 8 métodos del puerto (type-check)', () => {
+  it('una implementación mínima satisface los 9 métodos del puerto (type-check)', () => {
     // Este bloque verifica en runtime que una implementación fake
-    // que cumpla los 8 métodos es asignable a TutorExamsApi.
+    // que cumpla los 9 métodos es asignable a TutorExamsApi.
     // Si la interfaz cambiara y faltaran métodos, el assignment de tipo fallaría.
     const fake: TutorExamsApi = {
       getTutorExams: async () => [],
@@ -45,15 +45,16 @@ describe('TutorExamsApi port — smoke de tipos', () => {
       archivar: async (_recordId: string) => {
         return;
       },
+      refreshEnabled: async (_recordId: string) => ({ addedCount: 0, totalEnabledCount: 0 }),
     };
 
-    // Contamos los métodos expuestos en el fake (debe ser exactamente 8).
+    // Contamos los métodos expuestos en el fake (debe ser exactamente 9).
     const fakeAsRecord = fake as unknown as Record<string, unknown>;
     const methodCount = Object.keys(fakeAsRecord).filter(
       (key) => typeof fakeAsRecord[key] === 'function',
     ).length;
 
-    expect(methodCount).toBe(8);
+    expect(methodCount).toBe(9);
     expect(typeof fake.getTutorExams).toBe('function');
     expect(typeof fake.getExamsFinalizadas).toBe('function');
     expect(typeof fake.getExamDetail).toBe('function');
@@ -62,5 +63,6 @@ describe('TutorExamsApi port — smoke de tipos', () => {
     expect(typeof fake.iniciar).toBe('function');
     expect(typeof fake.finalizar).toBe('function');
     expect(typeof fake.archivar).toBe('function');
+    expect(typeof fake.refreshEnabled).toBe('function');
   });
 });

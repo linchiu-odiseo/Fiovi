@@ -49,4 +49,10 @@ export class FakeTutorExamsApi implements TutorExamsApi {
   async archivar(_recordId: string): Promise<void> {
     return;
   }
+
+  async refreshEnabled(
+    _recordId: string,
+  ): Promise<{ addedCount: number; totalEnabledCount: number }> {
+    return { addedCount: 0, totalEnabledCount: 0 };
+  }
 }

@@ -170,11 +170,49 @@
       </section>
     }
 
-    <!-- Botón principal: solo "Iniciar" acá (D5 guard). "Finalizar" es un
-         escape hatch discreto al final de la pantalla — el flujo esperado
-         es que el examen termine solo cuando venza el countdown, no que el
-         tutor lo corte manualmente. -->
-    @if (canIniciar()) {
+    <!-- Gate de reconciliación (reconcile-enabled-on-start-gate). El card
+         aparece cuando el examen está programado y el gate todavía no fue
+         superado. El CTA transformable pasa por "Actualizar lista", después
+         "Actualizando..." y desaparece cuando el roster toma el control.
+         Para exámenes en curso o finalizados el card nunca aparece porque
+         el roster ya está visible desde el inicio. Ver design.md D4, D6, D9. -->
+    @if (!vm.showRoster() && detail.status.value === 'scheduled') {
+      <section class="tutor-exam-detail__gate-card" data-testid="gate-card">
+        @switch (vm.gateState()) {
+          @case ('idle') {
+            <button
+              type="button"
+              class="tutor-exam-detail__btn-iniciar"
+              data-testid="btn-actualizar-lista"
+              (click)="onRefresh()"
+            >
+              Actualizar lista
+            </button>
+          }
+          @case ('refreshing') {
+            <button
+              type="button"
+              class="tutor-exam-detail__btn-iniciar"
+              data-testid="btn-actualizando"
+              disabled
+            >
+              Actualizando...
+            </button>
+          }
+          <!-- No hay @case ('ready'): cuando gateState pasa a 'ready',
+               showRoster() retorna true y el outer @if cierra este card. -->
+        }
+        <p class="tutor-exam-detail__gate-card-caption">
+          Actualizar lista de alumnos antes de iniciar
+        </p>
+      </section>
+    }
+
+    <!-- Botón "Iniciar examen" en Estado B (gate superado, showRoster=true).
+         Solo aplica cuando status=scheduled y el gate ya fue completado.
+         Para in_progress/finalized: el guard canIniciar() devuelve false
+         y este bloque tampoco renderiza. -->
+    @if (vm.showRoster() && canIniciar()) {
       <section class="tutor-exam-detail__actions">
         <button
           type="button"
@@ -343,22 +381,73 @@
             </div>
 
             @if (vm.pendingMode() === 'tarea') {
-              <div class="tutor-exam-detail__bp-cell" data-testid="deadline-day-field">
-                <p class="tutor-exam-detail__bp-label">Fecha límite</p>
-                <app-h-wheel
-                  [items]="dayChips()"
-                  [selectedId]="selectedDayId()"
-                  (selectedIdChange)="onDayIdChange($event)"
-                />
-              </div>
-              <div class="tutor-exam-detail__bp-cell" data-testid="deadline-hour-field">
-                <p class="tutor-exam-detail__bp-label">Hora límite</p>
-                <app-h-wheel
-                  [items]="hourChips()"
-                  [selectedId]="selectedHourId()"
-                  (selectedIdChange)="onHourIdChange($event)"
-                />
-              </div>
+              <!-- Ruedas horizontales legacy — ocultas en modo tarea (reemplazadas
+                   por inputs datetime-local). Se conservan en el DOM para
+                   rollback rápido: cambiar showHwheels() a true las restaura. -->
+              @if (vm.showHwheels()) {
+                <div class="tutor-exam-detail__bp-cell" data-testid="deadline-day-field">
+                  <p class="tutor-exam-detail__bp-label">Fecha límite</p>
+                  <app-h-wheel
+                    [items]="dayChips()"
+                    [selectedId]="selectedDayId()"
+                    (selectedIdChange)="onDayIdChange($event)"
+                  />
+                </div>
+                <div class="tutor-exam-detail__bp-cell" data-testid="deadline-hour-field">
+                  <p class="tutor-exam-detail__bp-label">Hora límite</p>
+                  <app-h-wheel
+                    [items]="hourChips()"
+                    [selectedId]="selectedHourId()"
+                    (selectedIdChange)="onHourIdChange($event)"
+                  />
+                </div>
+              }
+
+              <!-- Inputs datetime-local nativos (móvil-first). Reemplazan las
+                   ruedas cuando showHwheels() es false (modo tarea por defecto).
+                   El atributo min previene fechas de inicio en el pasado lejano;
+                   la validación client-side en el VM es la fuente de verdad. -->
+              @if (!vm.showHwheels()) {
+                <!-- Fecha de inicio (opcional): si el tutor no la toca, el examen
+                     abre inmediatamente al confirmar. -->
+                <div class="tutor-exam-detail__bp-cell" data-testid="started-at-field">
+                  <label for="started-at-input" class="tutor-exam-detail__bp-label">
+                    Fecha de inicio (opcional)
+                  </label>
+                  <input
+                    id="started-at-input"
+                    type="datetime-local"
+                    class="tutor-exam-detail__datetime-input"
+                    data-testid="started-at-input"
+                    [value]="vm.pendingStartedAt() ?? ''"
+                    (change)="onStartedAtChange($event)"
+                  />
+                  @if (vm.startedAtError()) {
+                    <p
+                      class="tutor-exam-detail__field-error"
+                      role="alert"
+                      data-testid="started-at-error"
+                    >
+                      {{ vm.startedAtError() }}
+                    </p>
+                  }
+                </div>
+
+                <!-- Fecha de cierre (obligatoria en modo tarea). -->
+                <div class="tutor-exam-detail__bp-cell" data-testid="open-until-dt-field">
+                  <label for="open-until-dt-input" class="tutor-exam-detail__bp-label">
+                    Fecha de cierre
+                  </label>
+                  <input
+                    id="open-until-dt-input"
+                    type="datetime-local"
+                    class="tutor-exam-detail__datetime-input"
+                    data-testid="open-until-dt-input"
+                    [value]="openUntilDatetimeLocal()"
+                    (change)="onOpenUntilChange($event)"
+                  />
+                </div>
+              }
             }
           </section>
 
@@ -367,6 +456,15 @@
                tutor confirma con contexto en lugar de descubrirlo al iniciar.
                Pill centrada con mono + tabular-nums para que los dígitos no
                salten al recomputar. -->
+          @if (vm.pendingMode() === 'tarea' && vm.pendingStartedAtDate(); as startedAt) {
+            <p class="tutor-exam-detail__deadline-preview" data-testid="opens-preview">
+              <span class="tutor-exam-detail__deadline-preview-label">Abre</span>
+              <span class="tutor-exam-detail__deadline-preview-value">
+                {{ formatDate(startedAt) }} · {{ formatTime(startedAt) }}
+              </span>
+            </p>
+          }
+
           @if (vm.pendingMode() === 'tarea' && vm.pendingOpenUntilDate(); as openUntil) {
             <p class="tutor-exam-detail__deadline-preview" data-testid="deadline-preview">
               <span class="tutor-exam-detail__deadline-preview-label">Cierra</span>
@@ -392,7 +490,9 @@
             type="button"
             class="tutor-exam-detail__modal-confirm tutor-exam-detail__modal-confirm--large"
             data-testid="btn-confirm-iniciar"
-            [disabled]="vm.isSaving()"
+            [disabled]="
+              vm.isSaving() || (vm.pendingMode() === 'tarea' && vm.isScheduledSubmitDisabled())
+            "
             (click)="onConfirmIniciarModal()"
           >
             Iniciar actividad
@@ -401,15 +501,20 @@
       </div>
     }
 
-    <!-- Lista de alumnos con checkboxes (D5: hasSubmitted + finalized → disabled) -->
-    <section class="tutor-exam-detail__students">
-      <div class="tutor-exam-detail__students-header">
-        <h2>Alumnos del aula</h2>
-        <span class="tutor-exam-detail__students-counter" data-testid="students-counter">
-          {{ vm.enabledCount() }} habilitados de {{ vm.totalStudents() }}
-        </span>
-      </div>
-      <!-- Lista compacta estilo iOS Settings: una sola card contenedora con
+    <!-- Roster de alumnos, botones Finalizar y Archivar. El bloque aparece
+         cuando el gate ya está superado. Para exámenes programados con
+         gate todavía activo, el roster queda oculto y el card de gate de
+         arriba muestra el CTA de reconciliación. Ver design.md D5, D7. -->
+    @if (vm.showRoster()) {
+      <!-- Lista de alumnos con checkboxes (D5: hasSubmitted + finalized → disabled) -->
+      <section class="tutor-exam-detail__students">
+        <div class="tutor-exam-detail__students-header">
+          <h2>Alumnos del aula</h2>
+          <span class="tutor-exam-detail__students-counter" data-testid="students-counter">
+            {{ vm.enabledCount() }} habilitados de {{ vm.totalStudents() }}
+          </span>
+        </div>
+        <!-- Lista compacta estilo iOS Settings: una sola card contenedora con
            dividers internos, filas densas para escanear cómodamente 60+
            alumnos sin scroll infinito. Cada fila es un label que envuelve
            el checkbox custom + nombre — click en cualquier parte del label
@@ -425,123 +530,125 @@
            dispare re-render. Con preventDefault el toggle nativo se bloquea
            y el signal es la única fuente de verdad. -->
 
-      <ul class="tutor-exam-detail__student-list">
-        <!-- Fila-buscador: integrada al mismo card como primera fila, con
+        <ul class="tutor-exam-detail__student-list">
+          <!-- Fila-buscador: integrada al mismo card como primera fila, con
              divider inferior automático via `+ &` en SCSS. Solo aparece cuando
              hay alumnos cargados — si el aula está vacía, no tiene sentido. -->
-        @if (vm.students().length > 0) {
-          <li class="tutor-exam-detail__student-search-row">
-            <span
-              class="material-symbols-outlined tutor-exam-detail__student-search-icon"
-              aria-hidden="true"
-            >
-              search
-            </span>
-            <input
-              type="search"
-              class="tutor-exam-detail__student-search-input"
-              data-testid="student-search-input"
-              placeholder="Buscar alumno..."
-              aria-label="Buscar alumno por apellido, nombre o código"
-              autocomplete="off"
-              autocorrect="off"
-              autocapitalize="off"
-              spellcheck="false"
-              [value]="vm.searchQuery()"
-              (input)="onSearchInput($event)"
-            />
-            @if (vm.searchQuery().length > 0) {
-              <button
-                type="button"
-                class="tutor-exam-detail__student-search-clear"
-                data-testid="student-search-clear"
-                aria-label="Limpiar búsqueda"
-                (click)="onClearSearch()"
+          @if (vm.students().length > 0) {
+            <li class="tutor-exam-detail__student-search-row">
+              <span
+                class="material-symbols-outlined tutor-exam-detail__student-search-icon"
+                aria-hidden="true"
               >
-                <span class="material-symbols-outlined" aria-hidden="true">close</span>
-              </button>
-            }
-          </li>
-        }
-        @for (student of vm.visibleStudents(); track student.studentId) {
-          <li class="tutor-exam-detail__student-item" data-testid="student-item">
-            <label class="tutor-exam-detail__student-label">
+                search
+              </span>
               <input
-                type="checkbox"
-                class="tutor-exam-detail__student-checkbox-input"
-                data-testid="student-checkbox"
-                [checked]="isStudentEnabled(student.studentId)"
-                [disabled]="isCheckboxDisabled(student)"
-                (click)="$event.preventDefault(); onToggleStudent(student.studentId)"
+                type="search"
+                class="tutor-exam-detail__student-search-input"
+                data-testid="student-search-input"
+                placeholder="Buscar alumno..."
+                aria-label="Buscar alumno por apellido, nombre o código"
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="off"
+                spellcheck="false"
+                [value]="vm.searchQuery()"
+                (input)="onSearchInput($event)"
               />
-              <span class="tutor-exam-detail__student-checkbox" aria-hidden="true">
-                <span class="material-symbols-outlined">check</span>
-              </span>
-              <span class="tutor-exam-detail__student-name">
-                {{ student.lastName }}, {{ student.firstName }}
-              </span>
-              @if (student.hasSubmitted) {
-                <span class="tutor-exam-detail__submitted-badge">
-                  <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
-                  Entregado
-                </span>
+              @if (vm.searchQuery().length > 0) {
+                <button
+                  type="button"
+                  class="tutor-exam-detail__student-search-clear"
+                  data-testid="student-search-clear"
+                  aria-label="Limpiar búsqueda"
+                  (click)="onClearSearch()"
+                >
+                  <span class="material-symbols-outlined" aria-hidden="true">close</span>
+                </button>
               }
-            </label>
-          </li>
-        } @empty {
-          @if (vm.hasNoSearchMatches()) {
-            <li class="tutor-exam-detail__no-students" data-testid="no-search-matches">
-              <p>No hay alumnos que coincidan con la búsqueda.</p>
-            </li>
-          } @else {
-            <li class="tutor-exam-detail__no-students">
-              <p>No hay alumnos en el aula.</p>
             </li>
           }
-        }
-      </ul>
-    </section>
+          @for (student of vm.visibleStudents(); track student.studentId) {
+            <li class="tutor-exam-detail__student-item" data-testid="student-item">
+              <label class="tutor-exam-detail__student-label">
+                <input
+                  type="checkbox"
+                  class="tutor-exam-detail__student-checkbox-input"
+                  data-testid="student-checkbox"
+                  [checked]="isStudentEnabled(student.studentId)"
+                  [disabled]="isCheckboxDisabled(student)"
+                  (click)="$event.preventDefault(); onToggleStudent(student.studentId)"
+                />
+                <span class="tutor-exam-detail__student-checkbox" aria-hidden="true">
+                  <span class="material-symbols-outlined">check</span>
+                </span>
+                <span class="tutor-exam-detail__student-name">
+                  {{ student.lastName }}, {{ student.firstName }}
+                </span>
+                @if (student.hasSubmitted) {
+                  <span class="tutor-exam-detail__submitted-badge">
+                    <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+                    Entregado
+                  </span>
+                }
+              </label>
+            </li>
+          } @empty {
+            @if (vm.hasNoSearchMatches()) {
+              <li class="tutor-exam-detail__no-students" data-testid="no-search-matches">
+                <p>No hay alumnos que coincidan con la búsqueda.</p>
+              </li>
+            } @else {
+              <li class="tutor-exam-detail__no-students">
+                <p>No hay alumnos en el aula.</p>
+              </li>
+            }
+          }
+        </ul>
+      </section>
 
-    <!-- Escape hatch: finalizar antes de tiempo. Aparece solo cuando canFinalizar
+      <!-- Escape hatch: finalizar antes de tiempo. Aparece solo cuando canFinalizar
          es true (status=in_progress). Diseño intencionalmente discreto — la UX
          esperada es dejar que el countdown expire, no cortar el examen manualmente. -->
-    @if (canFinalizar()) {
-      <section class="tutor-exam-detail__finalizar-early">
-        <p class="tutor-exam-detail__finalizar-early-hint">
-          ¿Necesitás cerrar antes del tiempo previsto?
-        </p>
-        <button
-          type="button"
-          class="tutor-exam-detail__finalizar-early-btn"
-          data-testid="btn-finalizar"
-          [disabled]="vm.isSaving()"
-          (click)="onFinalizar()"
-        >
-          Finalizar ahora
-        </button>
-      </section>
-    }
+      @if (canFinalizar()) {
+        <section class="tutor-exam-detail__finalizar-early">
+          <p class="tutor-exam-detail__finalizar-early-hint">
+            ¿Necesitás cerrar antes del tiempo previsto?
+          </p>
+          <button
+            type="button"
+            class="tutor-exam-detail__finalizar-early-btn"
+            data-testid="btn-finalizar"
+            [disabled]="vm.isSaving()"
+            (click)="onFinalizar()"
+          >
+            Finalizar ahora
+          </button>
+        </section>
+      }
 
-    <!-- Archivar: aparece cuando el examen ya está finalizado (status=finalized).
+      <!-- Archivar: aparece cuando el examen ya está finalizado (status=finalized).
          Reutiliza el mismo cajón escape-hatch — la UX es "acción secundaria
          que saca este examen de la vista principal". Al confirmar, el detalle
          redirige a /tutor/home porque el examen deja de aparecer en la lista. -->
-    @if (canArchivar()) {
-      <section class="tutor-exam-detail__finalizar-early">
-        <p class="tutor-exam-detail__finalizar-early-hint">
-          Podés archivar el examen para sacarlo de la lista.
-        </p>
-        <button
-          type="button"
-          class="tutor-exam-detail__finalizar-early-btn"
-          data-testid="btn-archivar"
-          [disabled]="vm.isSaving()"
-          (click)="onArchivar()"
-        >
-          Archivar
-        </button>
-      </section>
+      @if (canArchivar()) {
+        <section class="tutor-exam-detail__finalizar-early">
+          <p class="tutor-exam-detail__finalizar-early-hint">
+            Podés archivar el examen para sacarlo de la lista.
+          </p>
+          <button
+            type="button"
+            class="tutor-exam-detail__finalizar-early-btn"
+            data-testid="btn-archivar"
+            [disabled]="vm.isSaving()"
+            (click)="onArchivar()"
+          >
+            Archivar
+          </button>
+        </section>
+      }
     }
+    <!-- cierre @if (vm.showRoster()) -->
 
     <!-- Modal: confirmar deshabilitar alumno mientras el examen está en curso.
          El alumno queda fuera del set de habilitados; al finalizar el grader

@@ -99,6 +99,11 @@ interface FinalizeResponseDto {
   jobId?: string;
 }
 
+interface RefreshEnabledResponseDto {
+  addedCount: number;
+  totalEnabledCount: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class HttpTutorExamsApi implements TutorExamsApi {
   private readonly http = inject(HttpClient);
@@ -194,15 +199,20 @@ export class HttpTutorExamsApi implements TutorExamsApi {
   }
 
   // POST /t/:slug/virtual-exams/:recordId/start
-  // Body opcional `{ duration?, openUntil? }`. Cuando `openUntil` viene, el
-  // examen arranca en modo "tarea" (ver TutorExamsApi.iniciar). Respuesta: 204.
-  async iniciar(recordId: string, opts?: { duration?: number; openUntil?: Date }): Promise<void> {
+  // Body opcional `{ duration?, openUntil?, started_at? }`. Cuando `openUntil` viene, el
+  // examen arranca en modo "tarea" (ver TutorExamsApi.iniciar). `started_at` en ISO 8601
+  // programa la apertura a futuro (ventana now-5min .. now+15d). Respuesta: 204.
+  async iniciar(
+    recordId: string,
+    opts?: { duration?: number; openUntil?: Date; startedAt?: Date },
+  ): Promise<void> {
     // Construimos el body dropeando keys undefined para no enviar `null`
     // implícito ni `{ duration: undefined }` — el server-side zod distingue
     // presencia con `.optional()`.
-    const payload: { duration?: number; openUntil?: string } = {};
+    const payload: { duration?: number; openUntil?: string; started_at?: string } = {};
     if (opts?.duration !== undefined) payload.duration = opts.duration;
     if (opts?.openUntil !== undefined) payload.openUntil = opts.openUntil.toISOString();
+    if (opts?.startedAt !== undefined) payload.started_at = opts.startedAt.toISOString();
     const body = Object.keys(payload).length > 0 ? payload : null;
     try {
       await firstValueFrom(
@@ -246,6 +256,31 @@ export class HttpTutorExamsApi implements TutorExamsApi {
           .post<void>(apiPath.virtualExamArchive(this.requireSlug(), recordId), null)
           .pipe(timeout(10_000)),
       );
+    } catch (err) {
+      throw this.classifyTutorError(err);
+    }
+  }
+
+  // POST /t/:slug/virtual-exams/:recordId/refresh-enabled — sin body.
+  // Reconcilia la lista de alumnos habilitados con las matrículas actuales del aula.
+  // Timeout: 10s. `withCredentials` lo agrega el credentials.interceptor global.
+  // Errores clasificados por status puro via classifyTutorError (design.md D2 + D8).
+  async refreshEnabled(
+    recordId: string,
+  ): Promise<{ addedCount: number; totalEnabledCount: number }> {
+    try {
+      const dto = await firstValueFrom(
+        this.http
+          .post<RefreshEnabledResponseDto>(
+            apiPath.virtualExamRefreshEnabled(this.requireSlug(), recordId),
+            null,
+          )
+          .pipe(timeout(10_000)),
+      );
+      return {
+        addedCount: dto.addedCount,
+        totalEnabledCount: dto.totalEnabledCount,
+      };
     } catch (err) {
       throw this.classifyTutorError(err);
     }

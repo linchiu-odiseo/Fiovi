@@ -86,6 +86,10 @@ class FakeTutorExamDetailViewModel {
   // Contadores del panel de alumnos.
   readonly enabledCount = () => this.enabledStudentIds().length;
   readonly totalStudents = () => this.students().length;
+  // Gate 2-estados del VM real; template consulta showRoster() para elegir
+  // entre roster y gate card. Writable en el fake para que scenarios puedan
+  // togglear (default true — la mayoría asume roster visible).
+  readonly showRoster: WritableSignal<boolean> = signal(true);
 
   canIniciar = vi.fn().mockReturnValue(false);
   canFinalizar = vi.fn().mockReturnValue(false);

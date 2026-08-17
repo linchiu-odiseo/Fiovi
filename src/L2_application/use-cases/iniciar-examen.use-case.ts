@@ -16,13 +16,24 @@ import { TutorExamsApi } from '../../L1_domain/ports/tutor-exams-api';
 // (contador server-side de duration, heredado). En modo tarea `duration`
 // sigue significando "tiempo por alumno una vez que arranca localmente" —
 // el server no lo usa para cerrar; sí lo consume el PWA como cap del countdown.
+//
+// `startedAt` opcional: cuando se pasa, el examen arranca en modo programado —
+// el back no abre la sesión a los alumnos hasta que `now >= startedAt`. El
+// server valida la ventana (now-5min .. now+15d, y startedAt < openUntil).
+// El adapter serializa el Date a ISO 8601 en el payload.
 export class IniciarExamenUseCase {
   constructor(private readonly api: TutorExamsApi) {}
 
-  async execute(req: { recordId: string; duration?: number; openUntil?: Date }): Promise<void> {
+  async execute(req: {
+    recordId: string;
+    duration?: number;
+    openUntil?: Date;
+    startedAt?: Date;
+  }): Promise<void> {
     return this.api.iniciar(req.recordId, {
       duration: req.duration,
       openUntil: req.openUntil,
+      startedAt: req.startedAt,
     });
   }
 }

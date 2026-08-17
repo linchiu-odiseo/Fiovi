@@ -222,6 +222,46 @@ export class TutorExamDetailPage {
     this.vm.editingDuration.set(false);
   }
 
+  protected onStartedAtChange(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    const value = target?.value ?? '';
+    this.vm.pendingStartedAt.set(value.length > 0 ? value : null);
+  }
+
+  protected onOpenUntilChange(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    const value = target?.value ?? '';
+    if (value.length === 0) return;
+    // Convertir el valor datetime-local a Date y usar la rueda para mantener
+    // la compatibilidad con pendingOpenUntilDate(). Como el datetime-local
+    // emite "YYYY-MM-DDTHH:mm" usamos Date para extraer dayOffset y hora.
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return;
+    const now = new Date();
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const inputMidnight = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const diffMs = inputMidnight.getTime() - todayMidnight.getTime();
+    const dayOffset = Math.round(diffMs / (24 * 60 * 60 * 1000));
+    const hour = d.getHours();
+    if (dayOffset < 0 || hour < 1 || hour > 23) return;
+    this.vm.pendingDeadlineDayOffset.set(dayOffset);
+    this.vm.pendingDeadlineHour.set(hour);
+    if (this.vm.openUntilError() !== null) this.vm.openUntilError.set(null);
+  }
+
+  /** Formatea pendingOpenUntilDate como string datetime-local para el input. */
+  protected openUntilDatetimeLocal(): string {
+    const d = this.vm.pendingOpenUntilDate();
+    if (d === null) return '';
+    // datetime-local espera "YYYY-MM-DDTHH:mm"
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mi = String(d.getMinutes()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+  }
+
   private parseIntInput(event: Event): number | null {
     const target = event.target as HTMLInputElement | null;
     if (!target) return null;
@@ -289,6 +329,12 @@ export class TutorExamDetailPage {
 
   protected onRetry(): void {
     void this.vm.retry();
+  }
+
+  // Delega al VM la reconciliación del gate de habilitados.
+  // Invocado por el botón "Actualizar lista" en el card de gate (Estado A).
+  protected onRefresh(): void {
+    void this.vm.handleRefresh();
   }
 
   // Duración en minutos redondeados — el back guarda segundos.

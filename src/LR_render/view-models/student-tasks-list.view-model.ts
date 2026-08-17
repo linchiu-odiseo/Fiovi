@@ -14,7 +14,14 @@ import { LogoutUseCase } from '../../L2_application/use-cases/logout.use-case';
 // Estados visuales de una card de tarea. Mismos que `home.view-model.ts` para
 // que la lógica de composición viaje idéntica — solo cambia el countdown
 // (humano en días/horas en vez de minutos crudos).
-export type TareaEstado = 'pendiente' | 'abierto' | 'enviado' | 'cerrado';
+// `programada`: el examen está in_progress en el server pero el `started` cae
+// en el futuro → el alumno no puede entrar aún, ve countdown/fecha de apertura.
+export type TareaEstado = 'pendiente' | 'abierto' | 'enviado' | 'cerrado' | 'programada';
+
+// Umbral para mostrar el countdown en formato "Faltan Xh Ym":
+// si la apertura está a menos de 24h, el countdown es visible.
+// Si es mayor o igual a 24h, solo se muestra la fecha (sin countdown).
+const SCHEDULED_COUNTDOWN_THRESHOLD_MS = 24 * 60 * 60 * 1_000;
 
 export type ServerErrorKind = 'network' | 'session-expired' | 'unknown';
 
@@ -133,10 +140,22 @@ export class StudentTasksListViewModel {
   }
 
   private buildCard(exam: Exam, ack: SubmissionAck | null, now: Date): TareaCard {
-    const estado = this.composeEstado(exam, ack);
+    const estado = this.composeEstado(exam, ack, now);
+    // Solo la card en estado 'abierto' permite navegación al simulacro.
     const clickable = estado === 'abierto';
     const closeAt = exam.openUntil;
     const remainingMs = closeAt !== null ? Math.max(0, closeAt.getTime() - now.getTime()) : 0;
+
+    // Datos de apertura programada (solo aplica cuando estado === 'programada').
+    let opensAt: Date | null = null;
+    let opensInText: string | null = null;
+    if (estado === 'programada' && exam.started !== null) {
+      opensAt = exam.started;
+      const diffMs = exam.started.getTime() - now.getTime();
+      if (diffMs > 0 && diffMs < SCHEDULED_COUNTDOWN_THRESHOLD_MS) {
+        opensInText = formatOpensIn(diffMs);
+      }
+    }
 
     return {
       id: exam.id,
@@ -147,23 +166,41 @@ export class StudentTasksListViewModel {
       clickable,
       closeAt,
       countdownText: closeAt !== null ? formatRestanteTarea(remainingMs) : '',
+      opensAt,
+      opensInText,
     };
   }
 
   // Mismo criterio de composición que `home.view-model.ts` — la puerta es
   // `serverStatus`, el ack define enviado.
-  private composeEstado(exam: Exam, ack: SubmissionAck | null): TareaEstado {
+  // `programada`: in_progress pero el `started` del examen cae en el futuro.
+  // La auto-transición programada → abierto la dispara el ticker de 30s
+  // al recomputar cards — no se necesita lógica adicional.
+  private composeEstado(exam: Exam, ack: SubmissionAck | null, now: Date): TareaEstado {
     switch (exam.serverStatus.value) {
       case 'scheduled':
         return 'pendiente';
       case 'in_progress':
         if (ack !== null) return 'enviado';
+        // REQ-PA-02: started en el futuro → estado 'programada'.
+        if (exam.started !== null && now.getTime() < exam.started.getTime()) {
+          return 'programada';
+        }
         return 'abierto';
       case 'finalized':
         if (ack !== null) return 'enviado';
         return 'cerrado';
     }
   }
+}
+
+// Formatea la diferencia en ms como "Faltan Xh Ym" para el countdown de apertura.
+// Solo se llama cuando diffMs < 24h (el caller garantiza el threshold).
+function formatOpensIn(diffMs: number): string {
+  const totalMinutes = Math.ceil(diffMs / 60_000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `Faltan ${hours}h ${minutes}min`;
 }
 
 export interface TareaCard {
@@ -175,4 +212,9 @@ export interface TareaCard {
   clickable: boolean;
   closeAt: Date | null;
   countdownText: string;
+  // Fecha de apertura programada. Solo no-null cuando estado === 'programada'.
+  opensAt: Date | null;
+  // Texto de countdown "Faltan Xh Ym" cuando la apertura está a < 24h.
+  // null cuando la apertura está a >= 24h o cuando estado !== 'programada'.
+  opensInText: string | null;
 }

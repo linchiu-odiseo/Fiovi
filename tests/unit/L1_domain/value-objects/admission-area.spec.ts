@@ -1,19 +1,21 @@
 import { describe, it, expect } from 'vitest';
 import {
-  AdmissionArea,
+  KnownAdmissionArea,
   ADMISSION_AREAS,
   DEFAULT_ADMISSION_AREA,
   isAdmissionArea,
+  isKnownAdmissionArea,
 } from '../../../../src/L1_domain/value-objects/admission-area';
 
 // VO de área de POSTULACIÓN del alumno (NO confundir con Exam.area — curso).
-// Set cerrado de 16 valores hardcoded en L1 (design.md D2 de
-// `add-admission-area`): guard por igualdad estricta, sin factory, sin Zod.
-// Estos tests son el contrato del set — si crece o se reordena, la UI del
-// picker (grid rígido 3×6 con GENERAL span-3) deja de calzar.
+// Con `exam-admission-areas-picker` (2026-08-15), el union es ABIERTO:
+// `AdmissionArea = KnownAdmissionArea | (string & {})`. Las 16 hardcoded
+// siguen viviendo como `KnownAdmissionArea` (con autocomplete y layout
+// especial GENERAL span-3), pero el back es autoridad y puede mandar labels
+// arbitrarios que el picker renderiza tal cual.
 describe('AdmissionArea', () => {
-  describe('isAdmissionArea — set cerrado de 16 valores', () => {
-    const VALID: readonly AdmissionArea[] = [
+  describe('isAdmissionArea — guard relajado (cualquier string no vacío)', () => {
+    const KNOWN_VALID: readonly KnownAdmissionArea[] = [
       'A',
       'A1',
       'B',
@@ -32,24 +34,34 @@ describe('AdmissionArea', () => {
       'GENERAL',
     ];
 
-    it.each(VALID)('acepta "%s" (miembro del set)', (value) => {
+    it.each(KNOWN_VALID)('acepta "%s" (miembro del set conocido)', (value) => {
       expect(isAdmissionArea(value)).toBe(true);
     });
 
-    it('rechaza "VI" (romano fuera del set — defensa contra "y si agregan uno más")', () => {
-      expect(isAdmissionArea('VI')).toBe(false);
+    // Post-rollout: acepta strings arbitrarios del back — el back es
+    // autoridad sobre qué áreas existen (learnex snapshot de ExamStructureArea.name).
+    it('acepta "VI" (label arbitrario del back — union abierto)', () => {
+      expect(isAdmissionArea('VI')).toBe(true);
     });
 
-    it('rechaza "a" (letra minúscula — el set es case-sensitive)', () => {
-      expect(isAdmissionArea('a')).toBe(false);
+    it('acepta "a" (case-sensitive ya no importa — cualquier string va)', () => {
+      expect(isAdmissionArea('a')).toBe(true);
     });
 
-    it('rechaza "general" (lowercase — no matchea DEFAULT_ADMISSION_AREA)', () => {
-      expect(isAdmissionArea('general')).toBe(false);
+    it('acepta "general" lowercase (el back puede mandarlo tal cual)', () => {
+      expect(isAdmissionArea('general')).toBe(true);
+    });
+
+    it('acepta "Z-CUSTOM" (label con guión — string arbitrario)', () => {
+      expect(isAdmissionArea('Z-CUSTOM')).toBe(true);
     });
 
     it('rechaza string vacío', () => {
       expect(isAdmissionArea('')).toBe(false);
+    });
+
+    it('rechaza string solo con whitespace', () => {
+      expect(isAdmissionArea('   ')).toBe(false);
     });
 
     it('rechaza null', () => {
@@ -66,6 +78,32 @@ describe('AdmissionArea', () => {
 
     it('rechaza objeto ({})', () => {
       expect(isAdmissionArea({})).toBe(false);
+    });
+  });
+
+  describe('isKnownAdmissionArea — narrower para las 16 conocidas', () => {
+    it('acepta "APT" (miembro del set conocido)', () => {
+      expect(isKnownAdmissionArea('APT')).toBe(true);
+    });
+
+    it('acepta "GENERAL" (default)', () => {
+      expect(isKnownAdmissionArea('GENERAL')).toBe(true);
+    });
+
+    it('rechaza "VI" (fuera del set conocido — string arbitrario del back)', () => {
+      expect(isKnownAdmissionArea('VI')).toBe(false);
+    });
+
+    it('rechaza "general" (case-sensitive)', () => {
+      expect(isKnownAdmissionArea('general')).toBe(false);
+    });
+
+    it('rechaza string vacío', () => {
+      expect(isKnownAdmissionArea('')).toBe(false);
+    });
+
+    it('rechaza null', () => {
+      expect(isKnownAdmissionArea(null)).toBe(false);
     });
   });
 

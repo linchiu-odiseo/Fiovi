@@ -92,6 +92,38 @@
               <span class="material-symbols-outlined" aria-hidden="true">schedule</span>
               Pendiente de que el tutor la active
             </p>
+          } @else if (card.estado === 'programada') {
+            <!-- Estado programada: el examen está in_progress en el server pero
+                 opened_at cae en el futuro. El alumno ve la fecha de apertura y
+                 un countdown si la apertura está a < 24h. No puede iniciar. -->
+            <div class="task-card__programada" data-testid="programada-block">
+              <p class="task-card__status task-card__status--programada">
+                <span class="material-symbols-outlined" aria-hidden="true">lock_clock</span>
+                PROGRAMADA
+              </p>
+              @if (card.opensAt) {
+                <p class="task-card__opens-at" data-testid="opens-at-text">
+                  🔒 Abre el {{ formatOpensAt(card.opensAt) }}
+                </p>
+              }
+              @if (card.opensInText) {
+                <p class="task-card__countdown-open" data-testid="countdown-text">
+                  {{ card.opensInText }}
+                </p>
+              }
+            </div>
+          }
+
+          @if (card.estado === 'programada') {
+            <button
+              type="button"
+              class="task-card__btn-disabled"
+              data-testid="btn-no-disponible"
+              disabled
+              aria-disabled="true"
+            >
+              No disponible aún
+            </button>
           }
 
           @if (card.clickable) {

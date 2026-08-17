@@ -521,7 +521,12 @@ export class FakeTutorExamsApi implements TutorExamsApi {
   // los tests existentes; `iniciarCallsFull` registra también duration + openUntil
   // para los tests nuevos del override al iniciar y modo tarea.
   private iniciarCalls: string[] = [];
-  private iniciarCallsFull: { recordId: string; duration?: number; openUntil?: Date }[] = [];
+  private iniciarCallsFull: {
+    recordId: string;
+    duration?: number;
+    openUntil?: Date;
+    startedAt?: Date;
+  }[] = [];
 
   willResolveIniciar(): void {
     this.nextIniciar = { kind: 'resolve' };
@@ -539,16 +544,21 @@ export class FakeTutorExamsApi implements TutorExamsApi {
     recordId: string;
     duration?: number;
     openUntil?: Date;
+    startedAt?: Date;
   }[] {
     return this.iniciarCallsFull;
   }
 
-  async iniciar(recordId: string, opts?: { duration?: number; openUntil?: Date }): Promise<void> {
+  async iniciar(
+    recordId: string,
+    opts?: { duration?: number; openUntil?: Date; startedAt?: Date },
+  ): Promise<void> {
     this.iniciarCalls.push(recordId);
     this.iniciarCallsFull.push({
       recordId,
       duration: opts?.duration,
       openUntil: opts?.openUntil,
+      startedAt: opts?.startedAt,
     });
     if (!this.nextIniciar) {
       throw new Error(
@@ -612,6 +622,38 @@ export class FakeTutorExamsApi implements TutorExamsApi {
       );
     }
     if (this.nextArchivar.kind === 'reject') throw this.nextArchivar.error;
+  }
+
+  // --- refreshEnabled ---
+  private nextRefreshEnabled:
+    | { kind: 'resolve'; result: { addedCount: number; totalEnabledCount: number } }
+    | { kind: 'reject'; error: Error }
+    | null = null;
+  private refreshEnabledCalls: string[] = [];
+
+  willResolveRefreshEnabled(result: { addedCount: number; totalEnabledCount: number }): void {
+    this.nextRefreshEnabled = { kind: 'resolve', result };
+  }
+
+  willRejectRefreshEnabled(error: Error): void {
+    this.nextRefreshEnabled = { kind: 'reject', error };
+  }
+
+  getRefreshEnabledCalls(): readonly string[] {
+    return this.refreshEnabledCalls;
+  }
+
+  async refreshEnabled(
+    recordId: string,
+  ): Promise<{ addedCount: number; totalEnabledCount: number }> {
+    this.refreshEnabledCalls.push(recordId);
+    if (!this.nextRefreshEnabled) {
+      throw new Error(
+        'FakeTutorExamsApi: configurar willResolveRefreshEnabled o willRejectRefreshEnabled antes de llamar refreshEnabled()',
+      );
+    }
+    if (this.nextRefreshEnabled.kind === 'reject') throw this.nextRefreshEnabled.error;
+    return this.nextRefreshEnabled.result;
   }
 }
 

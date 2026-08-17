@@ -151,6 +151,7 @@
   }
 
   &__bp-label {
+    display: block;
     margin: 0;
     font-family: var(--font-mono, monospace);
     font-size: 0.65rem;
@@ -260,6 +261,44 @@
         cursor: not-allowed;
       }
     }
+  }
+
+  // Gate de reconciliación (reconcile-enabled-on-start-gate).
+  // Mismo look que __actions para el CTA (full width, alto grande) pero con
+  // caption discreto debajo — el botón es la acción, el texto solo aclara.
+  &__gate-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    margin-top: var(--space-sm);
+
+    button {
+      width: 100%;
+      min-height: 2.75rem;
+      padding: 0 var(--space-md);
+      border-radius: var(--radius);
+      border: 1px solid transparent;
+      font-family: var(--font-body);
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition:
+        background 120ms ease,
+        border-color 120ms ease;
+
+      &:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+    }
+  }
+
+  &__gate-card-caption {
+    margin: 0;
+    color: var(--color-on-surface-variant);
+    font-size: 0.8rem;
+    text-align: center;
+    opacity: 0.7;
   }
 
   &__btn-iniciar {

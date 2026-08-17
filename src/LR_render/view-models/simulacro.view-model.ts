@@ -26,6 +26,7 @@ import { SimulacroCerradoError } from '../../L1_domain/errors/simulacro-cerrado.
 import { SimulacroNoAsignadoError } from '../../L1_domain/errors/simulacro-no-asignado.error';
 import { InvalidSubmissionTimeError } from '../../L1_domain/errors/invalid-submission-time.error';
 import { InvalidPayloadError } from '../../L1_domain/errors/invalid-payload.error';
+import { ExamNotOpenYetError } from '../../L1_domain/errors/exam-not-open-yet.error';
 
 // Razón de redirect al /home, lo usa el view-model para no renderizar UI de
 // error en la página. Si en el futuro queremos un toast global, el `flash`
@@ -39,6 +40,7 @@ export type SimulacroErrorState =
   | 'network'
   | 'invalid-submission-time'
   | 'invalid-payload'
+  | 'not-open-yet'
   | 'unknown';
 
 // Estado del flujo de envío. 'idle' antes de cualquier intento;
@@ -106,6 +108,10 @@ export class SimulacroPageViewModel {
   readonly nowTick = signal<Date>(this.clock.now());
   readonly isSubmitting = signal(false);
   readonly submissionState = signal<SubmissionState>('idle');
+  // Mensaje de toast cuando el back rechaza el submit/draft con 422
+  // exam_not_open_yet. Contiene la fecha formateada es-PE si el error trae
+  // startedAt válido, o el fallback "Este examen aún no abre".
+  readonly notOpenYetMessage = signal<string | null>(null);
   // Comprobante criptográfico del último envío exitoso. Cuando es no-null,
   // el page renderiza `<app-submission-receipt-modal>` y NO navega: el alumno
   // ve el recibo. `onReceiptClose()` lo limpia y dispara el redirect a /home.
@@ -124,6 +130,14 @@ export class SimulacroPageViewModel {
   // materializa en storage (design.md D3 de add-admission-area).
   // NO confundir con `Exam.area` (curso: Letras/Ciencias/Números).
   readonly admissionArea = signal<AdmissionArea>(DEFAULT_ADMISSION_AREA);
+
+  // Subset del back para el picker (learnex PR #816 snapshot desde
+  // ExamStructureArea.name). `null` = sin restricción → picker muestra los
+  // 16 defaults. Array = subset elegible → picker muestra solo esos strings
+  // en ese orden. Puro derivado del examen actual; no hay estado propio.
+  readonly allowedAdmissionAreas: Signal<readonly string[] | null> = computed(
+    () => this.exam()?.allowedAdmissionAreas ?? null,
+  );
 
   // Signal opcional para UI futura. Hoy queda en 'idle' — el dispatcher no
   // expone ganchos para actualizarla. Change posterior los agregará cuando
@@ -753,6 +767,16 @@ export class SimulacroPageViewModel {
   // Aun así lo dejamos por defensa: si llegara, lo tratamos como red caída.
   private handleSubmissionError(err: unknown): void {
     this.submissionState.set('error');
+    // REQ-PA-03-VM: ExamNotOpenYetError → toast con fecha o fallback.
+    // Clasificación por instanceof (tipo), NUNCA por error.message.
+    if (err instanceof ExamNotOpenYetError) {
+      const msg = this.formatNotOpenYetMessage(err);
+      this.notOpenYetMessage.set(msg);
+      this.errorState.set('not-open-yet');
+      // No redirigir — el alumno se queda en la cartilla viendo el mensaje.
+      // El examen puede abrir en segundos; forzar redirect a /home sería peor UX.
+      return;
+    }
     if (err instanceof SimulacroCerradoError) {
       // El back rechazó el envío porque el examen ya cerró. Aprovechamos que
       // ya sabemos que hay potencialmente una fila del alumno en BD
@@ -798,6 +822,22 @@ export class SimulacroPageViewModel {
     this.errorState.set('unknown');
     void this.router.navigate(['/home']);
     throw err;
+  }
+
+  // Formatea el mensaje de "examen no abierto" con fecha es-PE si está disponible.
+  // Lógica: si startedAt es un Date válido → "Este examen abre el {fecha es-PE}".
+  //         Si es null o Invalid Date → "Este examen aún no abre".
+  // Usa instanceof ExamNotOpenYetError para acceder a startedAt (tipo, no message).
+  private formatNotOpenYetMessage(err: ExamNotOpenYetError): string {
+    const d = err.startedAt;
+    if (d === null || Number.isNaN(d.getTime())) {
+      return 'Este examen aún no abre';
+    }
+    const formatted = new Intl.DateTimeFormat('es-PE', {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    }).format(d);
+    return `Este examen abre el ${formatted}`;
   }
 
   private async loadMarcaciones(e: Exam): Promise<void> {
