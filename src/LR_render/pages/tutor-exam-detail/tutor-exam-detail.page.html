@@ -438,6 +438,8 @@
                         class="tutor-exam-detail__datetime-input"
                         data-testid="started-at-input"
                         [value]="vm.pendingStartedAt() ?? ''"
+                        [min]="vm.startedAtMinAttr()"
+                        [max]="vm.startedAtMaxAttr()"
                         (change)="onStartedAtChange($event)"
                       />
                       <span
@@ -469,7 +471,10 @@
                 }
 
                 <!-- Fecha de cierre (obligatoria en modo tarea). Sin default:
-                     el tutor debe elegir antes de poder confirmar. -->
+                     el tutor debe elegir antes de poder confirmar. min/max
+                     acotan el picker nativo (prevención de primer nivel); si
+                     igual llega una fecha inválida (escritura manual, edge de
+                     timezone) el error debajo del input avisa inmediato. -->
                 <div class="tutor-exam-detail__bp-cell" data-testid="open-until-dt-field">
                   <label for="open-until-dt-input" class="tutor-exam-detail__bp-label">
                     Fecha de cierre
@@ -480,7 +485,9 @@
                       type="datetime-local"
                       class="tutor-exam-detail__datetime-input"
                       data-testid="open-until-dt-input"
-                      [value]="openUntilDatetimeLocal()"
+                      [value]="vm.pendingOpenUntil() ?? ''"
+                      [min]="vm.openUntilMinAttr()"
+                      [max]="vm.openUntilMaxAttr()"
                       (change)="onOpenUntilChange($event)"
                     />
                     <span
@@ -489,6 +496,15 @@
                       >calendar_month</span
                     >
                   </div>
+                  @if (vm.openUntilError()) {
+                    <p
+                      class="tutor-exam-detail__field-error"
+                      role="alert"
+                      data-testid="open-until-error"
+                    >
+                      {{ vm.openUntilError() }}
+                    </p>
+                  }
                 </div>
               }
             }
@@ -538,11 +554,10 @@
             </p>
           }
 
-          @if (vm.openUntilError()) {
-            <p class="tutor-exam-detail__modal-error" role="alert" data-testid="open-until-error">
-              {{ vm.openUntilError() }}
-            </p>
-          }
+          <!-- openUntilError se renderiza inline debajo del input de cierre
+               (arriba, dentro de `open-until-dt-field`) para que el usuario
+               vea el problema al lado de la fecha que eligió. NO duplicar
+               acá — el feedback ambiguo distancia error y causa. -->
 
           <button
             type="button"

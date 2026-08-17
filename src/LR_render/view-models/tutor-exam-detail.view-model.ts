@@ -219,7 +219,13 @@ export class TutorExamDetailViewModel {
   readonly pendingMode = signal<'examen' | 'tarea'>('examen');
   readonly pendingDeadlineDayOffset = signal<number | null>(null);
   readonly pendingDeadlineHour = signal<number | null>(null);
-  readonly openUntilError = signal<string | null>(null);
+
+  // Source of truth para el flujo datetime-local (formato "YYYY-MM-DDTHH:mm").
+  // Preserva minutos (los signals legacy `dayOffset`+`hour` perdían precisión
+  // al reconstruir con setHours(h, 0, 0, 0)). `null` = tutor no eligió aún.
+  // Los signals legacy siguen viviendo como fallback para no romper tests
+  // que los setean directamente (spec de VM).
+  readonly pendingOpenUntil = signal<string | null>(null);
 
   // ── Señales para la programación de apertura (startedAt) ─────────────────
   // Cuando el modal está en modo "tarea", el tutor puede opcionalmente
@@ -333,11 +339,17 @@ export class TutorExamDetailViewModel {
   }
 
   /**
-   * Fecha absoluta de cierre derivada del día + hora seleccionados. Toma
-   * `now`, avanza `dayOffset` días, y setea la hora entera con minuto/seg 0.
-   * Retorna null cuando alguno de los signals es null.
+   * Fecha absoluta de cierre derivada del datetime-local (source of truth) o,
+   * como fallback, del día+hora legacy (h-wheels). El fallback existe SOLO
+   * para no romper tests que setean directamente `pendingDeadlineDayOffset`
+   * y `pendingDeadlineHour`; el flujo real usa `pendingOpenUntil`.
    */
   readonly pendingOpenUntilDate = computed<Date | null>(() => {
+    const raw = this.pendingOpenUntil();
+    if (raw !== null && raw.length > 0) {
+      const d = new Date(raw);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
     const offset = this.pendingDeadlineDayOffset();
     const hour = this.pendingDeadlineHour();
     if (offset === null || hour === null) return null;
@@ -346,6 +358,76 @@ export class TutorExamDetailViewModel {
     d.setDate(d.getDate() + offset);
     d.setHours(hour, 0, 0, 0);
     return d;
+  });
+
+  /**
+   * Error de validación de `openUntil` derivado del estado. Aplica solo en
+   * modo tarea. Reglas (en orden): (a) raw seteado que no parsea → fecha
+   * inválida; (b) sin fecha → sin error (helper text aparte); (c) fecha en
+   * el pasado; (d) fecha > now + 15d; (e) lapso menor a la duración del
+   * examen (openUntil - startedAt < duration).
+   *
+   * NOTA: la copy `'Tope 15 días'` está congelada por un test que la aserta
+   * literal (spec del VM). No cambiar sin actualizar el spec.
+   */
+  readonly openUntilError = computed<string | null>(() => {
+    if (this.pendingMode() !== 'tarea') return null;
+
+    const raw = this.pendingOpenUntil();
+    if (raw !== null && raw.length > 0) {
+      const parsed = new Date(raw);
+      if (Number.isNaN(parsed.getTime())) return 'Fecha inválida.';
+    }
+
+    const d = this.pendingOpenUntilDate();
+    if (d === null) return null; // Sin fecha aún: no es error, la helper text avisa.
+
+    const now = Date.now();
+    if (d.getTime() < now) return 'La fecha ya pasó.';
+    if (d.getTime() > now + HOMEWORK_MAX_WINDOW_MS) return 'Tope 15 días';
+
+    // Guard de duración: el lapso entre apertura (o AHORA) y cierre debe
+    // alcanzar para que el examen quepa. Sin esto, el server rechaza al
+    // arrancar y el tutor se lleva el error tarde. Ceil de minutos para
+    // que la copy sea legible ("30 min" en vez de "29.5 min").
+    const durationSec = this.detail()?.duration ?? 0;
+    const startAnchor = this.pendingStartedAtDate()?.getTime() ?? now;
+    const lapseMs = d.getTime() - startAnchor;
+    if (durationSec > 0 && lapseMs < durationSec * 1000) {
+      const durationMin = Math.ceil(durationSec / 60);
+      return `El lapso debe ser al menos ${durationMin} min (duración del examen).`;
+    }
+    return null;
+  });
+
+  /**
+   * `min`/`max` para los inputs datetime-local. Prevención de primer nivel:
+   * el picker nativo NO permite elegir fechas fuera del rango — el error
+   * computed queda como red de seguridad para escritura manual y edge cases
+   * de timezone. Formato requerido por el input: "YYYY-MM-DDTHH:mm".
+   *
+   * - openUntilMinAttr: AHORA (no cerrar en el pasado).
+   * - openUntilMaxAttr: AHORA + 15d (regla HOMEWORK_MAX_WINDOW_MS).
+   * - startedAtMinAttr: AHORA - CLOCK_SKEW_MS (tolerancia de reloj).
+   * - startedAtMaxAttr: openUntil - duración (para que el examen quepa)
+   *   o AHORA + 15d si el tutor todavía no eligió cierre.
+   */
+  readonly openUntilMinAttr = computed<string>(() =>
+    this.toDatetimeLocalString(new Date()),
+  );
+  readonly openUntilMaxAttr = computed<string>(() =>
+    this.toDatetimeLocalString(new Date(Date.now() + HOMEWORK_MAX_WINDOW_MS)),
+  );
+  readonly startedAtMinAttr = computed<string>(() =>
+    this.toDatetimeLocalString(new Date(Date.now() - CLOCK_SKEW_MS)),
+  );
+  readonly startedAtMaxAttr = computed<string>(() => {
+    const openUntil = this.pendingOpenUntilDate();
+    const durationSec = this.detail()?.duration ?? 0;
+    if (openUntil === null) {
+      return this.toDatetimeLocalString(new Date(Date.now() + HOMEWORK_MAX_WINDOW_MS));
+    }
+    return this.toDatetimeLocalString(new Date(openUntil.getTime() - durationSec * 1000));
   });
 
   /**
@@ -573,10 +655,10 @@ export class TutorExamDetailViewModel {
     this.pendingMode.set('examen');
     this.pendingDeadlineDayOffset.set(null);
     this.pendingDeadlineHour.set(null);
+    this.pendingOpenUntil.set(null);
     this.pendingStartedAt.set(null);
     this.pendingStartedAtEditing.set(false);
     this.durationError.set(null);
-    this.openUntilError.set(null);
     this.editingDuration.set(false);
     this.iniciarModalOpen.set(true);
   }
@@ -587,37 +669,29 @@ export class TutorExamDetailViewModel {
     this.pendingMode.set('examen');
     this.pendingDeadlineDayOffset.set(null);
     this.pendingDeadlineHour.set(null);
+    this.pendingOpenUntil.set(null);
     this.pendingStartedAt.set(null);
     this.pendingStartedAtEditing.set(false);
     this.durationError.set(null);
-    this.openUntilError.set(null);
     this.editingDuration.set(false);
   }
 
-  // Valida y parsea `openUntil`/`startedAt` en modo "tarea".
-  // Side-effect: setea openUntilError con la copy correspondiente si falla.
-  // Return: `null` si la validación falló, sino `{ openUntil, startedAt? }`.
-  // Server también rechaza fuera de rango con 422 — acá es UX temprana.
+  // Valida y arma el payload de `openUntil`/`startedAt` en modo "tarea".
+  // Los errores ya se derivan por computeds (openUntilError, startedAtError)
+  // y bloquean el botón (isScheduledSubmitDisabled). Acá solo garantizamos
+  // que hay valores válidos para armar el payload.
+  // Return: `null` si falta info o si algún computed reporta error (no debería
+  // pasar en la práctica porque el botón queda disabled — segunda línea de
+  // defensa contra confirm por doble click / bypass programático).
   private validateTareaModeInputs(): {
     openUntil: Date;
     startedAt: Date | undefined;
   } | null {
     const parsed = this.pendingOpenUntilDate();
-    if (parsed === null) {
-      this.openUntilError.set('Elegí día y hora de cierre.');
-      return null;
-    }
-    if (parsed.getTime() <= Date.now()) {
-      this.openUntilError.set('La hora ya pasó. Elegí otro día u otra hora.');
-      return null;
-    }
-    if (parsed.getTime() > Date.now() + HOMEWORK_MAX_WINDOW_MS) {
-      this.openUntilError.set('Tope 15 días');
-      return null;
-    }
-    if (this.startedAtError() !== null) {
-      return null;
-    }
+    if (parsed === null) return null;
+    if (this.openUntilError() !== null) return null;
+    if (this.startedAtError() !== null) return null;
+
     const rawStartedAt = this.pendingStartedAt();
     let startedAt: Date | undefined;
     if (rawStartedAt !== null) {
@@ -668,10 +742,10 @@ export class TutorExamDetailViewModel {
 
     this.iniciarModalOpen.set(false);
     this.durationError.set(null);
-    this.openUntilError.set(null);
     this.pendingMinutes.set(null);
     this.pendingDeadlineDayOffset.set(null);
     this.pendingDeadlineHour.set(null);
+    this.pendingOpenUntil.set(null);
     this.pendingStartedAt.set(null);
     this.editingDuration.set(false);
 
@@ -975,6 +1049,17 @@ export class TutorExamDetailViewModel {
         if (err instanceof NetworkError) return 'Sin conexión. Revisá tu red y reintentá.';
         return 'Ocurrió un error al actualizar los alumnos. Reintentá.';
     }
+  }
+
+  // Format helper para inputs datetime-local (formato "YYYY-MM-DDTHH:mm").
+  // Funcional puro: no toca signals, se puede llamar desde cualquier computed.
+  // Vive acá y no en `utils/` porque solo se usa desde este VM (por ahora).
+  private toDatetimeLocalString(d: Date): string {
+    const pad = (n: number): string => String(n).padStart(2, '0');
+    return (
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+      `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+    );
   }
 
   // ── Countdown ticker lifecycle ───────────────────────────────────────────

@@ -90,3 +90,4 @@ Auto-generado por `.claude/hooks/log-agent-usage.ps1` en cada PostToolUse del to
 | 2026-07-14 18:03:42 | hexagonal-guard  | Hexagonal boundaries audit                                       | opus-4-7 | 47,057       | --    | --       | $0.3554   |
 | 2026-07-14 22:36:13 | Explore          | Map all Identity property consumers                              | opus-4-7 | 40,265       | --    | --       | $0.2069   |
 | 2026-08-17 09:45:21 | frontend-builder | Implement tarea modal UX changes | opus-4-7 | 109,622 | -- | -- | $0.2501 |
+| 2026-08-17 10:16:06 | frontend-builder | Fix silent bug + add prevention guards | opus-4-7 | 107,988 | -- | -- | $0.2825 |
