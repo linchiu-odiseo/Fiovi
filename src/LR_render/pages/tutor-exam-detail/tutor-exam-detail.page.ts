@@ -93,7 +93,6 @@ export class TutorExamDetailPage {
     const n = Number(id);
     if (!Number.isFinite(n) || !Number.isInteger(n)) return;
     this.vm.pendingDeadlineDayOffset.set(n);
-    if (this.vm.openUntilError() !== null) this.vm.openUntilError.set(null);
 
     // Si al cambiar de día la hora previamente seleccionada quedó fuera del
     // rango válido (ej. venía MAÑ + 5h y se cambia a HOY a las 15h), snapear
@@ -103,7 +102,7 @@ export class TutorExamDetailPage {
     const firstValid = TutorExamDetailViewModel.firstValidHour(n);
     if (firstValid === null) {
       // Caso extremo: HOY a las 23h+ → no queda ninguna hora válida para HOY.
-      // Cae al mensaje "elegí día y hora" de la validación de confirm.
+      // El botón "Iniciar actividad" queda disabled (isScheduledSubmitDisabled).
       this.vm.pendingDeadlineHour.set(null);
       return;
     }
@@ -117,7 +116,6 @@ export class TutorExamDetailPage {
     const n = Number(id);
     if (!Number.isFinite(n) || !Number.isInteger(n)) return;
     this.vm.pendingDeadlineHour.set(n);
-    if (this.vm.openUntilError() !== null) this.vm.openUntilError.set(null);
   }
 
   // Ref al input de edit inline de duración. Autofoco + select al entrar
@@ -208,10 +206,9 @@ export class TutorExamDetailPage {
   }
 
   protected onModeChange(mode: 'examen' | 'tarea'): void {
+    // El error de fecha ya deriva del modo (computed openUntilError retorna
+    // null cuando pendingMode !== 'tarea'), así que no hay que limpiarlo.
     this.vm.pendingMode.set(mode);
-    // Al cambiar de modo limpio el error de fecha si el usuario venía
-    // corrigiéndolo — evita mostrar mensajes viejos que ya no aplican.
-    this.vm.openUntilError.set(null);
   }
 
   protected startEditDuration(): void {
@@ -228,38 +225,24 @@ export class TutorExamDetailPage {
     this.vm.pendingStartedAt.set(value.length > 0 ? value : null);
   }
 
-  protected onOpenUntilChange(event: Event): void {
-    const target = event.target as HTMLInputElement | null;
-    const value = target?.value ?? '';
-    if (value.length === 0) return;
-    // Convertir el valor datetime-local a Date y usar la rueda para mantener
-    // la compatibilidad con pendingOpenUntilDate(). Como el datetime-local
-    // emite "YYYY-MM-DDTHH:mm" usamos Date para extraer dayOffset y hora.
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return;
-    const now = new Date();
-    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const inputMidnight = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    const diffMs = inputMidnight.getTime() - todayMidnight.getTime();
-    const dayOffset = Math.round(diffMs / (24 * 60 * 60 * 1000));
-    const hour = d.getHours();
-    if (dayOffset < 0 || hour < 1 || hour > 23) return;
-    this.vm.pendingDeadlineDayOffset.set(dayOffset);
-    this.vm.pendingDeadlineHour.set(hour);
-    if (this.vm.openUntilError() !== null) this.vm.openUntilError.set(null);
+  /**
+   * Toggle del bloque "Iniciar tarea desde": expande/colapsa el input
+   * datetime-local de startedAt. Al colapsar, el VM limpia pendingStartedAt
+   * para que el server abra el examen inmediatamente al confirmar.
+   */
+  protected onToggleStartedAtEditing(): void {
+    this.vm.toggleStartedAtEditing();
   }
 
-  /** Formatea pendingOpenUntilDate como string datetime-local para el input. */
-  protected openUntilDatetimeLocal(): string {
-    const d = this.vm.pendingOpenUntilDate();
-    if (d === null) return '';
-    // datetime-local espera "YYYY-MM-DDTHH:mm"
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mi = String(d.getMinutes()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+  protected onOpenUntilChange(event: Event): void {
+    // Handler puro: solo transporta el valor raw al signal. Todos los guards
+    // (fecha pasada, tope 15 días, lapso vs duración) viven en el computed
+    // reactivo `openUntilError` — así el usuario ve el error inmediato en
+    // lugar de un early return silencioso que dejaba el input mostrando la
+    // fecha inválida y el botón deshabilitado sin explicación.
+    const target = event.target as HTMLInputElement | null;
+    const value = target?.value ?? '';
+    this.vm.pendingOpenUntil.set(value.length > 0 ? value : null);
   }
 
   private parseIntInput(event: Event): number | null {
