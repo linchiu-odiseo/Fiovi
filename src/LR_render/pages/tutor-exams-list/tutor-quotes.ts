@@ -7,6 +7,8 @@
 // wiring, cero i18n. Si el set crece o se vuelve interesante rotarlo
 // por hora del día / racha / etc, queda para un change separado.
 
+import { secureRandomFloat } from '../../utils/secure-random';
+
 export const TUTOR_QUOTES: readonly string[] = [
   'los alumnos no recuerdan lo que dijiste, recuerdan cómo los hiciste sentir',
   'un buen tutor deja huella sin darse cuenta',
@@ -17,6 +19,6 @@ export const TUTOR_QUOTES: readonly string[] = [
 ];
 
 export function randomTutorQuote(): string {
-  const index = Math.floor(Math.random() * TUTOR_QUOTES.length);
+  const index = Math.floor(secureRandomFloat() * TUTOR_QUOTES.length);
   return TUTOR_QUOTES[index]!;
 }

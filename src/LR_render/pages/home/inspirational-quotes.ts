@@ -9,6 +9,8 @@
 // una string del set (el invariante de "al menos 1 elemento" lo cubre el
 // test en tests/unit/LR_render/pages/home/inspirational-quotes.spec.ts).
 
+import { secureRandomFloat } from '../../utils/secure-random';
+
 export const INSPIRATIONAL_QUOTES: readonly string[] = [
   'la diferencia entre el que pasa y el que no son los días en que nadie estaba viendo',
   'lo que practicas en silencio aparece en la hoja cuando importa',
@@ -19,7 +21,7 @@ export const INSPIRATIONAL_QUOTES: readonly string[] = [
 ];
 
 export function randomQuote(): string {
-  const index = Math.floor(Math.random() * INSPIRATIONAL_QUOTES.length);
+  const index = Math.floor(secureRandomFloat() * INSPIRATIONAL_QUOTES.length);
   // El non-null assertion es seguro: el módulo expone una const readonly y
   // el test garantiza que el array no sea vacío. Si alguien lo vacía, el
   // build pasa pero el unit test falla — barrera temprana antes de prod.

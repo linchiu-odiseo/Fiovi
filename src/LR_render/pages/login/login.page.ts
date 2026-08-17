@@ -70,7 +70,7 @@ export class LoginPage implements OnInit {
     () => this.emailFormExpanded() || this.vm.ssoProviders().length === 0,
   );
 
-  @ViewChild('captcha') private captchaWidget?: CaptchaWidgetComponent;
+  @ViewChild('captcha') private readonly captchaWidget?: CaptchaWidgetComponent;
 
   ngOnInit(): void {
     // Si el backend redirigió a /login?ssoError=<code> tras un flow SSO
