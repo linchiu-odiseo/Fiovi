@@ -352,6 +352,7 @@
                     step="1"
                     class="tutor-exam-detail__duration-edit-input"
                     data-testid="minutes-input"
+                    aria-label="Duración en minutos"
                     [value]="vm.pendingMinutes()"
                     (input)="onMinutesInput($event)"
                     (blur)="stopEditDuration()"

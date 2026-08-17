@@ -27,6 +27,7 @@ import { SimulacroNoAsignadoError } from '../../L1_domain/errors/simulacro-no-as
 import { InvalidSubmissionTimeError } from '../../L1_domain/errors/invalid-submission-time.error';
 import { InvalidPayloadError } from '../../L1_domain/errors/invalid-payload.error';
 import { ExamNotOpenYetError } from '../../L1_domain/errors/exam-not-open-yet.error';
+import { secureRandomFloat } from '../utils/secure-random';
 
 // Razón de redirect al /home, lo usa el view-model para no renderizar UI de
 // error en la página. Si en el futuro queremos un toast global, el `flash`
@@ -570,7 +571,7 @@ export class SimulacroPageViewModel {
     const nuevoMap: AnswersMap = {};
 
     for (const pregunta of this.preguntas()) {
-      const proxima = opciones[Math.floor(Math.random() * opciones.length)] ?? null;
+      const proxima = opciones[Math.floor(secureRandomFloat() * opciones.length)] ?? null;
       await this.marcarRespuesta.execute({
         examId: e.id,
         pregunta,

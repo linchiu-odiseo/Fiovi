@@ -16,6 +16,7 @@ import { ExamsPermissionRevokedError } from '../../L1_domain/errors/exams-permis
 import { StudentNotLinkedError } from '../../L1_domain/errors/student-not-linked.error';
 import { randomQuote } from '../pages/home/inspirational-quotes';
 import { randomGreeting } from '../pages/home/greetings';
+import { secureRandomFloat } from '../utils/secure-random';
 
 export type ServerErrorKind = 'network' | 'session-expired' | 'unknown';
 
@@ -381,12 +382,12 @@ export class HomePageViewModel {
   /**
    * Programa un refresh diferido de la lista tras cruzar el cierre local de
    * una card. Jitter simétrico dispersa el pico cuando 500 alumnos cruzan
-   * el cierre a la misma hora. `Math.random()` alcanza — no es criptografía,
-   * solo dispersión estadística.
+   * el cierre a la misma hora. El randomizador solo necesita dispersión
+   * estadística, no fuerza criptográfica.
    */
   private schedulePostCierreRefresh(examId: string): void {
     if (this.stopped) return;
-    const jitter = Math.random() * 2 * POST_CIERRE_JITTER_MS - POST_CIERRE_JITTER_MS;
+    const jitter = secureRandomFloat() * 2 * POST_CIERRE_JITTER_MS - POST_CIERRE_JITTER_MS;
     const delay = POST_CIERRE_REFRESH_MS + jitter;
     const handle = setTimeout(() => {
       this.postCierreTimers.delete(examId);
