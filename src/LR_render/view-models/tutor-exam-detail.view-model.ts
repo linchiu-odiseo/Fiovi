@@ -412,9 +412,7 @@ export class TutorExamDetailViewModel {
    * - startedAtMaxAttr: openUntil - duración (para que el examen quepa)
    *   o AHORA + 15d si el tutor todavía no eligió cierre.
    */
-  readonly openUntilMinAttr = computed<string>(() =>
-    this.toDatetimeLocalString(new Date()),
-  );
+  readonly openUntilMinAttr = computed<string>(() => this.toDatetimeLocalString(new Date()));
   readonly openUntilMaxAttr = computed<string>(() =>
     this.toDatetimeLocalString(new Date(Date.now() + HOMEWORK_MAX_WINDOW_MS)),
   );
