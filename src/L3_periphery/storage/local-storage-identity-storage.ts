@@ -64,12 +64,12 @@ export class LocalStorageIdentityStorage implements IdentityStorage {
     // shape). Si ninguno matchea → clear + null.
     const persistedKind = parsed.dashboardKind;
     const fallbackKind = parsed.roles[0];
+    const fallbackCandidate =
+      fallbackKind && VALID_DASHBOARD_KINDS.has(fallbackKind as Role) ? fallbackKind : null;
     const candidateKind =
       persistedKind && VALID_DASHBOARD_KINDS.has(persistedKind as Role)
         ? persistedKind
-        : fallbackKind && VALID_DASHBOARD_KINDS.has(fallbackKind as Role)
-          ? fallbackKind
-          : null;
+        : fallbackCandidate;
     if (candidateKind === null) {
       localStorage.removeItem(STORAGE_KEY);
       return null;

@@ -54,7 +54,7 @@ export class GuardarDraftUseCase {
     const arr = new Array<string>(count).fill('-');
     for (const [pregunta, letra] of Object.entries(answers)) {
       if (letra === null) continue;
-      const idx = parseInt(pregunta, 10) - 1;
+      const idx = Number.parseInt(pregunta, 10) - 1;
       if (idx >= 0 && idx < count) {
         arr[idx] = letra;
       }
