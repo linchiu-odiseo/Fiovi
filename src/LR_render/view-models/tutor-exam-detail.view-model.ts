@@ -20,7 +20,6 @@ import { TutorExamsStore } from '../state/tutor-exams.store';
 import { TutorExamDetail } from '../../L1_domain/value-objects/tutor-exam-detail';
 import { ClassroomStudent } from '../../L1_domain/value-objects/classroom-student';
 import { TutorExam } from '../../L1_domain/entities/tutor-exam';
-import { ExamServerStatus } from '../../L1_domain/value-objects/exam-server-status';
 import { CLOCK } from '../../app.config';
 import { NetworkError } from '../../L1_domain/errors/network.error';
 import { ExamConflictError } from '../../L1_domain/errors/exam-conflict.error';
@@ -28,6 +27,7 @@ import { ExamPreconditionError } from '../../L1_domain/errors/exam-precondition.
 import { VirtualExamNotFoundError } from '../../L1_domain/errors/virtual-exam-not-found.error';
 import { TutorExamForbiddenError } from '../../L1_domain/errors/tutor-exam-forbidden.error';
 import { formatRestante, formatRestanteTarea } from '../utils/countdown-format';
+import { secureRandomFloat } from '../utils/secure-random';
 
 // Ticker del countdown: refresca `nowTick` cada 1s para que los signals
 // derivados (countdownRestante) recomputen. Idéntico al del simulacro del
@@ -1069,7 +1069,7 @@ export class TutorExamDetailViewModel {
    */
   private syncCountdownTicker(): void {
     const d = this.detail();
-    if (d && d.status.is('in_progress')) {
+    if (d?.status.is('in_progress')) {
       this.startCountdownTicker();
     } else {
       this.stopCountdownTicker();
@@ -1098,8 +1098,8 @@ export class TutorExamDetailViewModel {
   /**
    * Programa un único refresh diferido tras cruzar el cierre local del
    * countdown, con jitter simétrico para dispersar el pico cuando 500
-   * clientes cruzan el cierre a la misma hora. `Math.random()` alcanza:
-   * no necesitamos jitter criptográfico, sólo dispersión estadística.
+   * clientes cruzan el cierre a la misma hora. El jitter no requiere
+   * fuerza criptográfica, solo dispersión estadística.
    *
    * Reintento condicional: si el refresh falla (network) o si el back
    * responde todavía en `in_progress` (auto-finalize del backend aún no
@@ -1109,7 +1109,7 @@ export class TutorExamDetailViewModel {
    */
   private schedulePostCierreRefresh(recordId: string): void {
     if (this.stopped) return;
-    const jitter = Math.random() * 2 * POST_CIERRE_JITTER_MS - POST_CIERRE_JITTER_MS;
+    const jitter = secureRandomFloat() * 2 * POST_CIERRE_JITTER_MS - POST_CIERRE_JITTER_MS;
     const delay = POST_CIERRE_REFRESH_MS + jitter;
     this.postCierreTimer = setTimeout(async () => {
       this.postCierreTimer = null;
@@ -1117,7 +1117,7 @@ export class TutorExamDetailViewModel {
       try {
         await this.reloadDetail(recordId);
         const d = this.detail();
-        if (d && d.status.is('in_progress')) {
+        if (d?.status.is('in_progress')) {
           // Back aún no finalizó (lag del auto-finalize). Liberá el guard
           // para permitir un segundo intento en el próximo tick.
           this.postCierreRefreshDone.delete(recordId);
@@ -1233,7 +1233,7 @@ export class TutorExamDetailViewModel {
 }
 
 // Re-export ExamServerStatus for template usage (avoids extra imports in page).
-export { ExamServerStatus };
+export { ExamServerStatus } from '../../L1_domain/value-objects/exam-server-status';
 
 // ── Formatting helpers locales (los de countdown viven en utils/) ───────────
 

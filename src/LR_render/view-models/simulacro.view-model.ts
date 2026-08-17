@@ -27,6 +27,7 @@ import { SimulacroNoAsignadoError } from '../../L1_domain/errors/simulacro-no-as
 import { InvalidSubmissionTimeError } from '../../L1_domain/errors/invalid-submission-time.error';
 import { InvalidPayloadError } from '../../L1_domain/errors/invalid-payload.error';
 import { ExamNotOpenYetError } from '../../L1_domain/errors/exam-not-open-yet.error';
+import { secureRandomFloat } from '../utils/secure-random';
 
 // Razón de redirect al /home, lo usa el view-model para no renderizar UI de
 // error en la página. Si en el futuro queremos un toast global, el `flash`
@@ -338,8 +339,8 @@ export class SimulacroPageViewModel {
       // Mapea status servidor → razón de redirect. `scheduled` → 'pendiente';
       // `finalized` → 'cerrado'. La traducción a copy concreta vive en /home.
       const status = encontrado.serverStatus.value;
-      const reason: SimulacroErrorState =
-        status === 'scheduled' ? 'pendiente' : status === 'finalized' ? 'cerrado' : 'unknown';
+      const fallbackReason: SimulacroErrorState = status === 'finalized' ? 'cerrado' : 'unknown';
+      const reason: SimulacroErrorState = status === 'scheduled' ? 'pendiente' : fallbackReason;
       this.errorState.set(reason);
       void this.router.navigate(['/home']);
       return;
@@ -570,7 +571,7 @@ export class SimulacroPageViewModel {
     const nuevoMap: AnswersMap = {};
 
     for (const pregunta of this.preguntas()) {
-      const proxima = opciones[Math.floor(Math.random() * opciones.length)] ?? null;
+      const proxima = opciones[Math.floor(secureRandomFloat() * opciones.length)] ?? null;
       await this.marcarRespuesta.execute({
         examId: e.id,
         pregunta,

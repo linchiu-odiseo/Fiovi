@@ -1,12 +1,12 @@
-import { Injectable, Signal, computed, signal } from '@angular/core';
+import { Injectable, Signal, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { inject } from '@angular/core';
 import { AlternativaValue, AnswersMap } from '../../L1_domain/ports/markings-storage';
 import {
   AdmissionArea,
   DEFAULT_ADMISSION_AREA,
 } from '../../L1_domain/value-objects/admission-area';
 import { SubmissionAck } from '../../L1_domain/value-objects/submission-ack';
+import { secureRandomFloat } from '../utils/secure-random';
 
 // View-model de /demo-sheet: cartilla mock 100% en memoria para probar la UX
 // sin depender del back. No usa MarcarRespuestaUseCase, no toca IndexedDB, no
@@ -129,7 +129,7 @@ export class DemoSheetViewModel {
     const opciones: readonly AlternativaValue[] = ['A', 'B', 'C', 'D', 'E', null];
     const nuevoMap: AnswersMap = {};
     for (const pregunta of this.preguntas()) {
-      const proxima = opciones[Math.floor(Math.random() * opciones.length)] ?? null;
+      const proxima = opciones[Math.floor(secureRandomFloat() * opciones.length)] ?? null;
       nuevoMap[String(pregunta)] = proxima;
     }
     this.marcaciones.set(nuevoMap);
@@ -209,17 +209,17 @@ export class DemoSheetViewModel {
 }
 
 function fakeId(): string {
-  return `demo-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;
+  return `demo-${Date.now().toString(36)}-${Math.floor(secureRandomFloat() * 1e6).toString(36)}`;
 }
 
-// 64 chars hex random. No es sha256 real (usamos Math.random para no depender
-// de webcrypto), pero cumple el shape que valida `SubmissionAck` y el que
-// espera `formatHashBlock` del receipt modal — el bloque se ve idéntico al real.
+// 64 chars hex random. No es sha256 real, pero cumple el shape que valida
+// `SubmissionAck` y el que espera `formatHashBlock` del receipt modal — el
+// bloque se ve idéntico al real.
 function fakeHex64(): string {
   const chars = '0123456789abcdef';
   let out = '';
   for (let i = 0; i < 64; i++) {
-    out += chars[Math.floor(Math.random() * 16)];
+    out += chars[Math.floor(secureRandomFloat() * 16)];
   }
   return out;
 }

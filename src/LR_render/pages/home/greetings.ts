@@ -9,6 +9,8 @@
 // invariante "al menos 1 elemento" está cubierto por el unit test.
 // Aplica tanto a /student/home como a /tutor/home.
 
+import { secureRandomFloat } from '../../utils/secure-random';
+
 export const GREETINGS: readonly string[] = [
   'Hola',
   'Bienvenido',
@@ -18,6 +20,6 @@ export const GREETINGS: readonly string[] = [
 ];
 
 export function randomGreeting(): string {
-  const index = Math.floor(Math.random() * GREETINGS.length);
+  const index = Math.floor(secureRandomFloat() * GREETINGS.length);
   return GREETINGS[index]!;
 }
