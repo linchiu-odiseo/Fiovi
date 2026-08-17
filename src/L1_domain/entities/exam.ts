@@ -54,6 +54,38 @@ export class Exam {
    */
   public readonly allowedAdmissionAreas: readonly string[] | null;
 
+  private static assertNonEmpty(raw: string, field: 'id' | 'type' | 'name'): string {
+    const trimmed = (raw ?? '').trim();
+    if (trimmed.length === 0) {
+      throw new InvalidExamError(`Exam requiere un ${field} no vacío.`);
+    }
+    return trimmed;
+  }
+
+  private static assertPositiveInteger(value: number, field: 'count' | 'duration'): void {
+    if (!Number.isInteger(value) || value < 1) {
+      const suffix = field === 'duration' ? ' (segundos)' : '';
+      throw new InvalidExamError(
+        `Exam ${field} debe ser entero positivo${suffix}. Recibido: ${value}.`,
+      );
+    }
+  }
+
+  private static assertValidDate(value: Date, field: 'scheduled'): void {
+    if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
+      throw new InvalidExamError(`Exam requiere ${field} Date válido.`);
+    }
+  }
+
+  private static assertNullableDate(
+    value: Date | null,
+    field: 'started' | 'finished' | 'openUntil',
+  ): void {
+    if (value !== null && (!(value instanceof Date) || Number.isNaN(value.getTime()))) {
+      throw new InvalidExamError(`Exam ${field} debe ser Date válido o null.`);
+    }
+  }
+
   constructor(params: {
     id: string;
     area: string | null;
@@ -72,47 +104,15 @@ export class Exam {
     // restricción, picker muestra los 16 conocidos).
     allowedAdmissionAreas?: readonly string[] | null;
   }) {
-    const id = (params.id ?? '').trim();
-    if (id.length === 0) {
-      throw new InvalidExamError('Exam requiere un id no vacío.');
-    }
-    const type = (params.type ?? '').trim();
-    if (type.length === 0) {
-      throw new InvalidExamError('Exam requiere un type no vacío.');
-    }
-    const name = (params.name ?? '').trim();
-    if (name.length === 0) {
-      throw new InvalidExamError('Exam requiere un name no vacío.');
-    }
-    if (!Number.isInteger(params.count) || params.count <= 0) {
-      throw new InvalidExamError(`Exam count debe ser entero positivo. Recibido: ${params.count}.`);
-    }
-    if (!Number.isInteger(params.duration) || params.duration < 1) {
-      throw new InvalidExamError(
-        `Exam duration debe ser entero positivo (segundos). Recibido: ${params.duration}.`,
-      );
-    }
-    if (!(params.scheduled instanceof Date) || Number.isNaN(params.scheduled.getTime())) {
-      throw new InvalidExamError('Exam requiere scheduled Date válido.');
-    }
-    if (
-      params.started !== null &&
-      (!(params.started instanceof Date) || Number.isNaN(params.started.getTime()))
-    ) {
-      throw new InvalidExamError('Exam started debe ser Date válido o null.');
-    }
-    if (
-      params.finished !== null &&
-      (!(params.finished instanceof Date) || Number.isNaN(params.finished.getTime()))
-    ) {
-      throw new InvalidExamError('Exam finished debe ser Date válido o null.');
-    }
-    if (
-      params.openUntil !== null &&
-      (!(params.openUntil instanceof Date) || Number.isNaN(params.openUntil.getTime()))
-    ) {
-      throw new InvalidExamError('Exam openUntil debe ser Date válido o null.');
-    }
+    const id = Exam.assertNonEmpty(params.id, 'id');
+    const type = Exam.assertNonEmpty(params.type, 'type');
+    const name = Exam.assertNonEmpty(params.name, 'name');
+    Exam.assertPositiveInteger(params.count, 'count');
+    Exam.assertPositiveInteger(params.duration, 'duration');
+    Exam.assertValidDate(params.scheduled, 'scheduled');
+    Exam.assertNullableDate(params.started, 'started');
+    Exam.assertNullableDate(params.finished, 'finished');
+    Exam.assertNullableDate(params.openUntil, 'openUntil');
     if (!(params.serverStatus instanceof ExamServerStatus)) {
       throw new InvalidExamError('Exam requiere un ExamServerStatus válido.');
     }

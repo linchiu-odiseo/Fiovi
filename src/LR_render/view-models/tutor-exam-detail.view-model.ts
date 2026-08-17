@@ -39,6 +39,12 @@ const COUNTDOWN_TICK_MS = 1_000;
 // la misma ventana. Se usa como guarda client-side, no como fuente de verdad.
 const CLOCK_SKEW_MS = 5 * 60 * 1_000;
 
+// Estado del gate de reconciliación (reconcile-enabled-on-start-gate):
+//   idle       — antes del primer intento; muestra CTA "Actualizar lista".
+//   refreshing — POST /refresh en vuelo; muestra CTA "Actualizando...".
+//   ready      — gate superado; el roster toma el control (showRoster=true).
+type GateState = 'idle' | 'refreshing' | 'ready';
+
 // Ventana máxima hacia el futuro para `openUntil` en modo tarea.
 // 15 días en ms — el server también rechaza ventanas mayores.
 const HOMEWORK_MAX_WINDOW_MS = 15 * 24 * 60 * 60 * 1_000;
@@ -557,6 +563,41 @@ export class TutorExamDetailViewModel {
     this.editingDuration.set(false);
   }
 
+  // Valida y parsea `openUntil`/`startedAt` en modo "tarea".
+  // Side-effect: setea openUntilError con la copy correspondiente si falla.
+  // Return: `null` si la validación falló, sino `{ openUntil, startedAt? }`.
+  // Server también rechaza fuera de rango con 422 — acá es UX temprana.
+  private validateTareaModeInputs(): {
+    openUntil: Date;
+    startedAt: Date | undefined;
+  } | null {
+    const parsed = this.pendingOpenUntilDate();
+    if (parsed === null) {
+      this.openUntilError.set('Elegí día y hora de cierre.');
+      return null;
+    }
+    if (parsed.getTime() <= Date.now()) {
+      this.openUntilError.set('La hora ya pasó. Elegí otro día u otra hora.');
+      return null;
+    }
+    if (parsed.getTime() > Date.now() + HOMEWORK_MAX_WINDOW_MS) {
+      this.openUntilError.set('Tope 15 días');
+      return null;
+    }
+    if (this.startedAtError() !== null) {
+      return null;
+    }
+    const rawStartedAt = this.pendingStartedAt();
+    let startedAt: Date | undefined;
+    if (rawStartedAt !== null) {
+      const parsedStartedAt = new Date(rawStartedAt);
+      if (!Number.isNaN(parsedStartedAt.getTime())) {
+        startedAt = parsedStartedAt;
+      }
+    }
+    return { openUntil: parsed, startedAt };
+  }
+
   // Confirma el modal: valida los minutos, arma el total en segundos (segundos
   // siempre 0 en la UI), y dispara `iniciar()` con el override si el tutor
   // cambió el valor original.
@@ -582,41 +623,13 @@ export class TutorExamDetailViewModel {
       return;
     }
 
-    // Validación de openUntil cuando el modo es "tarea". El server también
-    // rechaza fuera de rango con 422 — acá es solo UX temprana. Los signals
-    // son ruedas discretas: offset de días (0..MAX-1) y hora entera (1..23).
-    // La única corner case que puede fallar: día=hoy + hora ya pasada.
     let openUntil: Date | undefined;
     let startedAt: Date | undefined;
     if (this.pendingMode() === 'tarea') {
-      const parsed = this.pendingOpenUntilDate();
-      if (parsed === null) {
-        this.openUntilError.set('Elegí día y hora de cierre.');
-        return;
-      }
-      if (parsed.getTime() <= Date.now()) {
-        this.openUntilError.set('La hora ya pasó. Elegí otro día u otra hora.');
-        return;
-      }
-      // Validación cliente: openUntil no puede superar now + 15 días.
-      if (parsed.getTime() > Date.now() + HOMEWORK_MAX_WINDOW_MS) {
-        this.openUntilError.set('Tope 15 días');
-        return;
-      }
-      openUntil = parsed;
-
-      // Procesar startedAt si el tutor lo ingresó.
-      // Si hay un error de validación (computed) no continuamos.
-      if (this.startedAtError() !== null) {
-        return;
-      }
-      const rawStartedAt = this.pendingStartedAt();
-      if (rawStartedAt !== null) {
-        const parsedStartedAt = new Date(rawStartedAt);
-        if (!Number.isNaN(parsedStartedAt.getTime())) {
-          startedAt = parsedStartedAt;
-        }
-      }
+      const tareaInputs = this.validateTareaModeInputs();
+      if (tareaInputs === null) return;
+      openUntil = tareaInputs.openUntil;
+      startedAt = tareaInputs.startedAt;
     }
 
     const currentDuration = this.detail()?.duration ?? null;
@@ -1036,12 +1049,10 @@ export class TutorExamDetailViewModel {
   // Ver design.md D4, D5, D7, D8.
 
   /** Estado interno mutable del gate. No accesible fuera del VM. */
-  private readonly _gateState: WritableSignal<'idle' | 'refreshing' | 'ready'> = signal<
-    'idle' | 'refreshing' | 'ready'
-  >('idle');
+  private readonly _gateState: WritableSignal<GateState> = signal<GateState>('idle');
 
   /** Estado readonly del gate expuesto al template via el page component. */
-  readonly gateState: Signal<'idle' | 'refreshing' | 'ready'> = this._gateState.asReadonly();
+  readonly gateState: Signal<GateState> = this._gateState.asReadonly();
 
   /**
    * Computed single-source-of-truth para el condicional del roster.

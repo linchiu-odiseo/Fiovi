@@ -170,13 +170,12 @@
       </section>
     }
 
-    <!-- Gate de reconciliación (reconcile-enabled-on-start-gate):
-         Card visible solo cuando el examen está programado (scheduled) y el
-         gate aún no fue superado (gateState !== 'ready'). Contiene el CTA
-         transformable que va de "Actualizar lista" → "Actualizando..." →
-         desaparece cuando el roster toma el control (showRoster=true).
-         Para exámenes in_progress / finalized: showRoster siempre true, este
-         card nunca renderiza. Ver design.md D4, D6, D9. -->
+    <!-- Gate de reconciliación (reconcile-enabled-on-start-gate). El card
+         aparece cuando el examen está programado y el gate todavía no fue
+         superado. El CTA transformable pasa por "Actualizar lista", después
+         "Actualizando..." y desaparece cuando el roster toma el control.
+         Para exámenes en curso o finalizados el card nunca aparece porque
+         el roster ya está visible desde el inicio. Ver design.md D4, D6, D9. -->
     @if (!vm.showRoster() && detail.status.value === 'scheduled') {
       <section class="tutor-exam-detail__gate-card" data-testid="gate-card">
         @switch (vm.gateState()) {
@@ -412,8 +411,11 @@
                 <!-- Fecha de inicio (opcional): si el tutor no la toca, el examen
                      abre inmediatamente al confirmar. -->
                 <div class="tutor-exam-detail__bp-cell" data-testid="started-at-field">
-                  <p class="tutor-exam-detail__bp-label">Fecha de inicio (opcional)</p>
+                  <label for="started-at-input" class="tutor-exam-detail__bp-label">
+                    Fecha de inicio (opcional)
+                  </label>
                   <input
+                    id="started-at-input"
                     type="datetime-local"
                     class="tutor-exam-detail__datetime-input"
                     data-testid="started-at-input"
@@ -433,8 +435,11 @@
 
                 <!-- Fecha de cierre (obligatoria en modo tarea). -->
                 <div class="tutor-exam-detail__bp-cell" data-testid="open-until-dt-field">
-                  <p class="tutor-exam-detail__bp-label">Fecha de cierre</p>
+                  <label for="open-until-dt-input" class="tutor-exam-detail__bp-label">
+                    Fecha de cierre
+                  </label>
                   <input
+                    id="open-until-dt-input"
                     type="datetime-local"
                     class="tutor-exam-detail__datetime-input"
                     data-testid="open-until-dt-input"
@@ -496,10 +501,10 @@
       </div>
     }
 
-    <!-- Roster de alumnos, botones Finalizar y Archivar: visibles solo cuando
-         vm.showRoster() es true. Para exámenes scheduled con gate activo
-         (gateState !== 'ready'), el roster está oculto y el card de gate
-         muestra el CTA de reconciliación. Ver design.md D5, D7. -->
+    <!-- Roster de alumnos, botones Finalizar y Archivar. El bloque aparece
+         cuando el gate ya está superado. Para exámenes programados con
+         gate todavía activo, el roster queda oculto y el card de gate de
+         arriba muestra el CTA de reconciliación. Ver design.md D5, D7. -->
     @if (vm.showRoster()) {
       <!-- Lista de alumnos con checkboxes (D5: hasSubmitted + finalized → disabled) -->
       <section class="tutor-exam-detail__students">
