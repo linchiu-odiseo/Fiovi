@@ -926,4 +926,134 @@
     color: var(--color-on-surface-variant);
     font-variant-numeric: tabular-nums;
   }
+
+  // ── Modal iniciar-actividad: bloque tarea (datetime inputs + toggles) ─────
+
+  // Header interno de la celda blueprint: label a la izquierda + botón X a la
+  // derecha. Usado por el bloque colapsable "Fecha de inicio" para permitir
+  // volver al estado por defecto (pill "Iniciar tarea desde").
+  &__bp-cell-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  &__bp-collapse-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0.15rem;
+    color: var(--color-on-surface-variant);
+    display: inline-flex;
+    align-items: center;
+
+    &:hover {
+      color: var(--color-on-surface);
+    }
+
+    .material-symbols-outlined {
+      font-size: 1rem;
+    }
+  }
+
+  // Wrapper del input datetime-local: contenedor relativo para posicionar el
+  // icono custom (calendar_month) sobre el área tappable del picker nativo.
+  &__datetime-wrapper {
+    position: relative;
+    display: block;
+  }
+
+  &__datetime-icon {
+    position: absolute;
+    right: 0.6rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--color-on-surface-variant);
+    pointer-events: none;
+    font-size: 1.1rem;
+  }
+
+  // Input datetime-local reestilizado: ocultamos el picker indicator nativo
+  // (SVG genérico del browser) pero mantenemos su área tappable como overlay
+  // invisible sobre toda la superficie del input — así el tap sigue abriendo
+  // el picker nativo. El icono custom se pinta por encima con
+  // pointer-events: none para no bloquear el overlay.
+  &__datetime-input {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.5rem 2.2rem 0.5rem 0.6rem;
+    background: var(--color-surface-container-lowest);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono, monospace);
+    font-size: 0.9rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-on-surface);
+    letter-spacing: -0.005em;
+
+    &:focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 1px;
+    }
+
+    &::-webkit-calendar-picker-indicator {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+    }
+  }
+
+  &__field-error {
+    margin: 0.35rem 0 0;
+    color: var(--color-error, #b00020);
+    font-size: 0.8rem;
+    line-height: 1.3;
+  }
+
+  // Pill "Iniciar tarea desde" — CTA compacto que expande el input datetime
+  // de startedAt. Usa borde dashed para señalizar acción opcional, y misma
+  // tipografía mono uppercase que los labels del blueprint para pertenecer
+  // al lenguaje visual del cajetín.
+  &__started-at-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.9rem;
+    background: transparent;
+    border: 1px dashed var(--color-outline-variant);
+    border-radius: 8px;
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-mono, monospace);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    width: 100%;
+    justify-content: center;
+
+    &:hover {
+      background: var(--color-surface-container-low);
+      color: var(--color-on-surface);
+    }
+
+    .material-symbols-outlined {
+      font-size: 1rem;
+    }
+  }
+
+  // Helper text que aparece bajo el cajetín en modo tarea cuando falta cierre.
+  // Refuerza el motivo por el que el CTA "Iniciar actividad" está deshabilitado.
+  &__tarea-helper-text {
+    margin: 0.5rem 0 0;
+    font-size: 0.75rem;
+    color: var(--color-on-surface-variant);
+    text-align: center;
+  }
 }

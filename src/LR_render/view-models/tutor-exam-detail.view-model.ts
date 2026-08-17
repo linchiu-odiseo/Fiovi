@@ -231,6 +231,26 @@ export class TutorExamDetailViewModel {
   // en confirmIniciarModal() al armar el payload.
   readonly pendingStartedAt = signal<string | null>(null);
 
+  // Toggle expandido/colapsado del bloque "Iniciar tarea desde".
+  //   false = pill button visible (default: el examen abre AHORA).
+  //   true  = datetime-local input expandido para elegir apertura futura.
+  // Al colapsar (toggleStartedAtEditing) también se limpia pendingStartedAt
+  // para que el server interprete el envío como "abrir ahora".
+  readonly pendingStartedAtEditing = signal<boolean>(false);
+
+  /**
+   * Toggle entre pill button (colapsado) y datetime input (expandido).
+   * Al colapsar, limpia pendingStartedAt → server interpreta como "ahora".
+   */
+  toggleStartedAtEditing(): void {
+    const current = this.pendingStartedAtEditing();
+    if (current) {
+      // Colapsando: limpiar el pendingStartedAt.
+      this.pendingStartedAt.set(null);
+    }
+    this.pendingStartedAtEditing.set(!current);
+  }
+
   // Error de validación client-side para startedAt.
   readonly startedAtError = computed<string | null>(() => {
     const raw = this.pendingStartedAt();
@@ -250,10 +270,19 @@ export class TutorExamDetailViewModel {
     return null;
   });
 
-  // `isScheduledSubmitDisabled` es true cuando hay error en startedAt o en openUntilError.
+  // `isScheduledSubmitDisabled` es true cuando:
+  //   - hay error en startedAt (validación client-side), o
+  //   - hay error en openUntil (validación client-side), o
+  //   - en modo tarea NO se eligió aún fecha de cierre (pendingOpenUntilDate = null).
   // El botón "Iniciar actividad" en modo tarea usa este computed para el [disabled].
+  // La condición del cierre-null fuerza al tutor a elegir explícitamente cuándo
+  // cierra antes de poder confirmar — antes el modal precargaba HOY 23h como
+  // default y el tutor podía confirmar sin haber elegido intencionalmente.
   readonly isScheduledSubmitDisabled = computed<boolean>(() => {
-    return this.startedAtError() !== null || this.openUntilError() !== null;
+    if (this.startedAtError() !== null) return true;
+    if (this.openUntilError() !== null) return true;
+    if (this.pendingMode() === 'tarea' && this.pendingOpenUntilDate() === null) return true;
+    return false;
   });
 
   // Fecha absoluta de apertura derivada del input datetime-local. Null cuando
@@ -536,15 +565,16 @@ export class TutorExamDetailViewModel {
     if (!d) return;
     this.pendingMinutes.set(Math.round(d.duration / 60));
     // Default modo "examen" — el comportamiento heredado no cambia si el tutor
-    // no toca el selector. Defaults del deadline: HOY a las 23h. La mayoría de
-    // las tareas cierran el mismo día — forzar "MAÑ 23h" empujaba al tutor a
-    // pelearse con la rueda para volver a HOY. Fallback a MAÑ 23h SOLO cuando
-    // el modal se abre a las 23h o después (HOY 23h sería un instante pasado).
+    // no toca el selector. En modo "tarea" YA NO precargamos día/hora de cierre:
+    // el tutor debe elegir explícitamente cuándo cierra antes de poder confirmar.
+    // Antes el modal precargaba HOY 23h → tutor podía disparar iniciar sin
+    // haber puesto atención al cierre. Ahora `isScheduledSubmitDisabled` bloquea
+    // el botón hasta que haya `pendingOpenUntilDate` no-null.
     this.pendingMode.set('examen');
-    const preferHoy = TutorExamDetailViewModel.isHourFutureToday(23);
-    this.pendingDeadlineDayOffset.set(preferHoy ? 0 : 1);
-    this.pendingDeadlineHour.set(23);
+    this.pendingDeadlineDayOffset.set(null);
+    this.pendingDeadlineHour.set(null);
     this.pendingStartedAt.set(null);
+    this.pendingStartedAtEditing.set(false);
     this.durationError.set(null);
     this.openUntilError.set(null);
     this.editingDuration.set(false);
@@ -558,6 +588,7 @@ export class TutorExamDetailViewModel {
     this.pendingDeadlineDayOffset.set(null);
     this.pendingDeadlineHour.set(null);
     this.pendingStartedAt.set(null);
+    this.pendingStartedAtEditing.set(false);
     this.durationError.set(null);
     this.openUntilError.set(null);
     this.editingDuration.set(false);

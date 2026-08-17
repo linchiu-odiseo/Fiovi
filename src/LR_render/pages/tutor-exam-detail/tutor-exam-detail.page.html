@@ -408,70 +408,128 @@
                    El atributo min previene fechas de inicio en el pasado lejano;
                    la validación client-side en el VM es la fuente de verdad. -->
               @if (!vm.showHwheels()) {
-                <!-- Fecha de inicio (opcional): si el tutor no la toca, el examen
-                     abre inmediatamente al confirmar. -->
-                <div class="tutor-exam-detail__bp-cell" data-testid="started-at-field">
-                  <label for="started-at-input" class="tutor-exam-detail__bp-label">
-                    Fecha de inicio (opcional)
-                  </label>
-                  <input
-                    id="started-at-input"
-                    type="datetime-local"
-                    class="tutor-exam-detail__datetime-input"
-                    data-testid="started-at-input"
-                    [value]="vm.pendingStartedAt() ?? ''"
-                    (change)="onStartedAtChange($event)"
-                  />
-                  @if (vm.startedAtError()) {
-                    <p
-                      class="tutor-exam-detail__field-error"
-                      role="alert"
-                      data-testid="started-at-error"
-                    >
-                      {{ vm.startedAtError() }}
-                    </p>
-                  }
-                </div>
+                <!-- Fecha de inicio (opcional): switch pill/expandido.
+                     Colapsado (default): pill "Iniciar tarea desde" — el examen
+                     abre AHORA al confirmar. Expandido: datetime-local con
+                     botón X para volver a colapsar y volver al default. -->
+                @if (vm.pendingStartedAtEditing()) {
+                  <div
+                    class="tutor-exam-detail__bp-cell tutor-exam-detail__bp-cell--collapsible"
+                    data-testid="started-at-field"
+                  >
+                    <div class="tutor-exam-detail__bp-cell-header">
+                      <label for="started-at-input" class="tutor-exam-detail__bp-label">
+                        Fecha de inicio
+                      </label>
+                      <button
+                        type="button"
+                        class="tutor-exam-detail__bp-collapse-btn"
+                        data-testid="started-at-collapse-btn"
+                        (click)="onToggleStartedAtEditing()"
+                        aria-label="Cerrar fecha de inicio (inicia ahora)"
+                      >
+                        <span class="material-symbols-outlined" aria-hidden="true">close</span>
+                      </button>
+                    </div>
+                    <div class="tutor-exam-detail__datetime-wrapper">
+                      <input
+                        id="started-at-input"
+                        type="datetime-local"
+                        class="tutor-exam-detail__datetime-input"
+                        data-testid="started-at-input"
+                        [value]="vm.pendingStartedAt() ?? ''"
+                        (change)="onStartedAtChange($event)"
+                      />
+                      <span
+                        class="material-symbols-outlined tutor-exam-detail__datetime-icon"
+                        aria-hidden="true"
+                        >calendar_month</span
+                      >
+                    </div>
+                    @if (vm.startedAtError()) {
+                      <p
+                        class="tutor-exam-detail__field-error"
+                        role="alert"
+                        data-testid="started-at-error"
+                      >
+                        {{ vm.startedAtError() }}
+                      </p>
+                    }
+                  </div>
+                } @else {
+                  <button
+                    type="button"
+                    class="tutor-exam-detail__started-at-toggle"
+                    data-testid="started-at-toggle"
+                    (click)="onToggleStartedAtEditing()"
+                  >
+                    <span class="material-symbols-outlined" aria-hidden="true">calendar_month</span>
+                    Iniciar tarea desde
+                  </button>
+                }
 
-                <!-- Fecha de cierre (obligatoria en modo tarea). -->
+                <!-- Fecha de cierre (obligatoria en modo tarea). Sin default:
+                     el tutor debe elegir antes de poder confirmar. -->
                 <div class="tutor-exam-detail__bp-cell" data-testid="open-until-dt-field">
                   <label for="open-until-dt-input" class="tutor-exam-detail__bp-label">
                     Fecha de cierre
                   </label>
-                  <input
-                    id="open-until-dt-input"
-                    type="datetime-local"
-                    class="tutor-exam-detail__datetime-input"
-                    data-testid="open-until-dt-input"
-                    [value]="openUntilDatetimeLocal()"
-                    (change)="onOpenUntilChange($event)"
-                  />
+                  <div class="tutor-exam-detail__datetime-wrapper">
+                    <input
+                      id="open-until-dt-input"
+                      type="datetime-local"
+                      class="tutor-exam-detail__datetime-input"
+                      data-testid="open-until-dt-input"
+                      [value]="openUntilDatetimeLocal()"
+                      (change)="onOpenUntilChange($event)"
+                    />
+                    <span
+                      class="material-symbols-outlined tutor-exam-detail__datetime-icon"
+                      aria-hidden="true"
+                      >calendar_month</span
+                    >
+                  </div>
                 </div>
               }
             }
           </section>
 
+          <!-- Helper text: aparece solo si el tutor todavía no eligió cierre.
+               Refuerza el motivo por el que el botón "Iniciar actividad" está
+               deshabilitado (isScheduledSubmitDisabled). -->
+          @if (vm.pendingMode() === 'tarea' && !vm.pendingOpenUntilDate()) {
+            <p class="tutor-exam-detail__tarea-helper-text" data-testid="tarea-helper-text">
+              Elegí cuándo cierra para poder iniciar.
+            </p>
+          }
+
           <!-- Preview del deadline: reactivo a los signals del modal. Cierra
                visualmente el loop "elegí día/hora → esto va a pasar", así el
                tutor confirma con contexto en lugar de descubrirlo al iniciar.
                Pill centrada con mono + tabular-nums para que los dígitos no
-               salten al recomputar. -->
-          @if (vm.pendingMode() === 'tarea' && vm.pendingStartedAtDate(); as startedAt) {
+               salten al recomputar.
+               Pill "Abre" SIEMPRE visible en modo tarea — muestra AHORA cuando
+               el tutor no eligió startedAt (default: server abre inmediato). -->
+          @if (vm.pendingMode() === 'tarea') {
             <p class="tutor-exam-detail__deadline-preview" data-testid="opens-preview">
               <span class="tutor-exam-detail__deadline-preview-label">Abre</span>
               <span class="tutor-exam-detail__deadline-preview-value">
-                {{ formatDate(startedAt) }} · {{ formatTime(startedAt) }}
+                @if (vm.pendingStartedAtDate(); as startedAt) {
+                  {{ formatDate(startedAt) }} · {{ formatTime(startedAt) }}
+                } @else {
+                  AHORA
+                }
               </span>
             </p>
-          }
 
-          @if (vm.pendingMode() === 'tarea' && vm.pendingOpenUntilDate(); as openUntil) {
-            <p class="tutor-exam-detail__deadline-preview" data-testid="deadline-preview">
-              <span class="tutor-exam-detail__deadline-preview-label">Cierra</span>
-              <span class="tutor-exam-detail__deadline-preview-value">
-                {{ formatDate(openUntil) }} · {{ formatTime(openUntil) }}
-              </span>
-            </p>
+            @if (vm.pendingOpenUntilDate(); as openUntil) {
+              <p class="tutor-exam-detail__deadline-preview" data-testid="deadline-preview">
+                <span class="tutor-exam-detail__deadline-preview-label">Cierra</span>
+                <span class="tutor-exam-detail__deadline-preview-value">
+                  {{ formatDate(openUntil) }} · {{ formatTime(openUntil) }}
+                </span>
+              </p>
+            }
           }
 
           @if (vm.durationError()) {

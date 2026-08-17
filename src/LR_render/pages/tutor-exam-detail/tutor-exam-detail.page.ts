@@ -228,6 +228,15 @@ export class TutorExamDetailPage {
     this.vm.pendingStartedAt.set(value.length > 0 ? value : null);
   }
 
+  /**
+   * Toggle del bloque "Iniciar tarea desde": expande/colapsa el input
+   * datetime-local de startedAt. Al colapsar, el VM limpia pendingStartedAt
+   * para que el server abra el examen inmediatamente al confirmar.
+   */
+  protected onToggleStartedAtEditing(): void {
+    this.vm.toggleStartedAtEditing();
+  }
+
   protected onOpenUntilChange(event: Event): void {
     const target = event.target as HTMLInputElement | null;
     const value = target?.value ?? '';

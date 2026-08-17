@@ -72,6 +72,29 @@ class FakeTutorExamDetailViewModel {
   readonly openUntilError: WritableSignal<string | null> = signal(null);
   readonly pendingDeadlineDateLabel = () => '';
   readonly pendingDeadlineTimeLabel = () => '';
+  // Signals reales del VM que el template consulta cuando se abre el modal
+  // "Iniciar actividad" en modo tarea. Los agregamos al fake aunque este spec
+  // no abre el modal, para evitar futuros "vm.X is not a function" cuando se
+  // agregue algún test que sí lo abra.
+  readonly pendingDeadlineDayOffset: WritableSignal<number | null> = signal(null);
+  readonly pendingDeadlineHour: WritableSignal<number | null> = signal(null);
+  readonly pendingStartedAt: WritableSignal<string | null> = signal(null);
+  readonly pendingStartedAtEditing: WritableSignal<boolean> = signal(false);
+  readonly pendingStartedAtDate = () => {
+    const raw = this.pendingStartedAt();
+    if (raw === null) return null;
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+  readonly pendingOpenUntilDate = () => null as Date | null;
+  readonly startedAtError = () => null as string | null;
+  readonly isScheduledSubmitDisabled = () => false;
+  readonly showHwheels = () => this.pendingMode() !== 'tarea';
+  toggleStartedAtEditing = vi.fn(() => {
+    const next = !this.pendingStartedAtEditing();
+    if (!next) this.pendingStartedAt.set(null);
+    this.pendingStartedAtEditing.set(next);
+  });
   readonly pendingTotalSeconds = () => {
     const m = this.pendingMinutes();
     return m === null ? null : m * 60;
