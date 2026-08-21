@@ -118,6 +118,14 @@ export class SimulacroPageViewModel {
   // ve el recibo. `onReceiptClose()` lo limpia y dispara el redirect a /home.
   readonly lastAck = signal<SubmissionAck | null>(null);
 
+  // Modal de revisión previa al envío manual. `true` mientras el alumno
+  // está decidiendo si envía o vuelve a marcar. Se dispara con
+  // `pedirConfirmacion()` (botón Enviar) y se cierra con
+  // `cancelarConfirmacion()` (botón "Volver a la cartilla" del modal) o con
+  // `submit()` al confirmar. El auto-envío por tiempo cumplido NO pasa por
+  // este flag — el timer llama `submit()` directo.
+  readonly confirmarEnvioAbierto = signal<boolean>(false);
+
   // Número de la pregunta cuya fila está actualmente en modo `editing`, o
   // null si ninguna lo está. Solo puede haber una a la vez — entrar a
   // edición en otra cierra la anterior automáticamente. El template usa
@@ -126,11 +134,19 @@ export class SimulacroPageViewModel {
   readonly editingRow = signal<number | null>(null);
 
   // Área de POSTULACIÓN elegida por el alumno para este examen.
-  // Se hidrata desde storage en loadMarcaciones; si nunca se persistió,
-  // arranca en DEFAULT_ADMISSION_AREA (GENERAL) — pero el default NO se
-  // materializa en storage (design.md D3 de add-admission-area).
+  // Se hidrata desde storage en loadMarcaciones.
+  //
+  // Valores posibles:
+  //   - string  → el alumno tiene un área efectiva (persistida o default GENERAL para FICHAS).
+  //   - null    → EXAMEN con subset restrictivo y sin selección válida todavía:
+  //               dispara el gate `needsAreaSelection` que oculta la cartilla
+  //               hasta que el alumno elija en el picker.
+  //
+  // En FICHAS (allowedAdmissionAreas === null) nunca es null: cae al default
+  // GENERAL sin persistir (design.md D3 de add-admission-area).
+  //
   // NO confundir con `Exam.area` (curso: Letras/Ciencias/Números).
-  readonly admissionArea = signal<AdmissionArea>(DEFAULT_ADMISSION_AREA);
+  readonly admissionArea = signal<AdmissionArea | null>(null);
 
   // Subset del back para el picker (learnex PR #816 snapshot desde
   // ExamStructureArea.name). `null` = sin restricción → picker muestra los
@@ -138,6 +154,17 @@ export class SimulacroPageViewModel {
   // en ese orden. Puro derivado del examen actual; no hay estado propio.
   readonly allowedAdmissionAreas: Signal<readonly string[] | null> = computed(
     () => this.exam()?.allowedAdmissionAreas ?? null,
+  );
+
+  // Gate del render: cuando el examen restringe áreas y el alumno no tiene
+  // una selección válida, la cartilla no debe verse ni ser marcable. El page
+  // envuelve la grilla en `@if (!needsAreaSelection())` y pasa este mismo
+  // signal al picker como `forceOpen` para que quede expandido sin pill.
+  //
+  // Solo aplica a EXAMEN. En FICHAS `admissionArea` nunca es null (se hidrata
+  // a GENERAL por default), por lo que este signal siempre es false.
+  readonly needsAreaSelection: Signal<boolean> = computed(
+    () => this.allowedAdmissionAreas() !== null && this.admissionArea() === null,
   );
 
   // Signal opcional para UI futura. Hoy queda en 'idle' — el dispatcher no
@@ -196,6 +223,21 @@ export class SimulacroPageViewModel {
     const referenceNow = Math.max(this.nowTick().getTime(), anchor.getTime());
     const remainingMs = Math.max(0, closeAt.getTime() - referenceNow);
     return formatRestante(remainingMs);
+  });
+
+  // True mientras el countdown esté corriendo (queda tiempo positivo). El
+  // template lo usa para pintar el reloj intermitente y reforzar la percepción
+  // de tiempo vivo — aplica tanto al formato "N min" como al "MM:SS". Falso
+  // solo cuando ya se cumplió el tiempo: en ese momento el banner "Tiempo
+  // agotado" ya comunica el estado y sumar blink al 00:00 sería ruido.
+  readonly countdownUrgente: Signal<boolean> = computed(() => {
+    const e = this.exam();
+    if (e === null) return false;
+    const closeAt = this.personalCloseAt();
+    if (closeAt === null) return false;
+    const anchor = e.esTarea() ? (this.myStartedAt() ?? e.scheduled) : (e.started ?? e.scheduled);
+    const referenceNow = Math.max(this.nowTick().getTime(), anchor.getTime());
+    return closeAt.getTime() - referenceNow > 0;
   });
 
   // Hora de cierre efectivo como "HH:MM" para mostrar junto al countdown.
@@ -370,7 +412,13 @@ export class SimulacroPageViewModel {
     }
     await this.loadMarcaciones(encontrado);
     this.startCountdownTicker();
-    this.scheduleAutoEnvio(encontrado);
+    // Auto-envío queda pendiente si el alumno debe elegir área primero
+    // (EXAMEN con subset restrictivo). `seleccionarArea()` lo agenda al
+    // resolver el gate. Sin este guard, el timer dispararía un submit sin
+    // área y el back rechazaría con INVALID_ADMISSION_AREA.
+    if (!this.needsAreaSelection()) {
+      this.scheduleAutoEnvio(encontrado);
+    }
   }
 
   /**
@@ -394,7 +442,10 @@ export class SimulacroPageViewModel {
     this.awaitingHomeworkStart.set(false);
     await this.loadMarcaciones(exam);
     this.startCountdownTicker();
-    this.scheduleAutoEnvio(exam);
+    // Mismo guard que en start(): sin área elegida no se agenda auto-envío.
+    if (!this.needsAreaSelection()) {
+      this.scheduleAutoEnvio(exam);
+    }
   }
 
   /**
@@ -590,6 +641,11 @@ export class SimulacroPageViewModel {
   // `marcarRespuesta` (design.md D7 de add-admission-area). El use case
   // revalida el input contra el set cerrado; si el picker emite algo
   // inválido, propaga InvalidAdmissionAreaError.
+  //
+  // Si el auto-envío estaba pendiente por el gate (start/confirmHomeworkStart
+  // detectaron needsAreaSelection y no lo agendaron), lo agendamos ahora
+  // que ya hay área válida. Idempotente: cancelamos primero para cubrir
+  // el caso hipotético de área elegida dos veces.
   async seleccionarArea(area: AdmissionArea): Promise<void> {
     if (this.stopped) return;
     const e = this.exam();
@@ -597,6 +653,9 @@ export class SimulacroPageViewModel {
     await this.seleccionarAdmissionArea.execute({ examId: e.id, area });
     this.admissionArea.set(area);
     this.draftDispatcher.notificarCambio(this.sessionId, e.count);
+    if (this.autoEnvioHandle === null && this.tareaAutoEnvioTimer === null) {
+      this.scheduleAutoEnvio(e);
+    }
   }
 
   volver(): void {
@@ -613,11 +672,44 @@ export class SimulacroPageViewModel {
   // navega — el alumno se queda viendo el banner naranja. El dispatcher
   // global (EnvioRetryDispatcher) hace el retry cuando vuelve la red; el
   // alumno puede tocar "Volver" cuando quiera, el envío ya está en cola.
+  // Abre el modal de revisión previa al submit. Espejo de la lógica del
+  // demo: no ejecuta el envío, solo lo prepara. Los guards duplican los del
+  // botón Enviar en el template — si algún guard falla, el modal simplemente
+  // no se abre (silencioso; el user ya vio el botón disabled o la vista sin
+  // botón). Es el ÚNICO camino manual al submit; el auto-envío programado
+  // llama `submit()` directo sin pasar por acá.
+  pedirConfirmacion(): void {
+    if (this.stopped) return;
+    if (this.isSubmitting()) return;
+    if (this.lastAck() !== null) return;
+    if (this.needsAreaSelection()) return;
+    const e = this.exam();
+    if (e === null) return;
+    if (!e.serverStatus.permiteEntrada()) return;
+    if (this.examenNoIniciado()) return;
+    if (this.examenTiempoCumplido()) return;
+    this.confirmarEnvioAbierto.set(true);
+  }
+
+  cancelarConfirmacion(): void {
+    this.confirmarEnvioAbierto.set(false);
+  }
+
   async submit(): Promise<void> {
     if (this.isSubmitting()) return;
     const e = this.exam();
     if (e === null) return;
     if (!e.serverStatus.permiteEntrada()) return;
+    // Hard block: sin área elegida en EXAMEN el submit no puede correr.
+    // El botón Enviar ya está disabled por needsAreaSelection en el template,
+    // este guard es la defensa contra call sites que bypaseen la UI
+    // (submit programático, futuros hotkeys, tests).
+    if (this.needsAreaSelection()) return;
+    // Cerramos el modal de confirmación si estaba abierto. Confirmar desde
+    // el modal ya invoca este método; el flag se apaga acá para asegurar
+    // que si por alguna razón (auto-envío disparándose mientras el modal
+    // estaba abierto) submit corre por otro camino, el modal no queda visible.
+    this.confirmarEnvioAbierto.set(false);
 
     // Cancel-on-submit: limpiar el debounce pendiente y marcar la sesión como
     // stopped ANTES de cualquier rama del submit. El POST en vuelo (si lo hay)
@@ -852,12 +944,25 @@ export class SimulacroPageViewModel {
     }
     this.marcaciones.set(fullMap);
 
-    // Hidratar admissionArea desde storage. `null` = el alumno nunca eligió
-    // expresamente para este examen → caemos al default (GENERAL). No
-    // persistimos el default en storage para mantener distinguibles "eligió
-    // GENERAL" vs "todavía no eligió nada" (design.md D3 de add-admission-area).
+    // Hidratar admissionArea desde storage. Reglas del gate:
+    //   - FICHAS (`allowedAdmissionAreas === null`): comportamiento heredado.
+    //     Cae al default GENERAL sin persistir (design.md D3 de add-admission-area).
+    //   - EXAMEN con área persistida dentro del subset actual: se mantiene.
+    //   - EXAMEN sin persistencia, o con área persistida fuera del subset actual
+    //     (el back cambió `allowedAdmissionAreas` entre sesiones): queda en null
+    //     para disparar `needsAreaSelection` y obligar al alumno a elegir antes
+    //     de ver la cartilla. No borramos el storage — si el alumno vuelve a
+    //     elegir, el use case sobreescribe; si sale sin elegir, el valor stale
+    //     queda pero nunca se usa mientras `allowedAdmissionAreas` no lo incluya.
     const persistedArea = await this.markings.getAdmissionArea(e.id);
-    this.admissionArea.set(persistedArea ?? DEFAULT_ADMISSION_AREA);
+    const allowed = e.allowedAdmissionAreas;
+    if (allowed === null) {
+      this.admissionArea.set(persistedArea ?? DEFAULT_ADMISSION_AREA);
+    } else if (persistedArea !== null && allowed.includes(persistedArea)) {
+      this.admissionArea.set(persistedArea);
+    } else {
+      this.admissionArea.set(null);
+    }
   }
 
   // El ticker solo refresca `nowTick` para que los signals derivados
@@ -889,8 +994,10 @@ function formatHHMM(d: Date): string {
 }
 
 // Formato adaptativo:
-//   ≥ 5 min   → "X min restantes"
-//   < 5 min   → "MM:SS"
+//   ≥ 5 min   → "X min"    (sin "restantes" — el `Cierra a las HH:MM` a la izquierda
+//                           ya da el contexto de que es tiempo remanente).
+//   < 5 min   → "MM:SS"    (reloj digital para los últimos minutos; el template
+//                           lo pinta intermitente para señalar urgencia).
 //   ≤ 0       → "00:00"
 // Con tabular-nums en el template el "MM:SS" no salta horizontalmente al
 // caer cada segundo.
@@ -898,7 +1005,7 @@ function formatRestante(ms: number): string {
   if (ms <= 0) return '00:00';
   if (ms >= SHOW_SECONDS_BELOW_MS) {
     const mins = Math.ceil(ms / 60_000);
-    return `${mins} min restantes`;
+    return `${mins} min`;
   }
   const totalSeconds = Math.ceil(ms / 1_000);
   const mm = Math.floor(totalSeconds / 60)

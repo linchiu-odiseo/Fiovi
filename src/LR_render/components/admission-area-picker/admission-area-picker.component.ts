@@ -44,7 +44,11 @@ const LONG_PRESS_MOVE_THRESHOLD_PX = 10;
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AdmissionAreaPickerComponent {
-  @Input({ required: true }) admissionArea!: AdmissionArea;
+  // `null` cuando el alumno todavía no eligió (EXAMEN con subset restrictivo
+  // gateado por el page). El pill nunca se muestra en ese caso porque el page
+  // pasa `forceOpen=true` — el fallback del template ("Selecciona tu área") es
+  // defensa por si algún caller olvidara el gate.
+  @Input({ required: true }) admissionArea!: AdmissionArea | null;
 
   // Subset opcional del back (snapshot al CREATE del examen desde learnex).
   // `null`/`undefined` (FICHAS y legacy) → picker renderiza las 16 conocidas
@@ -59,10 +63,26 @@ export class AdmissionAreaPickerComponent {
     this._allowedAreas.set(value ?? null);
   }
 
+  // Modo "gate": cuando true, el pill queda oculto y el grid se muestra
+  // siempre expandido sin posibilidad de colapsar hasta que el caller apague
+  // el flag. El page lo prende cuando el alumno debe elegir su área antes de
+  // ver la cartilla (EXAMEN con subset restrictivo y sin selección válida).
+  protected readonly forceOpenSig = signal(false);
+  @Input()
+  set forceOpen(value: boolean) {
+    this.forceOpenSig.set(value);
+  }
+
   @Output() readonly seleccion = new EventEmitter<AdmissionArea>();
 
   // false = colapsado (pill), true = expandido (grid 3×6).
   readonly expanded = signal(false);
+
+  // Vista efectiva: forceOpen gana sobre el estado local. Cuando el gate se
+  // apaga (alumno eligió → view-model actualiza needsAreaSelection → page
+  // apaga forceOpen), el picker vuelve al valor local de `expanded`, que en
+  // ese momento es false por el `onChipClick`.
+  protected readonly displayExpanded = computed(() => this.forceOpenSig() || this.expanded());
 
   // Lista efectiva para el @for del grid:
   //   - Sin restricción del back → `ADMISSION_AREAS` (16 conocidas, orden VO,
@@ -114,6 +134,9 @@ export class AdmissionAreaPickerComponent {
 
   protected onChipClick(area: string): void {
     this.seleccion.emit(area);
+    // Colapsa el estado local siempre. Si el gate `forceOpen` sigue prendido
+    // (edge case donde el caller no lo apaga en el mismo ciclo), `displayExpanded`
+    // se mantiene true por el OR y el grid sigue visible — comportamiento correcto.
     this.expanded.set(false);
   }
 }

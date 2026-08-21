@@ -5,6 +5,7 @@ import { AdmissionArea } from '../../../L1_domain/value-objects/admission-area';
 import { environment } from '../../../environments/environment';
 import { SimulacroPageViewModel } from '../../view-models/simulacro.view-model';
 import { SubmissionReceiptModalComponent } from '../../components/submission-receipt-modal/submission-receipt-modal.component';
+import { SubmitConfirmationModalComponent } from '../../components/submit-confirmation-modal/submit-confirmation-modal.component';
 import { AdmissionAreaPickerComponent } from '../../components/admission-area-picker/admission-area-picker.component';
 
 const ALTERNATIVAS: readonly AlternativaValue[] = ['A', 'B', 'C', 'D', 'E'];
@@ -23,7 +24,11 @@ const LONG_PRESS_MOVE_THRESHOLD_PX = 10;
   selector: 'app-simulacro-page',
   templateUrl: './simulacro.page.html',
   styleUrl: './simulacro.page.scss',
-  imports: [SubmissionReceiptModalComponent, AdmissionAreaPickerComponent],
+  imports: [
+    SubmissionReceiptModalComponent,
+    SubmitConfirmationModalComponent,
+    AdmissionAreaPickerComponent,
+  ],
   providers: [SimulacroPageViewModel],
 })
 export class SimulacroPage {
@@ -142,6 +147,14 @@ export class SimulacroPage {
   }
 
   protected onEnviarClick(): void {
+    this.vm.pedirConfirmacion();
+  }
+
+  protected onCancelarConfirmacion(): void {
+    this.vm.cancelarConfirmacion();
+  }
+
+  protected onConfirmarEnvio(): void {
     void this.vm.submit();
   }
 

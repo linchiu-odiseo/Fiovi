@@ -97,6 +97,28 @@
     font-weight: 600;
     color: var(--color-primary);
     font-variant-numeric: tabular-nums;
+
+    // Modificador que enciende el parpadeo. El view-model lo activa cuando
+    // el remaining cae bajo 5 min (modo MM:SS) para reforzar la urgencia.
+    // Pulso suave (opacity 1 ↔ 0.35) cada segundo, respeta prefers-reduced-motion.
+    &--urgente {
+      animation: header-restante-blink 1s ease-in-out infinite;
+
+      @media (prefers-reduced-motion: reduce) {
+        animation: none;
+        color: var(--color-error, var(--color-primary));
+      }
+    }
+  }
+}
+
+@keyframes header-restante-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
   }
 }
 

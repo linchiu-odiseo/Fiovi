@@ -24,6 +24,72 @@
   box-sizing: border-box;
 }
 
+// Panel dev-only para cambiar en vivo la cantidad de preguntas del demo.
+// Fila de pills compacta arriba del header. Solo existe en la demo — ver
+// racional de duplicación al inicio del archivo.
+// Panel dev del selector de preguntas. Vive entre el header y el picker de
+// área. Siempre una sola fila (nunca `flex-wrap`); si los pills no caben
+// en pantallas muy chicas, scroll horizontal con inercia iOS. Sin label —
+// el contexto (7 pills numéricos en un demo dev) lo hace auto-explicativo.
+.dev-count {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+  padding: 0.375rem 0.5rem;
+  background: rgb(0 36 83 / 3%);
+  border: 1px dashed rgb(0 36 83 / 18%);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  &__pill {
+    padding: 0.1875rem 0.5rem;
+    min-width: 1.875rem;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--color-outline-variant);
+    background: transparent;
+    color: var(--color-on-surface);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition:
+      background 120ms ease,
+      color 120ms ease,
+      border-color 120ms ease,
+      transform 60ms ease;
+
+    &:hover {
+      background: rgb(0 36 83 / 4%);
+      border-color: var(--color-primary);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+    }
+
+    &:active {
+      transform: scale(0.96);
+    }
+
+    &--active {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+      color: var(--color-on-primary);
+    }
+  }
+}
+
 .header {
   display: flex;
   align-items: flex-start;
@@ -99,6 +165,28 @@
     font-weight: 600;
     color: var(--color-primary);
     font-variant-numeric: tabular-nums;
+
+    // Espejo del `--urgente` del simulacro real: parpadea cuando el remaining
+    // cae bajo 5 min (modo MM:SS). Se anima incluso en el demo porque el
+    // countdown de 3 min ya arranca dentro del umbral.
+    &--urgente {
+      animation: header-restante-blink 1s ease-in-out infinite;
+
+      @media (prefers-reduced-motion: reduce) {
+        animation: none;
+        color: var(--color-error, var(--color-primary));
+      }
+    }
+  }
+}
+
+@keyframes header-restante-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
   }
 }
 
@@ -161,6 +249,19 @@
     display: flex;
     justify-content: space-between;
     gap: 0.4rem;
+  }
+
+  // Highlight verde tenue para filas MARCADAS. Feedback positivo tipo
+  // checklist: al principio la cartilla está limpia (blancos), y cada marca
+  // deja una fila verde. Al scrollear el alumno ve rápido qué respondió y
+  // qué queda vacío (no verde = falta). Se declara ANTES de `--editing`:
+  // cuando la fila entra en edición, gana el borde primary + shadow.
+  //
+  // TEMPORAL demo-only: threshold `> 25` vive inline en el template. Si el
+  // jefe aprueba, replicar en simulacro.page con la misma condición.
+  &--marcada {
+    background: rgb(46 125 50 / 8%);
+    border-color: rgb(46 125 50 / 22%);
   }
 
   &--editing {

@@ -78,6 +78,20 @@
     box-shadow: 0 0 0 2px rgb(0 36 83 / 0.12);
   }
 
+  // Copy protagónico cuando el picker está en modo gate (forceOpen). Reemplaza
+  // al `.row__chip` flotante — acá no queremos el chip discreto sino un prompt
+  // legible que le diga al alumno qué hacer antes de ver la cartilla.
+  &__prompt {
+    margin: 0 0 var(--space-md);
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--color-primary);
+    text-align: center;
+    text-transform: uppercase;
+  }
+
   // Grid rígido 6-col — GENERAL en fila 3 usa span-3 para cerrar la
   // retícula (design.md D6).
   &__grid {

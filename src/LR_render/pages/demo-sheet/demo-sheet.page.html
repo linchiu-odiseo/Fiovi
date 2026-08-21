@@ -7,7 +7,16 @@
     @if (!vm.examenTiempoCumplido()) {
       <div class="header__countdown" role="timer" aria-live="polite">
         <span class="header__cierre">Cierra a las {{ vm.cierreHHMM() }}</span>
-        <span class="header__restante">{{ vm.countdownRestante() }}</span>
+        <span
+          class="header__restante"
+          [class.header__restante--urgente]="vm.countdownUrgente()"
+          (pointerdown)="onCountdownPointerDown($event)"
+          (pointermove)="onCountdownPointerMove($event)"
+          (pointerup)="onCountdownPointerUpOrCancel()"
+          (pointercancel)="onCountdownPointerUpOrCancel()"
+        >
+          {{ vm.countdownRestante() }}
+        </span>
       </div>
     } @else {
       <span class="header__pill" aria-hidden="true">SIN BACK</span>
@@ -17,6 +26,21 @@
   @if (vm.examenTiempoCumplido()) {
     <div class="simulacro-banner" role="status" aria-live="polite">
       <p class="simulacro-banner__msg">⏰ Tiempo agotado. Estás en modo demo.</p>
+    </div>
+  }
+
+  @if (mostrarSelectorPreguntas()) {
+    <div class="dev-count" role="group" aria-label="Cantidad de preguntas (demo)">
+      @for (n of countPresets; track n) {
+        <button
+          type="button"
+          class="dev-count__pill"
+          [class.dev-count__pill--active]="vm.preguntasCount() === n"
+          (click)="onCambiarPreguntasClick(n)"
+        >
+          {{ n }}
+        </button>
+      }
     </div>
   }
 
@@ -36,6 +60,9 @@
         class="fila"
         [class.fila--locked]="vm.rowState(pregunta) === 'locked'"
         [class.fila--editing]="vm.rowState(pregunta) === 'editing'"
+        [class.fila--marcada]="
+          vm.rowState(pregunta) === 'locked' && vm.preguntasCount() > 25
+        "
         [attr.aria-label]="'Pregunta ' + pregunta"
         role="radiogroup"
         (pointerdown)="onRowPointerDown(pregunta, $event)"
@@ -99,6 +126,16 @@
   >
     🎲
   </button>
+}
+
+@if (vm.confirmarEnvioAbierto()) {
+  <app-submit-confirmation-modal
+    [preguntas]="vm.preguntas()"
+    [marcaciones]="vm.marcaciones()"
+    [admissionArea]="vm.admissionArea()"
+    (cancelar)="onCancelarConfirmacion()"
+    (confirmar)="onConfirmarEnvio()"
+  />
 }
 
 @if (vm.lastAck(); as ack) {
