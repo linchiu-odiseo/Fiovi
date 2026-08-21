@@ -16,7 +16,14 @@ import { secureRandomFloat } from '../utils/secure-random';
 // Nada de este view-model debería importarse desde código de producción real:
 // existe únicamente para poblar la ruta dev-only `/demo-sheet`.
 
-const DEMO_QUESTION_COUNT = 8;
+// Default al abrir /demo-sheet. Se puede cambiar en vivo con el selector de
+// preguntas del propio page (pills 4/8/12/15/25/50/100) para probar cómo se
+// comporta la cartilla y el modal de confirmación con distintos volúmenes.
+const DEMO_QUESTION_COUNT_DEFAULT = 8;
+
+// Presets del selector. Cambia la cantidad de preguntas y resetea marcaciones
+// al nuevo tamaño (más simple que preservar; el demo no persiste igual).
+export const DEMO_QUESTION_COUNT_PRESETS: readonly number[] = [4, 8, 12, 15, 25, 50, 100];
 const DEMO_DURATION_MS = 3 * 60_000; // 3 minutos
 const COUNTDOWN_TICK_MS = 1_000;
 const SHOW_SECONDS_BELOW_MS = 5 * 60_000;
@@ -39,8 +46,12 @@ export class DemoSheetViewModel {
 
   readonly examCourse = signal(DEMO_EXAM_COURSE);
   readonly examName = signal(DEMO_EXAM_NAME);
-  readonly preguntas: Signal<readonly number[]> = signal(
-    Array.from({ length: DEMO_QUESTION_COUNT }, (_, i) => i + 1),
+
+  // Cantidad de preguntas variable. Cambiar via `cambiarPreguntasCount()`
+  // resetea las marcaciones (más simple que preservar y padear/truncar).
+  readonly preguntasCount = signal<number>(DEMO_QUESTION_COUNT_DEFAULT);
+  readonly preguntas: Signal<readonly number[]> = computed(() =>
+    Array.from({ length: this.preguntasCount() }, (_, i) => i + 1),
   );
   readonly marcaciones = signal<AnswersMap>(this.emptyAnswersMap());
   readonly admissionArea = signal<AdmissionArea>(DEFAULT_ADMISSION_AREA);
@@ -48,6 +59,41 @@ export class DemoSheetViewModel {
   readonly isSubmitting = signal(false);
   readonly submissionState = signal<DemoSubmissionState>('idle');
   readonly lastAck = signal<SubmissionAck | null>(null);
+
+  // Modal de revisión previa al submit. `true` mientras el alumno está
+  // decidiendo si envía o vuelve. `confirmarEnvio()` cierra este signal y
+  // dispara `submit()`; `cancelarConfirmacion()` solo lo cierra.
+  readonly confirmarEnvioAbierto = signal<boolean>(false);
+
+  // Filtro visual del botón cíclico `todas → marcadas → blancos`. NO afecta
+  // el submit — solo la grilla renderizada. `preguntasVisibles` deriva de acá
+  // y de las marcaciones actuales.
+  readonly filtroPreguntas = signal<'todas' | 'marcadas' | 'blancos'>('todas');
+
+  readonly marcadasCount = computed(() => {
+    const map = this.marcaciones();
+    let n = 0;
+    for (const v of Object.values(map)) {
+      if (v !== null) n++;
+    }
+    return n;
+  });
+
+  readonly blancosCount = computed(() => this.preguntasCount() - this.marcadasCount());
+
+  // Preguntas efectivamente renderizadas en la grilla según el filtro. En
+  // 'todas' devuelve el array completo; en 'marcadas' / 'blancos' filtra.
+  // Signal derivado — recompone cuando cambia marcaciones o el filtro.
+  readonly preguntasVisibles: Signal<readonly number[]> = computed(() => {
+    const filtro = this.filtroPreguntas();
+    const all = this.preguntas();
+    if (filtro === 'todas') return all;
+    const map = this.marcaciones();
+    if (filtro === 'marcadas') {
+      return all.filter((p) => map[String(p)] !== null);
+    }
+    return all.filter((p) => map[String(p)] === null);
+  });
 
   // Ticker que refresca cada segundo para que el countdown recompute.
   readonly nowTick = signal<Date>(new Date());
@@ -66,6 +112,13 @@ export class DemoSheetViewModel {
   readonly countdownRestante: Signal<string> = computed(() => {
     const remainingMs = Math.max(0, this.closeAt.getTime() - this.nowTick().getTime());
     return formatRestante(remainingMs);
+  });
+
+  // True mientras el demo no haya vencido. Aplica el mismo blink al reloj
+  // que el simulacro real, en cualquier formato ("N min" o "MM:SS"). Espejo
+  // de `countdownUrgente` en el simulacro real.
+  readonly countdownUrgente: Signal<boolean> = computed(() => {
+    return this.closeAt.getTime() - this.nowTick().getTime() > 0;
   });
 
   readonly cierreHHMM: Signal<string> = computed(() => formatHHMM(this.closeAt));
@@ -141,13 +194,34 @@ export class DemoSheetViewModel {
     this.admissionArea.set(area);
   }
 
+  // Abre el modal de revisión. Antes existía un `submit()` directo desde el
+  // click del botón "Enviar"; ahora ese click abre este modal y el submit
+  // real se dispara solo si el alumno confirma con "Enviar y terminar".
+  // Guards duplican los de `submit()` para no mostrar el modal si ya se
+  // envió o si el tiempo se cumplió.
+  pedirConfirmacion(): void {
+    if (this.stopped) return;
+    if (this.isSubmitting()) return;
+    if (this.lastAck() !== null) return;
+    if (this.examenTiempoCumplido()) return;
+    this.confirmarEnvioAbierto.set(true);
+  }
+
+  cancelarConfirmacion(): void {
+    this.confirmarEnvioAbierto.set(false);
+  }
+
   // Simula un envío: `isSubmitting` en true, delay ~400ms, produce un
   // SubmissionAck falso con id, hash y timestamp inventados. El modal de
   // recibo (mismo componente que usa la cartilla real) se dispara con
   // `lastAck`. `onReceiptClose()` limpia y navega a /home.
+  //
+  // Solo se llama desde `pedirConfirmacion()` + confirmación del modal.
+  // No hay call site directo desde el template.
   async submit(): Promise<void> {
     if (this.isSubmitting()) return;
     if (this.examenTiempoCumplido()) return;
+    this.confirmarEnvioAbierto.set(false);
     this.isSubmitting.set(true);
     this.submissionState.set('sending');
     await new Promise((resolve) => setTimeout(resolve, FAKE_SUBMIT_DELAY_MS));
@@ -199,9 +273,31 @@ export class DemoSheetViewModel {
     }
   }
 
+  // DEV: cambia el volumen de preguntas y resetea la cartilla al nuevo tamaño.
+  // Ignora valores no positivos por defensa. No-op si el count ya coincide para
+  // evitar wipe innecesario cuando el usuario re-clickea el mismo pill.
+  //
+  // Reset del filtro a 'todas' — en cartillas nuevas (o cortas) no tiene sentido
+  // arrastrar el filtro anterior.
+  cambiarPreguntasCount(n: number): void {
+    if (this.stopped) return;
+    if (!Number.isInteger(n) || n <= 0) return;
+    if (this.preguntasCount() === n) return;
+    this.preguntasCount.set(n);
+    this.marcaciones.set(this.emptyAnswersMap());
+    this.filtroPreguntas.set('todas');
+    this.exitEditing();
+  }
+
+  cambiarFiltro(filtro: 'todas' | 'marcadas' | 'blancos'): void {
+    if (this.stopped) return;
+    this.filtroPreguntas.set(filtro);
+  }
+
   private emptyAnswersMap(): AnswersMap {
     const map: AnswersMap = {};
-    for (let i = 1; i <= DEMO_QUESTION_COUNT; i++) {
+    const count = this.preguntasCount();
+    for (let i = 1; i <= count; i++) {
       map[String(i)] = null;
     }
     return map;
@@ -236,7 +332,7 @@ function formatRestante(ms: number): string {
   if (ms <= 0) return '00:00';
   if (ms >= SHOW_SECONDS_BELOW_MS) {
     const mins = Math.ceil(ms / 60_000);
-    return `${mins} min restantes`;
+    return `${mins} min`;
   }
   const totalSeconds = Math.ceil(ms / 1_000);
   const mm = Math.floor(totalSeconds / 60)

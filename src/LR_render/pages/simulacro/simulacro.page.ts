@@ -5,9 +5,22 @@ import { AdmissionArea } from '../../../L1_domain/value-objects/admission-area';
 import { environment } from '../../../environments/environment';
 import { SimulacroPageViewModel } from '../../view-models/simulacro.view-model';
 import { SubmissionReceiptModalComponent } from '../../components/submission-receipt-modal/submission-receipt-modal.component';
+import { SubmitConfirmationModalComponent } from '../../components/submit-confirmation-modal/submit-confirmation-modal.component';
 import { AdmissionAreaPickerComponent } from '../../components/admission-area-picker/admission-area-picker.component';
 
 const ALTERNATIVAS: readonly AlternativaValue[] = ['A', 'B', 'C', 'D', 'E'];
+
+type QuestionsFilter = 'todas' | 'marcadas' | 'blancos';
+
+// Ciclo del botón: cada tap avanza al siguiente. Loop natural
+// (blancos → vuelve a todas).
+const FILTRO_CICLO: readonly QuestionsFilter[] = ['todas', 'marcadas', 'blancos'];
+
+const FILTRO_LABELS: Readonly<Record<QuestionsFilter, string>> = {
+  todas: 'TODAS',
+  marcadas: 'MARCADAS',
+  blancos: 'BLANCOS',
+};
 
 // Duración mínima del press para que cuente como long-press. Estándar en
 // gestos táctiles (Material, iOS): 500ms es lo que se siente "deliberado"
@@ -23,7 +36,11 @@ const LONG_PRESS_MOVE_THRESHOLD_PX = 10;
   selector: 'app-simulacro-page',
   templateUrl: './simulacro.page.html',
   styleUrl: './simulacro.page.scss',
-  imports: [SubmissionReceiptModalComponent, AdmissionAreaPickerComponent],
+  imports: [
+    SubmissionReceiptModalComponent,
+    SubmitConfirmationModalComponent,
+    AdmissionAreaPickerComponent,
+  ],
   providers: [SimulacroPageViewModel],
 })
 export class SimulacroPage {
@@ -142,6 +159,14 @@ export class SimulacroPage {
   }
 
   protected onEnviarClick(): void {
+    this.vm.pedirConfirmacion();
+  }
+
+  protected onCancelarConfirmacion(): void {
+    this.vm.cancelarConfirmacion();
+  }
+
+  protected onConfirmarEnvio(): void {
     void this.vm.submit();
   }
 
@@ -151,5 +176,25 @@ export class SimulacroPage {
 
   protected onDadoClick(): void {
     void this.vm.marcarAleatorio();
+  }
+
+  // Botón cíclico de filtro: label uppercase del estado actual + contador
+  // en vivo. Cada tap avanza al siguiente en `FILTRO_CICLO` (loop natural).
+  protected filtroLabel(): string {
+    return FILTRO_LABELS[this.vm.filtroPreguntas()];
+  }
+
+  protected filtroCount(): number {
+    const f = this.vm.filtroPreguntas();
+    if (f === 'marcadas') return this.vm.marcadasCount();
+    if (f === 'blancos') return this.vm.blancosCount();
+    return this.vm.preguntas().length;
+  }
+
+  protected onCiclarFiltro(): void {
+    const actual = this.vm.filtroPreguntas();
+    const idx = FILTRO_CICLO.indexOf(actual);
+    const proximo = FILTRO_CICLO[(idx + 1) % FILTRO_CICLO.length]!;
+    this.vm.cambiarFiltro(proximo);
   }
 }
