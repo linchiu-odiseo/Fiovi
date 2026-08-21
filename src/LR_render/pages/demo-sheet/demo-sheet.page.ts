@@ -1,9 +1,25 @@
-import { Component, DestroyRef, inject } from '@angular/core';
+import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { AlternativaValue } from '../../../L1_domain/ports/markings-storage';
 import { AdmissionArea } from '../../../L1_domain/value-objects/admission-area';
-import { DemoSheetViewModel } from '../../view-models/demo-sheet.view-model';
+import {
+  DEMO_QUESTION_COUNT_PRESETS,
+  DemoSheetViewModel,
+} from '../../view-models/demo-sheet.view-model';
 import { AdmissionAreaPickerComponent } from '../../components/admission-area-picker/admission-area-picker.component';
 import { SubmissionReceiptModalComponent } from '../../components/submission-receipt-modal/submission-receipt-modal.component';
+import { SubmitConfirmationModalComponent } from '../../components/submit-confirmation-modal/submit-confirmation-modal.component';
+
+type QuestionsFilter = 'todas' | 'marcadas' | 'blancos';
+
+// Ciclo del botón: cada tap avanza al siguiente. Loop natural
+// (blancos → vuelve a todas).
+const FILTRO_CICLO: readonly QuestionsFilter[] = ['todas', 'marcadas', 'blancos'];
+
+const FILTRO_LABELS: Readonly<Record<QuestionsFilter, string>> = {
+  todas: 'TODAS',
+  marcadas: 'MARCADAS',
+  blancos: 'BLANCOS',
+};
 
 const ALTERNATIVAS: readonly AlternativaValue[] = ['A', 'B', 'C', 'D', 'E'];
 
@@ -20,7 +36,11 @@ const LONG_PRESS_MOVE_THRESHOLD_PX = 10;
   selector: 'app-demo-sheet-page',
   templateUrl: './demo-sheet.page.html',
   styleUrl: './demo-sheet.page.scss',
-  imports: [SubmissionReceiptModalComponent, AdmissionAreaPickerComponent],
+  imports: [
+    SubmissionReceiptModalComponent,
+    SubmitConfirmationModalComponent,
+    AdmissionAreaPickerComponent,
+  ],
   providers: [DemoSheetViewModel],
 })
 export class DemoSheetPage {
@@ -28,6 +48,12 @@ export class DemoSheetPage {
   protected readonly vm = inject(DemoSheetViewModel);
 
   protected readonly alternativas = ALTERNATIVAS;
+  protected readonly countPresets = DEMO_QUESTION_COUNT_PRESETS;
+
+  // DEV: panel para cambiar la cantidad de preguntas en vivo. Oculto por
+  // default; se revela con long-press sobre el contador del header. Como
+  // es exclusivo del demo (que ya es dev-only) no afecta la UX real.
+  protected readonly mostrarSelectorPreguntas = signal<boolean>(false);
 
   private longPressTimer: ReturnType<typeof setTimeout> | null = null;
   private longPressActivePregunta: number | null = null;
@@ -35,9 +61,17 @@ export class DemoSheetPage {
   private longPressStartY = 0;
   private suppressNextClick = false;
 
+  // Estado del long-press sobre el contador del header (distinto del de la
+  // grilla). Lo separamos para no cruzar cancelaciones cuando el usuario
+  // arranca un press sobre una fila y termina sobre el reloj o viceversa.
+  private countdownLongPressTimer: ReturnType<typeof setTimeout> | null = null;
+  private countdownLongPressStartX = 0;
+  private countdownLongPressStartY = 0;
+
   constructor() {
     this.destroyRef.onDestroy(() => {
       this.cancelLongPress();
+      this.cancelCountdownLongPress();
       this.vm.stop();
     });
   }
@@ -96,6 +130,14 @@ export class DemoSheetPage {
   }
 
   protected onEnviarClick(): void {
+    this.vm.pedirConfirmacion();
+  }
+
+  protected onCancelarConfirmacion(): void {
+    this.vm.cancelarConfirmacion();
+  }
+
+  protected onConfirmarEnvio(): void {
     void this.vm.submit();
   }
 
@@ -105,5 +147,65 @@ export class DemoSheetPage {
 
   protected onAdmissionAreaSeleccion(area: AdmissionArea): void {
     this.vm.seleccionarArea(area);
+  }
+
+  protected onCambiarPreguntasClick(n: number): void {
+    this.vm.cambiarPreguntasCount(n);
+    // Cerrar el panel tras elegir — patrón dropdown. Si el dev quiere probar
+    // otro tamaño, vuelve a long-press sobre el contador.
+    this.mostrarSelectorPreguntas.set(false);
+  }
+
+  // Botón cíclico de filtro: label uppercase del estado actual + contador
+  // en vivo. Cada tap avanza al siguiente en `FILTRO_CICLO` (loop natural).
+  protected filtroLabel(): string {
+    return FILTRO_LABELS[this.vm.filtroPreguntas()];
+  }
+
+  protected filtroCount(): number {
+    const f = this.vm.filtroPreguntas();
+    if (f === 'marcadas') return this.vm.marcadasCount();
+    if (f === 'blancos') return this.vm.blancosCount();
+    return this.vm.preguntasCount();
+  }
+
+  protected onCiclarFiltro(): void {
+    const actual = this.vm.filtroPreguntas();
+    const idx = FILTRO_CICLO.indexOf(actual);
+    const proximo = FILTRO_CICLO[(idx + 1) % FILTRO_CICLO.length]!;
+    this.vm.cambiarFiltro(proximo);
+  }
+
+  // Long-press sobre el contador → toggle del panel dev de preguntas.
+  // Mismos umbrales que el long-press de la grilla y del picker de área
+  // (500ms, 10px de tolerancia) para consistencia gestual.
+  protected onCountdownPointerDown(ev: PointerEvent): void {
+    this.cancelCountdownLongPress();
+    this.countdownLongPressStartX = ev.clientX;
+    this.countdownLongPressStartY = ev.clientY;
+    this.countdownLongPressTimer = setTimeout(() => {
+      this.countdownLongPressTimer = null;
+      this.mostrarSelectorPreguntas.update((v) => !v);
+    }, LONG_PRESS_DURATION_MS);
+  }
+
+  protected onCountdownPointerMove(ev: PointerEvent): void {
+    if (this.countdownLongPressTimer === null) return;
+    const dx = Math.abs(ev.clientX - this.countdownLongPressStartX);
+    const dy = Math.abs(ev.clientY - this.countdownLongPressStartY);
+    if (dx > LONG_PRESS_MOVE_THRESHOLD_PX || dy > LONG_PRESS_MOVE_THRESHOLD_PX) {
+      this.cancelCountdownLongPress();
+    }
+  }
+
+  protected onCountdownPointerUpOrCancel(): void {
+    this.cancelCountdownLongPress();
+  }
+
+  private cancelCountdownLongPress(): void {
+    if (this.countdownLongPressTimer !== null) {
+      clearTimeout(this.countdownLongPressTimer);
+      this.countdownLongPressTimer = null;
+    }
   }
 }
