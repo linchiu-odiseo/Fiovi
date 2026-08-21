@@ -82,6 +82,7 @@
   // al `.row__chip` flotante — acá no queremos el chip discreto sino un prompt
   // legible que le diga al alumno qué hacer antes de ver la cartilla.
   &__prompt {
+    display: block; // el tag es <output> (inline por default), forzamos block
     margin: 0 0 var(--space-md);
     font-family: var(--font-mono);
     font-size: 0.875rem;

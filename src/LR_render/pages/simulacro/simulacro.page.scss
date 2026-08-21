@@ -461,6 +461,7 @@
 // `examenTiempoCumplido` ("tiempo agotado"). Ambos comparten estilo:
 // fondo warning + texto centrado + entrar/salir vía @if del template.
 .simulacro-banner {
+  display: block; // el tag es <output> (inline por default), forzamos block
   padding: 0.75rem 0.9rem;
   margin-top: var(--space-md);
   border-radius: var(--radius);

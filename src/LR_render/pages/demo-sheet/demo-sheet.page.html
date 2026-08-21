@@ -24,9 +24,9 @@
   </header>
 
   @if (vm.examenTiempoCumplido()) {
-    <div class="simulacro-banner" role="status" aria-live="polite">
+    <output class="simulacro-banner" aria-live="polite">
       <p class="simulacro-banner__msg">⏰ Tiempo agotado. Estás en modo demo.</p>
-    </div>
+    </output>
   }
 
   @if (mostrarSelectorPreguntas()) {
@@ -88,10 +88,10 @@
         (pointercancel)="onRowPointerUpOrCancel()"
       >
         @if (vm.rowState(pregunta) === 'editing') {
-          <span class="row__chip" role="status" aria-live="polite">
+          <output class="row__chip" aria-live="polite">
             <span class="material-symbols-outlined" aria-hidden="true">edit</span>
             Toca para cambiar
-          </span>
+          </output>
         }
         <span class="fila__numero">{{ pregunta.toString().padStart(2, '0') }}</span>
         <div class="fila__bubbles">

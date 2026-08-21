@@ -58,18 +58,18 @@
       </header>
 
       @if (vm.examenNoIniciado()) {
-        <div class="simulacro-banner" role="status" aria-live="polite">
+        <output class="simulacro-banner" aria-live="polite">
           <p class="simulacro-banner__msg">
             ☕ El examen está tomando un café<br />
             ¡espera la señal para empezar!
           </p>
-        </div>
+        </output>
       }
 
       @if (vm.examenTiempoCumplido()) {
-        <div class="simulacro-banner" role="status" aria-live="polite">
+        <output class="simulacro-banner" aria-live="polite">
           <p class="simulacro-banner__msg">⏰ Tiempo agotado. Tus marcas quedaron guardadas.</p>
-        </div>
+        </output>
       }
 
       <div class="area-filter-row">
@@ -119,10 +119,10 @@
               (pointercancel)="onRowPointerUpOrCancel()"
             >
               @if (vm.rowState(pregunta) === 'editing') {
-                <span class="row__chip" role="status" aria-live="polite">
+                <output class="row__chip" aria-live="polite">
                   <span class="material-symbols-outlined" aria-hidden="true">edit</span>
                   Toca para cambiar
-                </span>
+                </output>
               }
               <span class="fila__numero">{{ pregunta.toString().padStart(2, '0') }}</span>
               <div class="fila__bubbles">
@@ -145,7 +145,7 @@
         </section>
 
         @if (vm.submissionState() === 'queued') {
-          <div class="queued-banner" role="status" aria-live="polite">
+          <output class="queued-banner" aria-live="polite">
             <span class="queued-banner__icon" aria-hidden="true">●</span>
             <div class="queued-banner__copy">
               <p class="queued-banner__title">Pendiente de envío</p>
@@ -153,7 +153,7 @@
                 Sin conexión. Tus respuestas se enviarán automáticamente cuando vuelva la red.
               </p>
             </div>
-          </div>
+          </output>
         }
       }
 

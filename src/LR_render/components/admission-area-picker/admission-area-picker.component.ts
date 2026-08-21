@@ -110,8 +110,7 @@ export class AdmissionAreaPickerComponent {
   //     `GENERAL` no está en el subset, ningún chip aplica span-3 y el grid
   //     se adapta natural.
   protected readonly visibleAreas = computed<readonly string[]>(() => {
-    const allowed = this._allowedAreas();
-    return allowed === null ? ADMISSION_AREAS : allowed;
+    return this._allowedAreas() ?? ADMISSION_AREAS;
   });
 
   // Estado del long-press en curso. Vivimos acá (no en signals) porque son

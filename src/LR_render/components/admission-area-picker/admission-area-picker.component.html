@@ -25,12 +25,12 @@
     aria-label="Selección de área"
   >
     @if (forceOpenSig()) {
-      <p class="area-picker__prompt" role="status" aria-live="polite">Selecciona tu área</p>
+      <output class="area-picker__prompt" aria-live="polite">Selecciona tu área</output>
     } @else {
-      <span class="row__chip" role="status" aria-live="polite">
+      <output class="row__chip" aria-live="polite">
         <span class="material-symbols-outlined" aria-hidden="true">edit</span>
         Toca para cambiar
-      </span>
+      </output>
     }
     <div class="area-picker__grid">
       @for (area of visibleAreas(); track area) {
