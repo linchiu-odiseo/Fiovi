@@ -65,6 +65,36 @@ export class DemoSheetViewModel {
   // dispara `submit()`; `cancelarConfirmacion()` solo lo cierra.
   readonly confirmarEnvioAbierto = signal<boolean>(false);
 
+  // Filtro visual del botón cíclico `todas → marcadas → blancos`. NO afecta
+  // el submit — solo la grilla renderizada. `preguntasVisibles` deriva de acá
+  // y de las marcaciones actuales.
+  readonly filtroPreguntas = signal<'todas' | 'marcadas' | 'blancos'>('todas');
+
+  readonly marcadasCount = computed(() => {
+    const map = this.marcaciones();
+    let n = 0;
+    for (const v of Object.values(map)) {
+      if (v !== null) n++;
+    }
+    return n;
+  });
+
+  readonly blancosCount = computed(() => this.preguntasCount() - this.marcadasCount());
+
+  // Preguntas efectivamente renderizadas en la grilla según el filtro. En
+  // 'todas' devuelve el array completo; en 'marcadas' / 'blancos' filtra.
+  // Signal derivado — recompone cuando cambia marcaciones o el filtro.
+  readonly preguntasVisibles: Signal<readonly number[]> = computed(() => {
+    const filtro = this.filtroPreguntas();
+    const all = this.preguntas();
+    if (filtro === 'todas') return all;
+    const map = this.marcaciones();
+    if (filtro === 'marcadas') {
+      return all.filter((p) => map[String(p)] !== null);
+    }
+    return all.filter((p) => map[String(p)] === null);
+  });
+
   // Ticker que refresca cada segundo para que el countdown recompute.
   readonly nowTick = signal<Date>(new Date());
   private readonly startedAt = new Date();
@@ -246,13 +276,22 @@ export class DemoSheetViewModel {
   // DEV: cambia el volumen de preguntas y resetea la cartilla al nuevo tamaño.
   // Ignora valores no positivos por defensa. No-op si el count ya coincide para
   // evitar wipe innecesario cuando el usuario re-clickea el mismo pill.
+  //
+  // Reset del filtro a 'todas' — en cartillas nuevas (o cortas) no tiene sentido
+  // arrastrar el filtro anterior.
   cambiarPreguntasCount(n: number): void {
     if (this.stopped) return;
     if (!Number.isInteger(n) || n <= 0) return;
     if (this.preguntasCount() === n) return;
     this.preguntasCount.set(n);
     this.marcaciones.set(this.emptyAnswersMap());
+    this.filtroPreguntas.set('todas');
     this.exitEditing();
+  }
+
+  cambiarFiltro(filtro: 'todas' | 'marcadas' | 'blancos'): void {
+    if (this.stopped) return;
+    this.filtroPreguntas.set(filtro);
   }
 
   private emptyAnswersMap(): AnswersMap {

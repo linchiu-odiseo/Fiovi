@@ -44,10 +44,29 @@
     </div>
   }
 
-  <app-admission-area-picker
-    [admissionArea]="vm.admissionArea()"
-    (seleccion)="onAdmissionAreaSeleccion($event)"
-  />
+  <div class="area-filter-row">
+    <p class="area-filter-row__hint">Mantén presionado para cambiar</p>
+    <div class="area-filter-row__body">
+      <app-admission-area-picker
+        class="area-filter-row__picker"
+        [admissionArea]="vm.admissionArea()"
+        [showHint]="false"
+        (seleccion)="onAdmissionAreaSeleccion($event)"
+      />
+      <button
+        type="button"
+        class="filter-cycle"
+        [class.filter-cycle--marcadas]="vm.filtroPreguntas() === 'marcadas'"
+        [class.filter-cycle--blancos]="vm.filtroPreguntas() === 'blancos'"
+        [class.filter-cycle--todas]="vm.filtroPreguntas() === 'todas'"
+        [attr.aria-label]="'Filtro: ' + filtroLabel() + '. Toca para cambiar.'"
+        (click)="onCiclarFiltro()"
+      >
+        <span class="filter-cycle__label">{{ filtroLabel() }}</span>
+        <span class="filter-cycle__count">{{ filtroCount() }}</span>
+      </button>
+    </div>
+  </div>
 
   <section
     class="grilla"
@@ -55,14 +74,12 @@
     [attr.aria-disabled]="!vm.vigente() ? 'true' : null"
     aria-label="Cartilla de marcaciones (demo)"
   >
-    @for (pregunta of vm.preguntas(); track pregunta) {
+    @for (pregunta of vm.preguntasVisibles(); track pregunta) {
       <div
         class="fila"
         [class.fila--locked]="vm.rowState(pregunta) === 'locked'"
         [class.fila--editing]="vm.rowState(pregunta) === 'editing'"
-        [class.fila--marcada]="
-          vm.rowState(pregunta) === 'locked' && vm.preguntasCount() > 25
-        "
+        [class.fila--marcada]="vm.rowState(pregunta) === 'locked'"
         [attr.aria-label]="'Pregunta ' + pregunta"
         role="radiogroup"
         (pointerdown)="onRowPointerDown(pregunta, $event)"

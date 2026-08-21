@@ -12,7 +12,9 @@
     >
       {{ admissionArea ?? 'Selecciona tu área' }}
     </button>
-    <span class="area-summary__hint"> Mantén presionado<br />para cambiar </span>
+    @if (showHintSig()) {
+      <span class="area-summary__hint"> Mantén presionado<br />para cambiar </span>
+    }
   </div>
 }
 

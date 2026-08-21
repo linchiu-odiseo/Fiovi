@@ -24,9 +24,143 @@
   box-sizing: border-box;
 }
 
-// Panel dev-only para cambiar en vivo la cantidad de preguntas del demo.
-// Fila de pills compacta arriba del header. Solo existe en la demo — ver
-// racional de duplicación al inicio del archivo.
+// Layout unificado área + filtro cíclico en una fila. El hint "Mantén
+// presionado para cambiar" vive arriba a la izquierda (font chico), y
+// reemplaza al hint interno del picker (desactivado con [showHint]="false").
+// Cuando el picker se expande al grid 6-col, el `:has(.picker-expanded)`
+// oculta el filter — mejor que empujarlo abajo o meterlo en overlap.
+.area-filter-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  &__hint {
+    margin: 0 auto 0 6px;
+    font-family: var(--font-mono);
+    font-size: 0.5625rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-outline);
+    text-align: left;
+    line-height: 1.2;
+  }
+
+  &__body {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 8px;
+
+    // Cuando el picker se expande al grid 6-col ocultamos el filter — mejor
+    // que empujarlo abajo (el grid necesita el ancho completo y el filter
+    // pierde relevancia mientras el alumno elige área). Al colapsar vuelve.
+    // `.picker-expanded` viene del HostBinding del picker.
+    &:has(.picker-expanded) .filter-cycle {
+      display: none;
+    }
+  }
+
+  // Picker crece para llenar el ancho sobrante — el filter-cycle a la
+  // derecha mantiene su ancho natural (flex: 0 0 auto) y el picker toma
+  // el resto. Cuando el picker se expande al grid, el filter se oculta
+  // por el `:has()` de arriba y el picker cubre solo la fila.
+  &__picker {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+
+// Botón cíclico de filtro: card blanco con borde outline (mismo look que
+// el card del área para que se vean como pareja). Un tap avanza al
+// siguiente estado del ciclo (todas → marcadas → blancos → todas).
+.filter-cycle {
+  appearance: none;
+  flex: 0 0 auto;
+  padding: 10px 10px;
+  background: var(--color-surface-container-lowest);
+  border: 1px solid var(--color-outline-variant);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  color: var(--color-on-surface-variant);
+  white-space: nowrap;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    transform 60ms ease;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+
+  &__label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--color-primary);
+  }
+
+  &__count {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-primary);
+  }
+
+  // Fondo según el estado activo — refuerza visualmente qué filtro está
+  // aplicado. Verde saturado igual al de las filas marcadas (pero más fuerte
+  // porque acá es zona chica y necesita contraste); blanco puro con sombra
+  // sutil cuando muestra los sin marcar; gris tenue en modo "todas".
+  &--marcadas {
+    background: rgb(69 225 183 / 45%);
+    border-color: rgb(69 225 183 / 70%);
+  }
+
+  &--blancos {
+    background: #ffffff;
+    border-color: var(--color-outline);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 6%);
+  }
+
+  &--todas {
+    background: rgb(116 119 128 / 18%);
+    border-color: rgb(116 119 128 / 35%);
+  }
+
+  // Hover solo en dispositivos con puntero fino (mouse/trackpad). En touch
+  // el `:hover` táctil queda "pegado" post-tap hasta el próximo toque en
+  // otro lado — el guard `@media (hover: hover)` lo evita en móvil. Además,
+  // cada estado tiene su propio hover en el MISMO tono para que nunca se
+  // vuelva gris azulado cuando debería ser verde/blanco.
+  @media (hover: hover) and (pointer: fine) {
+    &--marcadas:hover {
+      background: rgb(69 225 183 / 60%);
+      border-color: rgb(69 225 183 / 85%);
+    }
+
+    &--blancos:hover {
+      background: #f5f7fa;
+    }
+
+    &--todas:hover {
+      background: rgb(116 119 128 / 28%);
+      border-color: rgb(116 119 128 / 50%);
+    }
+  }
+}
+
 // Panel dev del selector de preguntas. Vive entre el header y el picker de
 // área. Siempre una sola fila (nunca `flex-wrap`); si los pills no caben
 // en pantallas muy chicas, scroll horizontal con inercia iOS. Sin label —
@@ -251,17 +385,14 @@
     gap: 0.4rem;
   }
 
-  // Highlight verde tenue para filas MARCADAS. Feedback positivo tipo
-  // checklist: al principio la cartilla está limpia (blancos), y cada marca
-  // deja una fila verde. Al scrollear el alumno ve rápido qué respondió y
-  // qué queda vacío (no verde = falta). Se declara ANTES de `--editing`:
-  // cuando la fila entra en edición, gana el borde primary + shadow.
-  //
-  // TEMPORAL demo-only: threshold `> 25` vive inline en el template. Si el
-  // jefe aprueba, replicar en simulacro.page con la misma condición.
+  // Highlight verde mint para filas marcadas. Feedback tipo checklist:
+  // al principio la cartilla está limpia (blancos), y cada marca deja una
+  // fila verde. Al scrollear el alumno ve rápido qué respondió y qué queda
+  // vacío. Se declara ANTES de `--editing`: cuando la fila entra en modo
+  // edición, el borde primary + shadow ganan por orden de aparición.
   &--marcada {
-    background: rgb(46 125 50 / 8%);
-    border-color: rgb(46 125 50 / 22%);
+    background: rgb(69 225 183 / 20%);
+    border-color: rgb(69 225 183 / 20%);
   }
 
   &--editing {

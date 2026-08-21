@@ -10,6 +10,18 @@ import { AdmissionAreaPickerComponent } from '../../components/admission-area-pi
 
 const ALTERNATIVAS: readonly AlternativaValue[] = ['A', 'B', 'C', 'D', 'E'];
 
+type QuestionsFilter = 'todas' | 'marcadas' | 'blancos';
+
+// Ciclo del botón: cada tap avanza al siguiente. Loop natural
+// (blancos → vuelve a todas).
+const FILTRO_CICLO: readonly QuestionsFilter[] = ['todas', 'marcadas', 'blancos'];
+
+const FILTRO_LABELS: Readonly<Record<QuestionsFilter, string>> = {
+  todas: 'TODAS',
+  marcadas: 'MARCADAS',
+  blancos: 'BLANCOS',
+};
+
 // Duración mínima del press para que cuente como long-press. Estándar en
 // gestos táctiles (Material, iOS): 500ms es lo que se siente "deliberado"
 // sin sentirse "lento". Por debajo da falsos positivos con scroll/tap rápido.
@@ -164,5 +176,25 @@ export class SimulacroPage {
 
   protected onDadoClick(): void {
     void this.vm.marcarAleatorio();
+  }
+
+  // Botón cíclico de filtro: label uppercase del estado actual + contador
+  // en vivo. Cada tap avanza al siguiente en `FILTRO_CICLO` (loop natural).
+  protected filtroLabel(): string {
+    return FILTRO_LABELS[this.vm.filtroPreguntas()];
+  }
+
+  protected filtroCount(): number {
+    const f = this.vm.filtroPreguntas();
+    if (f === 'marcadas') return this.vm.marcadasCount();
+    if (f === 'blancos') return this.vm.blancosCount();
+    return this.vm.preguntas().length;
+  }
+
+  protected onCiclarFiltro(): void {
+    const actual = this.vm.filtroPreguntas();
+    const idx = FILTRO_CICLO.indexOf(actual);
+    const proximo = FILTRO_CICLO[(idx + 1) % FILTRO_CICLO.length]!;
+    this.vm.cambiarFiltro(proximo);
   }
 }

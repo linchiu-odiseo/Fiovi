@@ -3,6 +3,7 @@ import {
   Component,
   computed,
   EventEmitter,
+  HostBinding,
   Input,
   Output,
   signal,
@@ -73,6 +74,16 @@ export class AdmissionAreaPickerComponent {
     this.forceOpenSig.set(value);
   }
 
+  // Cuando false, oculta el texto lateral "Mantén presionado para cambiar".
+  // El caller es responsable de mostrarlo por afuera si lo necesita. Útil
+  // en layouts donde el pill comparte fila con otros controles (ej. el wheel
+  // de filtro del demo, donde el hint vive arriba del bloque).
+  protected readonly showHintSig = signal(true);
+  @Input()
+  set showHint(value: boolean) {
+    this.showHintSig.set(value);
+  }
+
   @Output() readonly seleccion = new EventEmitter<AdmissionArea>();
 
   // false = colapsado (pill), true = expandido (grid 3×6).
@@ -83,6 +94,14 @@ export class AdmissionAreaPickerComponent {
   // apaga forceOpen), el picker vuelve al valor local de `expanded`, que en
   // ese momento es false por el `onChipClick`.
   protected readonly displayExpanded = computed(() => this.forceOpenSig() || this.expanded());
+
+  // Refleja `displayExpanded` como clase en el host. Permite que layouts
+  // exteriores reaccionen sin API extra (ej. el demo oculta el filter
+  // cíclico al lado con `:has(.picker-expanded)`).
+  @HostBinding('class.picker-expanded')
+  get expandedHostClass(): boolean {
+    return this.displayExpanded();
+  }
 
   // Lista efectiva para el @for del grid:
   //   - Sin restricción del back → `ADMISSION_AREAS` (16 conocidas, orden VO,

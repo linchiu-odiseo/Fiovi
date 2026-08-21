@@ -172,6 +172,43 @@ export class SimulacroPageViewModel {
   // UX pida render visible del estado del auto-save.
   readonly draftStatus = signal<'idle' | 'syncing' | 'synced' | 'offline'>('idle');
 
+  // Filtro visual del botón cíclico `todas → marcadas → blancos`. NO afecta
+  // el submit (las marcaciones persistidas en IDB se envían todas), solo la
+  // grilla renderizada. Espejo del demo — en la cartilla real el alumno
+  // puede usarlo para ubicar rápido las que le faltan sin scroll largo.
+  readonly filtroPreguntas = signal<'todas' | 'marcadas' | 'blancos'>('todas');
+
+  readonly marcadasCount = computed(() => {
+    const map = this.marcaciones();
+    let n = 0;
+    for (const v of Object.values(map)) {
+      if (v !== null) n++;
+    }
+    return n;
+  });
+
+  readonly blancosCount = computed(() => this.preguntas().length - this.marcadasCount());
+
+  // Preguntas efectivamente renderizadas en la grilla según el filtro. En
+  // 'todas' devuelve el array completo; en 'marcadas' / 'blancos' filtra.
+  // El modal de confirmación sigue leyendo `preguntas()` (no `visibles`) para
+  // mostrar el resumen completo aunque el alumno haya filtrado.
+  readonly preguntasVisibles: Signal<readonly number[]> = computed(() => {
+    const filtro = this.filtroPreguntas();
+    const all = this.preguntas();
+    if (filtro === 'todas') return all;
+    const map = this.marcaciones();
+    if (filtro === 'marcadas') {
+      return all.filter((p) => map[String(p)] !== null);
+    }
+    return all.filter((p) => map[String(p)] === null);
+  });
+
+  cambiarFiltro(filtro: 'todas' | 'marcadas' | 'blancos'): void {
+    if (this.stopped) return;
+    this.filtroPreguntas.set(filtro);
+  }
+
   // Lista derivada de números de pregunta 1..count. Recomputa solo cuando
   // cambia el examen — barato.
   readonly preguntas: Signal<readonly number[]> = computed(() => {
