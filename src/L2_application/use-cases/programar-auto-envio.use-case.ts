@@ -14,6 +14,11 @@ export interface ProgramarAutoEnvioInput {
   exam: Exam;
   onResult?: (result: EnviarSimulacroOutput) => void;
   onError?: (err: unknown) => void;
+  // Callback invocado JUSTO ANTES de disparar el POST del auto-envío.
+  // Sync, sin efectos observables al resultado. Consumido por el view-model
+  // para emitir el evento `AS` del audit-log (distinguir auto vs manual).
+  // El use case no depende de audit-log — solo expone el hook opcional.
+  onFire?: () => void;
 }
 
 export interface AutoEnvioHandle {
@@ -56,6 +61,7 @@ export class ProgramarAutoEnvioUseCase {
 
     const timeout = setTimeout(async () => {
       try {
+        input.onFire?.();
         const result = await this.enviar.execute({
           examId: input.exam.id,
           clientFinishedAtOverride: finDate,

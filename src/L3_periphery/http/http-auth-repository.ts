@@ -1,7 +1,9 @@
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { AuthRepository } from '../../L1_domain/ports/auth-repository';
+import { ENDPOINT_IDS } from '../telemetry/audit-log-dictionaries';
+import { ENDPOINT_ID_TOKEN } from '../telemetry/tokens';
 import { Identity, Role } from '../../L1_domain/entities/identity';
 import { SelectionChallenge } from '../../L1_domain/value-objects/selection-challenge';
 import { SsoProvider } from '../../L1_domain/value-objects/sso-provider';
@@ -150,6 +152,7 @@ export class HttpAuthRepository implements AuthRepository {
         this.http.post<PublicAuthResponseDto | PublicAuthSelectionResponseDto>(
           apiPath.login(),
           body,
+          { context: new HttpContext().set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.login) },
         ),
       );
       if (isSelectionResponse(dto)) {
@@ -169,7 +172,9 @@ export class HttpAuthRepository implements AuthRepository {
   async selectTenant(input: { selectionToken: string; slug: string }): Promise<Identity> {
     try {
       const dto = await firstValueFrom(
-        this.http.post<PublicAuthResponseDto>(apiPath.selectTenant(), input),
+        this.http.post<PublicAuthResponseDto>(apiPath.selectTenant(), input, {
+          context: new HttpContext().set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.selectTenant),
+        }),
       );
       return this.mapIdentityFromPublic(dto);
     } catch (err) {
@@ -181,7 +186,9 @@ export class HttpAuthRepository implements AuthRepository {
   async listSsoProviders(): Promise<SsoProvider[]> {
     try {
       const dto = await firstValueFrom(
-        this.http.get<PublicSsoProvidersResponseDto>(apiPath.listSsoProviders()),
+        this.http.get<PublicSsoProvidersResponseDto>(apiPath.listSsoProviders(), {
+          context: new HttpContext().set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.listSsoProviders),
+        }),
       );
       return dto.providers.map((p) => ({ provider: p.provider, displayName: p.displayName }));
     } catch {
@@ -195,7 +202,11 @@ export class HttpAuthRepository implements AuthRepository {
   async me(): Promise<Identity> {
     const slug = this.requireSlug();
     try {
-      const dto = await firstValueFrom(this.http.get<TenantAuthResponseDto>(apiPath.me(slug)));
+      const dto = await firstValueFrom(
+        this.http.get<TenantAuthResponseDto>(apiPath.me(slug), {
+          context: new HttpContext().set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.me),
+        }),
+      );
       return this.mapIdentityFromTenant(dto, slug);
     } catch (err) {
       if (err instanceof UnsupportedRoleError) throw err;
@@ -207,7 +218,13 @@ export class HttpAuthRepository implements AuthRepository {
     const slug = this.requireSlug();
     try {
       const dto = await firstValueFrom(
-        this.http.post<TenantAuthResponseDto>(apiPath.refresh(slug), {}),
+        this.http.post<TenantAuthResponseDto>(
+          apiPath.refresh(slug),
+          {},
+          {
+            context: new HttpContext().set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.refresh),
+          },
+        ),
       );
       return this.mapIdentityFromTenant(dto, slug);
     } catch (err) {
@@ -221,7 +238,15 @@ export class HttpAuthRepository implements AuthRepository {
     if (!slug) return; // sin slug no hay endpoint que llamar — best-effort.
     // Best-effort: errores de red o 5xx no se clasifican — el LogoutUseCase
     // ya envuelve la llamada en try/catch y continúa con la limpieza local.
-    await firstValueFrom(this.http.post(apiPath.logout(slug), {}));
+    await firstValueFrom(
+      this.http.post(
+        apiPath.logout(slug),
+        {},
+        {
+          context: new HttpContext().set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.logout),
+        },
+      ),
+    );
   }
 
   async getProfile(role: Role): Promise<StudentProfile | TutorProfile> {
@@ -229,12 +254,16 @@ export class HttpAuthRepository implements AuthRepository {
     try {
       if (role === 'student') {
         const dto = await firstValueFrom(
-          this.http.get<StudentProfileDto>(apiPath.profile(slug, 'student')),
+          this.http.get<StudentProfileDto>(apiPath.profile(slug, 'student'), {
+            context: new HttpContext().set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.profile),
+          }),
         );
         return this.mapStudentProfile(dto);
       }
       const dto = await firstValueFrom(
-        this.http.get<TutorProfileDto>(apiPath.profile(slug, 'tutor')),
+        this.http.get<TutorProfileDto>(apiPath.profile(slug, 'tutor'), {
+          context: new HttpContext().set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.profile),
+        }),
       );
       return this.mapTutorProfile(dto);
     } catch (err) {

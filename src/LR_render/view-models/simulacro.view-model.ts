@@ -12,6 +12,9 @@ import {
 import { SeleccionarAdmissionAreaUseCase } from '../../L2_application/use-cases/seleccionar-admission-area.use-case';
 import { CLOCK, MARKINGS_STORAGE } from '../../app.config';
 import { DraftAutoSaveDispatcher } from '../../L3_periphery/envio/draft-auto-save-dispatcher.service';
+import { AuditLogStore } from '../../L3_periphery/telemetry/audit-log-store.service';
+import { shortSessionId } from '../../L3_periphery/telemetry/day-key';
+import type { AlternativaCode } from '../../L3_periphery/telemetry/audit-log-event';
 import { Exam } from '../../L1_domain/entities/exam';
 import { Alternativa } from '../../L1_domain/value-objects/alternativa';
 import { AlternativaValue, AnswersMap } from '../../L1_domain/ports/markings-storage';
@@ -101,6 +104,7 @@ export class SimulacroPageViewModel {
   // environment.draftEnabled===true, o NoopDraftAutoSaveDispatcher si está
   // apagado. El view-model llama métodos sin condicional (design.md D7).
   private readonly draftDispatcher = inject(DraftAutoSaveDispatcher);
+  private readonly auditLog = inject(AuditLogStore);
 
   readonly exam = signal<Exam | null>(null);
   readonly marcaciones = signal<AnswersMap>({});
@@ -432,6 +436,12 @@ export class SimulacroPageViewModel {
 
     this.sessionId = encontrado.id;
     this.exam.set(encontrado);
+    // Audit-log: emitir SS (session start) al abrir la sesión. Fire-and-forget.
+    this.auditLog.append({
+      t: Date.now(),
+      e: 'SS',
+      s: shortSessionId(this.sessionId),
+    });
     // Modo "tarea": si ya hay un myStartedAt sellado en visitas previas,
     // lo restauramos y seguimos el flujo normal. Si no lo hay, esta es la
     // primera vez que el alumno abre la tarea (o volvió sin confirmar):
@@ -630,6 +640,14 @@ export class SimulacroPageViewModel {
     });
 
     this.marcaciones.update((prev) => ({ ...prev, [String(pregunta)]: proxima }));
+    // Audit-log: emitir MK. Fire-and-forget. `null` → '0' (clear).
+    this.auditLog.append({
+      t: Date.now(),
+      e: 'MK',
+      s: shortSessionId(this.sessionId),
+      q: pregunta,
+      a: mkAlt(proxima),
+    });
     // Notificar al dispatcher que hay cambios para auto-save. Se llama DESPUÉS
     // de la escritura exitosa en IDB — el dispatcher leerá el snapshot de IDB
     // cuando el debounce expire. Si el flag está apagado, el Noop absorbe la
@@ -666,6 +684,14 @@ export class SimulacroPageViewModel {
         alternativa: Alternativa.fromString(proxima),
       });
       nuevoMap[String(pregunta)] = proxima;
+      // Audit-log: emitir MK por cada pregunta del batch aleatorio.
+      this.auditLog.append({
+        t: Date.now(),
+        e: 'MK',
+        s: shortSessionId(this.sessionId),
+        q: pregunta,
+        a: mkAlt(proxima),
+      });
     }
 
     this.marcaciones.set(nuevoMap);
@@ -818,6 +844,9 @@ export class SimulacroPageViewModel {
         this.tareaAutoEnvioTimer = null;
         if (this.stopped) return;
         if (this.isSubmitting()) return;
+        // Audit-log: marcar que este submit es auto (timer disparó) para
+        // distinguirlo del submit manual en reclamos post-facto.
+        this.emitAutoSubmit();
         // submit() se encarga del router por modo, del stateo de submissionState,
         // del cancel del draft dispatcher, etc.
         void this.submit();
@@ -829,6 +858,8 @@ export class SimulacroPageViewModel {
     // a EnviarSimulacroUseCase con clientFinishedAtOverride para lock exact.
     this.autoEnvioHandle = this.programarAutoEnvio.execute({
       exam,
+      // Emitir AS justo antes del POST del auto-envío (hook onFire del use case).
+      onFire: () => this.emitAutoSubmit(),
       onResult: (result) => {
         // El timer ya disparó: el handle representa un cancelable agotado.
         // Lo soltamos para que `maybeRedirectIfExpired` no quede bloqueado
@@ -854,6 +885,19 @@ export class SimulacroPageViewModel {
         if (this.stopped) return;
         this.handleSubmissionError(err);
       },
+    });
+  }
+
+  // Audit-log: emitir evento AS (auto-submit fired). Se invoca desde:
+  //   - Modo tarea: setTimeout callback ANTES de llamar `submit()`.
+  //   - Modo examen: pasado como `onFire` al use case; el use case lo llama
+  //     ANTES del POST a `enviar-simulacro`.
+  // Fire-and-forget (store cachea excepciones).
+  private emitAutoSubmit(): void {
+    this.auditLog.append({
+      t: Date.now(),
+      e: 'AS',
+      s: shortSessionId(this.sessionId),
     });
   }
 
@@ -1022,6 +1066,12 @@ export class SimulacroPageViewModel {
       this.countdownTimer = null;
     }
   }
+}
+
+// Mapea AlternativaValue (null | 'A'..'E') al AlternativaCode del audit-log
+// ('0' | 'A'..'E'). null (clear) → '0'.
+function mkAlt(v: AlternativaValue): AlternativaCode {
+  return v === null ? '0' : v;
 }
 
 function formatHHMM(d: Date): string {

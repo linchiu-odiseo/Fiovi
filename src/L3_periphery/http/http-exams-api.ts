@@ -1,7 +1,10 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { timeout } from 'rxjs/operators';
+import { ENDPOINT_IDS } from '../telemetry/audit-log-dictionaries';
+import { ENDPOINT_ID_TOKEN, MARKS_COUNT_TOKEN, SESSION_ID_TOKEN } from '../telemetry/tokens';
+import { shortSessionId } from '../telemetry/day-key';
 import {
   DraftRequest,
   EnvioRequest,
@@ -151,7 +154,9 @@ export class HttpExamsApi implements ExamsApi {
   async getTodaysExams(): Promise<ExamsListResult> {
     try {
       const dto = await firstValueFrom(
-        this.http.get<ExamsListResponseDto>(apiPath.studentExamSessions(this.requireSlug())),
+        this.http.get<ExamsListResponseDto>(apiPath.studentExamSessions(this.requireSlug()), {
+          context: new HttpContext().set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.studentExamSessions),
+        }),
       );
       // Pasa el DTO al dominio sin filtrar: los casos `in_progress` con
       // `started === null` (data rara que el back en teoría nunca emite)
@@ -186,6 +191,12 @@ export class HttpExamsApi implements ExamsApi {
             responses: req.responses,
             client_finished_at: req.clientFinishedAt,
           },
+          {
+            context: new HttpContext()
+              .set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.studentExamSubmit)
+              .set(MARKS_COUNT_TOKEN, countMarks(req.responses))
+              .set(SESSION_ID_TOKEN, shortSessionId(req.examId)),
+          },
         ),
       );
       // El VO valida shape: hash 64 hex, submittedAt Date válido.
@@ -211,6 +222,12 @@ export class HttpExamsApi implements ExamsApi {
             responses: req.responses,
             client_finished_at: req.clientFinishedAt,
           },
+          {
+            context: new HttpContext()
+              .set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.studentExamSubmitHomework)
+              .set(MARKS_COUNT_TOKEN, countMarks(req.responses))
+              .set(SESSION_ID_TOKEN, shortSessionId(req.examId)),
+          },
         ),
       );
       const ack = new SubmissionAck(dto.id, dto.submission_hash, new Date(dto.submitted_at));
@@ -231,11 +248,20 @@ export class HttpExamsApi implements ExamsApi {
     try {
       await firstValueFrom(
         this.http
-          .post<void>(apiPath.studentExamDraft(this.requireSlug(), req.examId), {
-            code: req.code,
-            admission_area: req.admissionArea,
-            responses: req.responses,
-          })
+          .post<void>(
+            apiPath.studentExamDraft(this.requireSlug(), req.examId),
+            {
+              code: req.code,
+              admission_area: req.admissionArea,
+              responses: req.responses,
+            },
+            {
+              context: new HttpContext()
+                .set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.studentExamDraft)
+                .set(MARKS_COUNT_TOKEN, countMarksFromCompact(req.responses))
+                .set(SESSION_ID_TOKEN, shortSessionId(req.examId)),
+            },
+          )
           .pipe(timeout(10_000)),
       );
     } catch (err) {
@@ -249,7 +275,14 @@ export class HttpExamsApi implements ExamsApi {
     try {
       const dto = await firstValueFrom(
         this.http
-          .get<MySubmissionResponseDto>(apiPath.studentMySubmission(this.requireSlug(), sessionId))
+          .get<MySubmissionResponseDto>(
+            apiPath.studentMySubmission(this.requireSlug(), sessionId),
+            {
+              context: new HttpContext()
+                .set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.studentMySubmission)
+                .set(SESSION_ID_TOKEN, shortSessionId(sessionId)),
+            },
+          )
           .pipe(timeout(10_000)),
       );
       return this.toMySubmission(dto);
@@ -454,4 +487,21 @@ export class HttpExamsApi implements ExamsApi {
     }
     return new NetworkError();
   }
+}
+
+// Cuenta las respuestas del Record (submit/submit-homework). Todas las
+// entradas del Record ya vienen filtradas por el L2 (sin nulls) — el conteo
+// es el size del objeto.
+function countMarks(responses: Record<string, 'A' | 'B' | 'C' | 'D' | 'E'>): number {
+  return Object.keys(responses).length;
+}
+
+// Cuenta las respuestas del string compacto del draft. Cada '-' representa
+// una pregunta sin marcar; el resto son A-E. Ver DraftRequest.responses.
+function countMarksFromCompact(compact: string): number {
+  let n = 0;
+  for (const c of compact) {
+    if (c !== '-') n++;
+  }
+  return n;
 }

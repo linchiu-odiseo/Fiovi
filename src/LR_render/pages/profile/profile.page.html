@@ -87,6 +87,18 @@
         <span class="menu-item__label">Acerca de</span>
       </button>
     </li>
+
+    <li>
+      <button
+        type="button"
+        class="menu-item"
+        (click)="onDescargarLogsClick()"
+        data-testid="descargar-logs-link"
+      >
+        <span class="material-symbols-outlined menu-item__icon" aria-hidden="true">download</span>
+        <span class="menu-item__label">Descargar logs</span>
+      </button>
+    </li>
   </ul>
 
   <footer class="profile__footer">

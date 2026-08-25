@@ -4,6 +4,7 @@ import { GetIdentityUseCase } from '../../../L2_application/use-cases/get-identi
 import { GetProfileUseCase } from '../../../L2_application/use-cases/get-profile.use-case';
 import { LogoutUseCase } from '../../../L2_application/use-cases/logout.use-case';
 import { PwaUpdateService } from '../../../L3_periphery/pwa/pwa-update.service';
+import { AuditLogSerializer } from '../../../L3_periphery/telemetry/audit-log-serializer';
 import { environment } from '../../../environments/environment';
 import { StudentProfile } from '../../../L1_domain/value-objects/student-profile';
 import { TutorProfile } from '../../../L1_domain/value-objects/tutor-profile';
@@ -39,6 +40,7 @@ export class ProfilePage {
   private readonly getIdentity = inject(GetIdentityUseCase);
   private readonly getProfile = inject(GetProfileUseCase);
   private readonly logout = inject(LogoutUseCase);
+  private readonly auditLogSerializer = inject(AuditLogSerializer);
   protected readonly pwa = inject(PwaUpdateService);
 
   protected readonly appVersion = environment.appVersion;
@@ -169,6 +171,13 @@ export class ProfilePage {
 
   protected onAcercaDeClick(): void {
     this.showAboutModal.set(true);
+  }
+
+  protected async onDescargarLogsClick(): Promise<void> {
+    // Audit-log Fase 0: descarga NDJSON del día actual. Siempre visible en la
+    // rama feat/audit-log-fase-0 (sin feature flag per design Decision 6).
+    // Cuando la rama se promueva a develop se evalúa si necesita gating.
+    await this.auditLogSerializer.downloadCurrentDay();
   }
 
   protected onAboutModalDismiss(): void {

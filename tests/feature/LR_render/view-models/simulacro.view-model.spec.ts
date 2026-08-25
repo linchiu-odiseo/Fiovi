@@ -868,6 +868,18 @@ describe('SimulacroPageViewModel', () => {
       vm.stop();
     });
 
+    it('view-model pasa callback onFire al use case (para emitir AS en audit-log)', async () => {
+      const exam = buildExam('exam-1', 'in_progress');
+      fakeGetTodaysExams.willResolve([exam]);
+      const vm = createVm();
+      await vm.start('exam-1');
+
+      expect(fakeProgramar.calls).toHaveLength(1);
+      expect(fakeProgramar.calls[0].onFire).toBeDefined();
+      expect(typeof fakeProgramar.calls[0].onFire).toBe('function');
+      vm.stop();
+    });
+
     it('onResult con status queued → submissionState=queued, lastAck null, NO navega', async () => {
       const exam = buildExam('exam-1', 'in_progress');
       fakeGetTodaysExams.willResolve([exam]);

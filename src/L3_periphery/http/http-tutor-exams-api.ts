@@ -1,7 +1,9 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { timeout } from 'rxjs/operators';
+import { ENDPOINT_IDS } from '../telemetry/audit-log-dictionaries';
+import { ENDPOINT_ID_TOKEN } from '../telemetry/tokens';
 import { FinalizeResult, TutorExamsApi } from '../../L1_domain/ports/tutor-exams-api';
 import { TutorExam } from '../../L1_domain/entities/tutor-exam';
 import { TutorExamDetail } from '../../L1_domain/value-objects/tutor-exam-detail';
@@ -124,7 +126,9 @@ export class HttpTutorExamsApi implements TutorExamsApi {
     try {
       const dto = await firstValueFrom(
         this.http
-          .get<TutorVirtualExamListResponseDto>(apiPath.tutorVirtualExams(this.requireSlug()))
+          .get<TutorVirtualExamListResponseDto>(apiPath.tutorVirtualExams(this.requireSlug()), {
+            context: new HttpContext().set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.tutorVirtualExams),
+          })
           .pipe(timeout(10_000)),
       );
       return dto.items.map((item) => this.toTutorExam(item));
@@ -138,7 +142,9 @@ export class HttpTutorExamsApi implements TutorExamsApi {
     try {
       const dto = await firstValueFrom(
         this.http
-          .get<TutorFinalizadasResponseDto>(apiPath.tutorExamsFinalizadas(this.requireSlug()))
+          .get<TutorFinalizadasResponseDto>(apiPath.tutorExamsFinalizadas(this.requireSlug()), {
+            context: new HttpContext().set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.tutorExamsFinalizadas),
+          })
           .pipe(timeout(10_000)),
       );
       return dto.items.map((item) => this.toTutorExamFromFinalizada(item));
@@ -152,7 +158,9 @@ export class HttpTutorExamsApi implements TutorExamsApi {
     try {
       const dto = await firstValueFrom(
         this.http
-          .get<VirtualExamDetailDto>(apiPath.virtualExam(this.requireSlug(), recordId))
+          .get<VirtualExamDetailDto>(apiPath.virtualExam(this.requireSlug(), recordId), {
+            context: new HttpContext().set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.virtualExam),
+          })
           .pipe(timeout(10_000)),
       );
       return this.toTutorExamDetail(dto);
@@ -171,6 +179,9 @@ export class HttpTutorExamsApi implements TutorExamsApi {
         this.http
           .get<ClassroomStudentsResponseDto>(
             apiPath.classroomStudents(this.requireSlug(), req.classroomId, req.virtualExamDetailId),
+            {
+              context: new HttpContext().set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.classroomStudents),
+            },
           )
           .pipe(timeout(10_000)),
       );
@@ -188,9 +199,16 @@ export class HttpTutorExamsApi implements TutorExamsApi {
     try {
       await firstValueFrom(
         this.http
-          .patch<void>(apiPath.virtualExamEnabledStudents(this.requireSlug(), req.recordId), {
-            enabledStudentIds: req.enabledStudentIds,
-          })
+          .patch<void>(
+            apiPath.virtualExamEnabledStudents(this.requireSlug(), req.recordId),
+            { enabledStudentIds: req.enabledStudentIds },
+            {
+              context: new HttpContext().set(
+                ENDPOINT_ID_TOKEN,
+                ENDPOINT_IDS.virtualExamEnabledStudents,
+              ),
+            },
+          )
           .pipe(timeout(10_000)),
       );
     } catch (err) {
@@ -217,7 +235,9 @@ export class HttpTutorExamsApi implements TutorExamsApi {
     try {
       await firstValueFrom(
         this.http
-          .post<void>(apiPath.virtualExamStart(this.requireSlug(), recordId), body)
+          .post<void>(apiPath.virtualExamStart(this.requireSlug(), recordId), body, {
+            context: new HttpContext().set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.virtualExamStart),
+          })
           .pipe(timeout(10_000)),
       );
     } catch (err) {
@@ -236,6 +256,9 @@ export class HttpTutorExamsApi implements TutorExamsApi {
           .post<FinalizeResponseDto>(
             apiPath.virtualExamFinalize(this.requireSlug(), recordId),
             null,
+            {
+              context: new HttpContext().set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.virtualExamFinalize),
+            },
           )
           .pipe(timeout(10_000)),
       );
@@ -253,7 +276,9 @@ export class HttpTutorExamsApi implements TutorExamsApi {
     try {
       await firstValueFrom(
         this.http
-          .post<void>(apiPath.virtualExamArchive(this.requireSlug(), recordId), null)
+          .post<void>(apiPath.virtualExamArchive(this.requireSlug(), recordId), null, {
+            context: new HttpContext().set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.virtualExamArchive),
+          })
           .pipe(timeout(10_000)),
       );
     } catch (err) {
@@ -274,6 +299,12 @@ export class HttpTutorExamsApi implements TutorExamsApi {
           .post<RefreshEnabledResponseDto>(
             apiPath.virtualExamRefreshEnabled(this.requireSlug(), recordId),
             null,
+            {
+              context: new HttpContext().set(
+                ENDPOINT_ID_TOKEN,
+                ENDPOINT_IDS.virtualExamRefreshEnabled,
+              ),
+            },
           )
           .pipe(timeout(10_000)),
       );

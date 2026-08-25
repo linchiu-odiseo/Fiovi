@@ -68,6 +68,9 @@ import {
   NoopDraftAutoSaveDispatcher,
 } from './L3_periphery/envio/draft-auto-save-dispatcher.service';
 import { credentialsInterceptor } from './L3_periphery/interceptors/credentials.interceptor';
+import { auditLogInterceptor } from './L3_periphery/telemetry/audit-log.interceptor';
+import { AuditLogStore } from './L3_periphery/telemetry/audit-log-store.service';
+import { installAuditLogListeners } from './L3_periphery/telemetry/audit-log-listeners';
 import { BeforeInstallPromptAdapter } from './L3_periphery/pwa/before-install-prompt.adapter';
 import { BrowserInstallEnvironmentProbe } from './L3_periphery/pwa/browser-install-environment-probe';
 import { PwaUpdateService } from './L3_periphery/pwa/pwa-update.service';
@@ -129,7 +132,10 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes),
-    provideHttpClient(withInterceptors([credentialsInterceptor])),
+    // audit-log.interceptor va DESPUÉS de credentials para observar el flujo
+    // final (200 tras refresh exitoso o 401 final si refresh falló) sin
+    // duplicar la request de refresh como si fuera independiente (design Decision 2).
+    provideHttpClient(withInterceptors([credentialsInterceptor, auditLogInterceptor])),
     provideServiceWorker('ngsw-worker.js', {
       enabled: !isDevMode(),
       registrationStrategy: 'registerWhenStable:30000',
@@ -460,6 +466,13 @@ export const appConfig: ApplicationConfig = {
     // se queda en modo `hidden` en Android.
     provideAppInitializer(() => {
       inject(BeforeInstallPromptAdapter).start();
+    }),
+
+    // Audit-log Fase 0: instala listeners globales (visibilitychange,
+    // online/offline, appinstalled) y emite AO + DP + AI-standalone al
+    // bootstrap. Ver design.md Decisions 5, 8 y REQ-AL-02.
+    provideAppInitializer(() => {
+      installAuditLogListeners(inject(AuditLogStore));
     }),
   ],
 };
