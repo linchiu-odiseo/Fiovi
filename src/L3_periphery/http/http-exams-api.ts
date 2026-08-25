@@ -22,6 +22,7 @@ import { InvalidExamError } from '../../L1_domain/errors/invalid-exam.error';
 import { InvalidPayloadError } from '../../L1_domain/errors/invalid-payload.error';
 import { InvalidSubmissionTimeError } from '../../L1_domain/errors/invalid-submission-time.error';
 import { NetworkError } from '../../L1_domain/errors/network.error';
+import { RateLimitError } from '../../L1_domain/errors/rate-limit.error';
 import { ExamsPermissionRevokedError } from '../../L1_domain/errors/exams-permission-revoked.error';
 import { SimulacroCerradoError } from '../../L1_domain/errors/simulacro-cerrado.error';
 import { SimulacroNoAsignadoError } from '../../L1_domain/errors/simulacro-no-asignado.error';
@@ -319,6 +320,8 @@ export class HttpExamsApi implements ExamsApi {
 
   // Clasificación por (status, endpoint, body.code) — NUNCA por message.
   // 401 lo absorbe el credentials.interceptor (refresh + redirect login).
+  // 429: RateLimitError separado de NetworkError para que /home lo silencie
+  // (sin banner "Reintentar") y no gatille más 429 en el aula.
   private classifyListError(err: unknown): Error {
     if (err instanceof InvalidExamError) return err;
     if (err instanceof HttpErrorResponse) {
@@ -328,7 +331,8 @@ export class HttpExamsApi implements ExamsApi {
         if (body.code === 'STUDENT_NOT_LINKED') return new StudentNotLinkedError();
         return new NetworkError();
       }
-      if (err.status === 0 || err.status === 429 || err.status >= 500) {
+      if (err.status === 429) return new RateLimitError();
+      if (err.status === 0 || err.status >= 500) {
         return new NetworkError();
       }
     }
