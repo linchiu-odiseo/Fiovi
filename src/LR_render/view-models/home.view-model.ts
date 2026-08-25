@@ -9,6 +9,7 @@ import { Exam } from '../../L1_domain/entities/exam';
 import { StudentProfile } from '../../L1_domain/value-objects/student-profile';
 import { SubmissionAck } from '../../L1_domain/value-objects/submission-ack';
 import { NetworkError } from '../../L1_domain/errors/network.error';
+import { RateLimitError } from '../../L1_domain/errors/rate-limit.error';
 import { SessionExpiredError } from '../../L1_domain/errors/session-expired.error';
 import { ProfileNotAvailableError } from '../../L1_domain/errors/profile-not-available.error';
 import { OfflineStorageUnavailableError } from '../../L1_domain/errors/offline-storage-unavailable.error';
@@ -241,6 +242,11 @@ export class HomePageViewModel {
         void this.router.navigate(['/login']);
       } else if (err instanceof NetworkError) {
         this.serverError.set('network');
+      } else if (err instanceof RateLimitError) {
+        // 429 en el aula: silencio total. No prendemos banner ni limpiamos
+        // `exams` — si había cards renderizadas se preservan; si es el primer
+        // load caemos al empty-state genérico. Evita que 500 alumnos toquen
+        // "Reintentar" y disparen otra ronda de 429 al backend compartido.
       } else {
         this.serverError.set('unknown');
         // Bug del programador o error no modelado: re-lanzar para no silenciar.

@@ -16,6 +16,7 @@ import { ExamServerStatus } from '../../../../src/L1_domain/value-objects/exam-s
 import { ServerTime } from '../../../../src/L1_domain/value-objects/server-time';
 import { SubmissionAck } from '../../../../src/L1_domain/value-objects/submission-ack';
 import { NetworkError } from '../../../../src/L1_domain/errors/network.error';
+import { RateLimitError } from '../../../../src/L1_domain/errors/rate-limit.error';
 import { SessionExpiredError } from '../../../../src/L1_domain/errors/session-expired.error';
 import { ProfileNotAvailableError } from '../../../../src/L1_domain/errors/profile-not-available.error';
 import { OfflineStorageUnavailableError } from '../../../../src/L1_domain/errors/offline-storage-unavailable.error';
@@ -450,6 +451,25 @@ describe('HomePageViewModel', () => {
       await vm.refresh();
 
       expect(vm.serverError()).toBe('network');
+      expect(navigateSpy).not.toHaveBeenCalled();
+      vm.stop();
+    });
+
+    it('RateLimitError (429) NO prende banner ni limpia exams — silencio total', async () => {
+      const prev = [buildExam('exam-1', 'in_progress')];
+      fakeGetTodaysExams.willResolve(prev);
+      const vm = createVm();
+      await vm.start();
+      expect(vm.exams()).toHaveLength(1);
+
+      const router = TestBed.inject(Router);
+      const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+      fakeGetTodaysExams.willReject(new RateLimitError());
+      await vm.refresh();
+
+      expect(vm.serverError()).toBeNull();
+      expect(vm.exams()).toEqual(prev);
       expect(navigateSpy).not.toHaveBeenCalled();
       vm.stop();
     });
