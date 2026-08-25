@@ -646,6 +646,99 @@ describe('HomePageViewModel', () => {
     });
   });
 
+  // En móvil real, `visibilitychange` rebota (notificaciones, apagar/prender
+  // pantalla, alt-tab) y cada rebote solía gastar cuota del rate limit
+  // compartido del aula. El throttle leading-edge deja pasar el primer refresh
+  // y descarta los siguientes dentro de VISIBILITY_REFRESH_THROTTLE_MS.
+  describe('visibilitychange — throttle 30s sobre el refresh on-focus', () => {
+    it('primer visibilitychange→visible después de start() dispara refresh', async () => {
+      fakeGetTodaysExams.willResolve([]);
+      setDocumentVisibility('visible');
+
+      const vm = createVm();
+      await vm.start();
+      const callsAfterStart = fakeGetTodaysExams.callCount;
+
+      setDocumentVisibility('hidden');
+      document.dispatchEvent(new Event('visibilitychange'));
+      setDocumentVisibility('visible');
+      document.dispatchEvent(new Event('visibilitychange'));
+      await Promise.resolve();
+
+      expect(fakeGetTodaysExams.callCount).toBe(callsAfterStart + 1);
+      vm.stop();
+    });
+
+    it('rebotes hidden↔visible dentro de 30s NO disparan un segundo refresh', async () => {
+      fakeGetTodaysExams.willResolve([]);
+      setDocumentVisibility('visible');
+      fakeClock.setNow(new Date('2026-06-11T10:00:00Z'));
+
+      const vm = createVm();
+      await vm.start();
+      const callsAfterStart = fakeGetTodaysExams.callCount;
+
+      for (let i = 0; i < 5; i++) {
+        setDocumentVisibility('hidden');
+        document.dispatchEvent(new Event('visibilitychange'));
+        fakeClock.setNow(new Date(`2026-06-11T10:00:${String(i * 2 + 1).padStart(2, '0')}Z`));
+        setDocumentVisibility('visible');
+        document.dispatchEvent(new Event('visibilitychange'));
+        await Promise.resolve();
+      }
+
+      // Un solo refresh por focus + throttle: los otros 4 fueron descartados.
+      expect(fakeGetTodaysExams.callCount).toBe(callsAfterStart + 1);
+      vm.stop();
+    });
+
+    it('después de 30s desde el último refresh on-focus, un nuevo visibilitychange sí dispara refresh', async () => {
+      fakeGetTodaysExams.willResolve([]);
+      setDocumentVisibility('visible');
+      fakeClock.setNow(new Date('2026-06-11T10:00:00Z'));
+
+      const vm = createVm();
+      await vm.start();
+      const callsAfterStart = fakeGetTodaysExams.callCount;
+
+      // Primer refresh on-focus.
+      setDocumentVisibility('hidden');
+      document.dispatchEvent(new Event('visibilitychange'));
+      setDocumentVisibility('visible');
+      document.dispatchEvent(new Event('visibilitychange'));
+      await Promise.resolve();
+      expect(fakeGetTodaysExams.callCount).toBe(callsAfterStart + 1);
+
+      // Avanzamos el reloj 30s exactos (piso).
+      fakeClock.setNow(new Date('2026-06-11T10:00:30Z'));
+
+      setDocumentVisibility('hidden');
+      document.dispatchEvent(new Event('visibilitychange'));
+      setDocumentVisibility('visible');
+      document.dispatchEvent(new Event('visibilitychange'));
+      await Promise.resolve();
+
+      expect(fakeGetTodaysExams.callCount).toBe(callsAfterStart + 2);
+      vm.stop();
+    });
+
+    it('visibilitychange→hidden nunca dispara refresh (solo pausa polling)', async () => {
+      fakeGetTodaysExams.willResolve([]);
+      setDocumentVisibility('visible');
+
+      const vm = createVm();
+      await vm.start();
+      const callsAfterStart = fakeGetTodaysExams.callCount;
+
+      setDocumentVisibility('hidden');
+      document.dispatchEvent(new Event('visibilitychange'));
+      await Promise.resolve();
+
+      expect(fakeGetTodaysExams.callCount).toBe(callsAfterStart);
+      vm.stop();
+    });
+  });
+
   describe('degradación graceful: dos exámenes in_progress', () => {
     it('emite console.warn con count + primer id cuando vienen 2 in_progress simultáneos', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);

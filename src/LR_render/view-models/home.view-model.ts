@@ -52,6 +52,13 @@ const POST_CIERRE_REFRESH_MS = 10_000;
 // el mismo ms (thundering herd).
 const POST_CIERRE_JITTER_MS = 3_000;
 
+// Piso entre dos refreshes disparados por `visibilitychange`. En móvil real,
+// el evento rebota (notificaciones, apagar/prender pantalla, alt-tab) y sin
+// throttle cada rebote gasta cuota del rate limit compartido del aula. 30s es
+// holgado — el poll base ya corre cada 180s, así que un refresh "on-focus"
+// suprimido no atrasa la lista más allá del ciclo normal.
+const VISIBILITY_REFRESH_THROTTLE_MS = 30_000;
+
 // View-model de /home. Provider-local al HomePage (no providedIn root) para que
 // cada montaje arranque limpio sus timers y listeners.
 @Injectable()
@@ -142,6 +149,7 @@ export class HomePageViewModel {
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private countdownTimer: ReturnType<typeof setInterval> | null = null;
   private visibilityListener: (() => void) | null = null;
+  private lastVisibilityRefreshAt = 0;
   private started = false;
   private stopped = false;
 
@@ -362,7 +370,16 @@ export class HomePageViewModel {
     const handler = (): void => {
       if (this.stopped) return;
       if (document.visibilityState === 'visible') {
-        void this.refresh();
+        // Throttle leading-edge: el primer refresh tras volver a foreground pasa,
+        // los siguientes dentro de VISIBILITY_REFRESH_THROTTLE_MS se descartan
+        // (rebotes de notificaciones / apagar pantalla en móvil). El re-arranque
+        // del poll queda fuera del throttle porque es idempotente y necesario si
+        // se pausó al ocultarse.
+        const now = this.clock.now().getTime();
+        if (now - this.lastVisibilityRefreshAt >= VISIBILITY_REFRESH_THROTTLE_MS) {
+          this.lastVisibilityRefreshAt = now;
+          void this.refresh();
+        }
         this.startPollingIfVisible();
       } else {
         this.stopPolling();
