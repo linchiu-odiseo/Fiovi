@@ -35,6 +35,7 @@ export class CloudflareTurnstileProvider implements CaptchaProvider {
   private scriptPromise: Promise<void> | null = null;
 
   isEnabled(): boolean {
+    if (environment.devTools) return false;
     return this.provider === 'turnstile' && this.siteKey.length > 0;
   }
 
