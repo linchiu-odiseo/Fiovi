@@ -9,6 +9,7 @@ import { FakeAuthRepository } from '../../fixtures/auth-repository.fake';
 import { FakeIdentityStorage } from '../../fixtures/identity-storage.fake';
 import { FakeProfileStorage } from '../../fixtures/profile-storage.fake';
 import { FakePwaCookieModeStore } from '../../fixtures/pwa-cookie-mode-store.fake';
+import { FakeSessionRefreshScheduler } from '../../fixtures/session-refresh-scheduler.fake';
 import { FakeTenantSlugCache } from '../../fixtures/tenant-slug-cache.fake';
 import { GetProfileUseCase } from '../../../../src/L2_application/use-cases/get-profile.use-case';
 
@@ -61,6 +62,7 @@ describe('LoginUseCase', () => {
   let profileStorage: FakeProfileStorage;
   let slugCache: FakeTenantSlugCache;
   let pwaCookieMode: FakePwaCookieModeStore;
+  let refreshScheduler: FakeSessionRefreshScheduler;
   let getProfile: GetProfileUseCase;
   let useCase: LoginUseCase;
 
@@ -72,8 +74,16 @@ describe('LoginUseCase', () => {
     profileStorage = new FakeProfileStorage();
     slugCache = new FakeTenantSlugCache();
     pwaCookieMode = new FakePwaCookieModeStore();
+    refreshScheduler = new FakeSessionRefreshScheduler();
     getProfile = new GetProfileUseCase(profileStorage, repo);
-    useCase = new LoginUseCase(repo, identityStorage, slugCache, getProfile, pwaCookieMode);
+    useCase = new LoginUseCase(
+      repo,
+      identityStorage,
+      slugCache,
+      getProfile,
+      pwaCookieMode,
+      refreshScheduler,
+    );
   });
 
   it('login de alumno exitoso devuelve Identity con role student', async () => {
@@ -193,6 +203,30 @@ describe('LoginUseCase', () => {
     expect(result).toBe(identity);
     expect(await identityStorage.read()).toBe(identity);
     await new Promise((r) => setTimeout(r, 0));
+  });
+
+  describe('proactive refresh scheduler', () => {
+    it('login exitoso (Identity) agenda el scheduler con el expiresAt de la identity', async () => {
+      const identity = makeStudentIdentity();
+      repo.willResolveLogin(identity);
+      repo.willRejectProfile(new Error('no profile'));
+      await useCase.execute(credentials);
+      expect(refreshScheduler.scheduleCalls).toEqual([identity.expiresAt]);
+      expect(refreshScheduler.cancelCalls).toBe(0);
+    });
+
+    it('login con SelectionChallenge NO agenda el scheduler (auth incompleta)', async () => {
+      repo.willResolveLogin(makeChallenge());
+      await useCase.execute(credentials);
+      // El schedule ocurrira en SelectTenantUseCase cuando el user elija tenant.
+      expect(refreshScheduler.scheduleCalls).toEqual([]);
+    });
+
+    it('login fallido (InvalidCredentialsError) NO agenda el scheduler', async () => {
+      repo.willRejectLogin(new InvalidCredentialsError());
+      await expect(useCase.execute(credentials)).rejects.toThrow(InvalidCredentialsError);
+      expect(refreshScheduler.scheduleCalls).toEqual([]);
+    });
   });
 
   describe('PWA cookie mode flag', () => {

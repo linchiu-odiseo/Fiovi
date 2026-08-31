@@ -7,6 +7,7 @@ import { UnsupportedRoleError } from '../../../../src/L1_domain/errors/unsupport
 import { FakeAuthRepository } from '../../fixtures/auth-repository.fake';
 import { FakeIdentityStorage } from '../../fixtures/identity-storage.fake';
 import { FakeProfileStorage } from '../../fixtures/profile-storage.fake';
+import { FakeSessionRefreshScheduler } from '../../fixtures/session-refresh-scheduler.fake';
 import { FakeTenantSlugCache } from '../../fixtures/tenant-slug-cache.fake';
 import { GetProfileUseCase } from '../../../../src/L2_application/use-cases/get-profile.use-case';
 
@@ -32,6 +33,7 @@ describe('InitializeSessionUseCase', () => {
   let identityStorage: FakeIdentityStorage;
   let profileStorage: FakeProfileStorage;
   let slugCache: FakeTenantSlugCache;
+  let refreshScheduler: FakeSessionRefreshScheduler;
   let getProfile: GetProfileUseCase;
   let useCase: InitializeSessionUseCase;
 
@@ -40,8 +42,15 @@ describe('InitializeSessionUseCase', () => {
     identityStorage = new FakeIdentityStorage();
     profileStorage = new FakeProfileStorage();
     slugCache = new FakeTenantSlugCache();
+    refreshScheduler = new FakeSessionRefreshScheduler();
     getProfile = new GetProfileUseCase(profileStorage, repo);
-    useCase = new InitializeSessionUseCase(repo, identityStorage, slugCache, getProfile);
+    useCase = new InitializeSessionUseCase(
+      repo,
+      identityStorage,
+      slugCache,
+      getProfile,
+      refreshScheduler,
+    );
   });
 
   describe('sin slug hidratado ni identity previa', () => {
@@ -146,6 +155,36 @@ describe('InitializeSessionUseCase', () => {
 
       expect(result).toBeNull();
       expect(await identityStorage.read()).toBeNull();
+    });
+  });
+
+  describe('proactive refresh scheduler', () => {
+    it('me() exitoso agenda el scheduler con el expiresAt de la identity fresh', async () => {
+      slugCache.set('vonex');
+      const identity = makeStudentIdentity();
+      repo.willResolveMe(identity);
+      repo.willRejectProfile(new Error('no profile'));
+      await useCase.execute();
+      expect(refreshScheduler.scheduleCalls).toEqual([identity.expiresAt]);
+    });
+
+    it('me() con SessionExpiredError NO agenda scheduler (no hay identity valida)', async () => {
+      slugCache.set('vonex');
+      repo.willRejectMe(new SessionExpiredError());
+      await useCase.execute();
+      expect(refreshScheduler.scheduleCalls).toEqual([]);
+    });
+
+    it('sin slug ni identity previa NO agenda scheduler (no autenticado)', async () => {
+      await useCase.execute();
+      expect(refreshScheduler.scheduleCalls).toEqual([]);
+    });
+
+    it('me() con NetworkError NO agenda scheduler; UI muestra offline', async () => {
+      slugCache.set('vonex');
+      repo.willRejectMe(new NetworkError());
+      await expect(useCase.execute()).rejects.toBeInstanceOf(NetworkError);
+      expect(refreshScheduler.scheduleCalls).toEqual([]);
     });
   });
 });

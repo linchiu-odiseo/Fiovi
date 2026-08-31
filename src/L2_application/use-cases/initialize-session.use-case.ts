@@ -1,5 +1,6 @@
 import { AuthRepository } from '../../L1_domain/ports/auth-repository';
 import { IdentityStorage } from '../../L1_domain/ports/identity-storage';
+import { SessionRefreshScheduler } from '../../L1_domain/ports/session-refresh-scheduler';
 import { TenantSlugCache } from '../../L1_domain/ports/tenant-slug-cache';
 import { Identity } from '../../L1_domain/entities/identity';
 import { SessionExpiredError } from '../../L1_domain/errors/session-expired.error';
@@ -30,6 +31,7 @@ export class InitializeSessionUseCase {
     private readonly identityStorage: IdentityStorage,
     private readonly slugCache: TenantSlugCache,
     private readonly getProfile: GetProfileUseCase,
+    private readonly refreshScheduler: SessionRefreshScheduler,
   ) {}
 
   async execute(): Promise<Identity | null> {
@@ -47,6 +49,12 @@ export class InitializeSessionUseCase {
       const identity = await this.authRepo.me();
       await this.identityStorage.write(identity);
       this.slugCache.set(identity.tenantSlug);
+      // Al arrancar la app con sesion viva, agenda el proximo refresh proactivo.
+      // Si la cookie ya esta dentro del lead time (device dormido varias horas
+      // pero refresh cookie aun viva), el scheduler dispara refresh en el
+      // proximo tick — evita que el primer clic del usuario post-arranque
+      // dispare el 401 -> refresh -> retry.
+      this.refreshScheduler.schedule(identity.expiresAt);
       // Fire-and-forget: warm up del caché de perfil.
       void this.getProfile.execute(identity.role()).catch(() => undefined);
       return identity;

@@ -7,6 +7,7 @@ import { NativeInstallPrompt } from '../L1_domain/ports/native-install-prompt';
 import { ProfileStorage } from '../L1_domain/ports/profile-storage';
 import { OutboxStoragePort } from '../L1_domain/ports/outbox-storage.port';
 import { PwaCookieModeStore } from '../L1_domain/ports/pwa-cookie-mode-store';
+import { SessionRefreshScheduler } from '../L1_domain/ports/session-refresh-scheduler';
 import { SwMessengerPort } from '../L1_domain/ports/sw-messenger.port';
 import { TutorExamsApi } from '../L1_domain/ports/tutor-exams-api';
 import { TutorNavigationApi } from '../L1_domain/ports/tutor-navigation-api';
@@ -48,6 +49,16 @@ export const CAPTCHA_PROVIDER = new InjectionToken<CaptchaProvider>('CaptchaProv
 // encendido) y por los use-cases de login/select-tenant/sso-callback (lo encienden
 // tras auth exitosa). Ver `PwaCookieModeStore` para el racional del flag.
 export const PWA_COOKIE_MODE_STORE = new InjectionToken<PwaCookieModeStore>('PwaCookieModeStore');
+
+// Token DI para el scheduler proactivo de refresh de sesion. El binding concreto
+// vive en `app.config.ts` con `useExisting: BrowserSessionRefreshScheduler`. Los
+// use-cases de auth (login, select-tenant, refresh, logout, initialize-session)
+// lo inyectan para agendar/cancelar el timer que dispara refresh unos segundos
+// antes de que expire el access token. Ver `SessionRefreshScheduler` para el
+// contrato y motivacion.
+export const SESSION_REFRESH_SCHEDULER = new InjectionToken<SessionRefreshScheduler>(
+  'SessionRefreshScheduler',
+);
 
 // Tokens del card "Instala Fiovi como app" del /home. Los tres colaboran para
 // que el `DecideInstallCardStateUseCase` (L2) decida qué modalidad mostrar:

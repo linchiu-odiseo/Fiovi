@@ -7,6 +7,7 @@ import { FakeAuthRepository } from '../../fixtures/auth-repository.fake';
 import { FakeIdentityStorage } from '../../fixtures/identity-storage.fake';
 import { FakeProfileStorage } from '../../fixtures/profile-storage.fake';
 import { FakePwaCookieModeStore } from '../../fixtures/pwa-cookie-mode-store.fake';
+import { FakeSessionRefreshScheduler } from '../../fixtures/session-refresh-scheduler.fake';
 import { FakeTenantSlugCache } from '../../fixtures/tenant-slug-cache.fake';
 import { GetProfileUseCase } from '../../../../src/L2_application/use-cases/get-profile.use-case';
 
@@ -30,6 +31,7 @@ describe('SelectTenantUseCase', () => {
   let profileStorage: FakeProfileStorage;
   let slugCache: FakeTenantSlugCache;
   let pwaCookieMode: FakePwaCookieModeStore;
+  let refreshScheduler: FakeSessionRefreshScheduler;
   let useCase: SelectTenantUseCase;
 
   const input = { selectionToken: 'jwt.token', slug: 'pitagoras' };
@@ -40,8 +42,16 @@ describe('SelectTenantUseCase', () => {
     profileStorage = new FakeProfileStorage();
     slugCache = new FakeTenantSlugCache();
     pwaCookieMode = new FakePwaCookieModeStore();
+    refreshScheduler = new FakeSessionRefreshScheduler();
     const getProfile = new GetProfileUseCase(profileStorage, repo);
-    useCase = new SelectTenantUseCase(repo, identityStorage, slugCache, getProfile, pwaCookieMode);
+    useCase = new SelectTenantUseCase(
+      repo,
+      identityStorage,
+      slugCache,
+      getProfile,
+      pwaCookieMode,
+      refreshScheduler,
+    );
   });
 
   it('selección exitosa persiste identity, hidrata slugCache con el slug elegido y devuelve Identity', async () => {

@@ -1,6 +1,7 @@
 import { AuthRepository } from '../../L1_domain/ports/auth-repository';
 import { IdentityStorage } from '../../L1_domain/ports/identity-storage';
 import { PwaCookieModeStore } from '../../L1_domain/ports/pwa-cookie-mode-store';
+import { SessionRefreshScheduler } from '../../L1_domain/ports/session-refresh-scheduler';
 import { TenantSlugCache } from '../../L1_domain/ports/tenant-slug-cache';
 import { Identity } from '../../L1_domain/entities/identity';
 import { SelectionChallenge } from '../../L1_domain/value-objects/selection-challenge';
@@ -30,6 +31,7 @@ export class LoginUseCase {
     private readonly slugCache: TenantSlugCache,
     private readonly getProfile: GetProfileUseCase,
     private readonly pwaCookieMode: PwaCookieModeStore,
+    private readonly refreshScheduler: SessionRefreshScheduler,
   ) {}
 
   async execute(credentials: {
@@ -49,6 +51,11 @@ export class LoginUseCase {
     // el flag para que las próximas requests también manden el header y backend
     // lea el par pwa correcto.
     this.pwaCookieMode.enable();
+    // Agenda refresh proactivo antes de que expire el access token: evita el
+    // patron 401 -> refresh -> retry del interceptor reactivo, y con 1000
+    // alumnos logueados en un rango corto (ej. 08:00) distribuye el trabajo
+    // de refresh en el tiempo en vez de concentrarlo en el burst post-exp.
+    this.refreshScheduler.schedule(identity.expiresAt);
     // Fire-and-forget: no bloquea el retorno del use case.
     void this.getProfile.execute(identity.role()).catch((err) => {
       console.warn('profile fetch post-login failed', err);
