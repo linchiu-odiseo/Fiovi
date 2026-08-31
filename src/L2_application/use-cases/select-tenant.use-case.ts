@@ -1,6 +1,7 @@
 import { AuthRepository } from '../../L1_domain/ports/auth-repository';
 import { IdentityStorage } from '../../L1_domain/ports/identity-storage';
 import { PwaCookieModeStore } from '../../L1_domain/ports/pwa-cookie-mode-store';
+import { SessionRefreshScheduler } from '../../L1_domain/ports/session-refresh-scheduler';
 import { TenantSlugCache } from '../../L1_domain/ports/tenant-slug-cache';
 import { Identity } from '../../L1_domain/entities/identity';
 import { GetProfileUseCase } from './get-profile.use-case';
@@ -27,6 +28,7 @@ export class SelectTenantUseCase {
     private readonly slugCache: TenantSlugCache,
     private readonly getProfile: GetProfileUseCase,
     private readonly pwaCookieMode: PwaCookieModeStore,
+    private readonly refreshScheduler: SessionRefreshScheduler,
   ) {}
 
   async execute(input: { selectionToken: string; slug: string }): Promise<Identity> {
@@ -37,6 +39,8 @@ export class SelectTenantUseCase {
     // /auth/select-tenant). Prendemos el flag para que próximas requests
     // también manden el header — ver PwaCookieModeStore para el racional.
     this.pwaCookieMode.enable();
+    // Refresh proactivo — ver comentario en `login.use-case.ts` para racional.
+    this.refreshScheduler.schedule(identity.expiresAt);
     void this.getProfile.execute(identity.role()).catch((err) => {
       console.warn('profile fetch post-select-tenant failed', err);
     });

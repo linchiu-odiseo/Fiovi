@@ -4,6 +4,7 @@ import { Identity } from '../../../../src/L1_domain/entities/identity';
 import { FakeAuthRepository } from '../../fixtures/auth-repository.fake';
 import { FakeIdentityStorage } from '../../fixtures/identity-storage.fake';
 import { FakeProfileStorage } from '../../fixtures/profile-storage.fake';
+import { FakeSessionRefreshScheduler } from '../../fixtures/session-refresh-scheduler.fake';
 import { FakeTenantSlugCache } from '../../fixtures/tenant-slug-cache.fake';
 import { DraftDispatcher } from '../../../../src/L1_domain/ports/draft-dispatcher';
 import { RouterPort } from '../../../../src/L1_domain/ports/router-port';
@@ -73,6 +74,7 @@ describe('LogoutUseCase', () => {
   let draftDispatcher: FakeDraftDispatcher;
   let router: FakeRouter;
   let swMessenger: FakeSwMessenger;
+  let refreshScheduler: FakeSessionRefreshScheduler;
   let useCase: LogoutUseCase;
 
   beforeEach(() => {
@@ -83,6 +85,7 @@ describe('LogoutUseCase', () => {
     draftDispatcher = new FakeDraftDispatcher();
     router = new FakeRouter();
     swMessenger = new FakeSwMessenger();
+    refreshScheduler = new FakeSessionRefreshScheduler();
     useCase = new LogoutUseCase(
       repo,
       identityStorage,
@@ -90,6 +93,7 @@ describe('LogoutUseCase', () => {
       profileStorage,
       draftDispatcher,
       router,
+      refreshScheduler,
       swMessenger,
     );
   });
@@ -149,6 +153,7 @@ describe('LogoutUseCase', () => {
         profileStorage,
         draftDispatcher,
         router,
+        refreshScheduler,
       );
       await expect(ucWithoutSw.execute()).resolves.toBeUndefined();
     });
@@ -165,6 +170,25 @@ describe('LogoutUseCase', () => {
     it('identity null → profileStorage.clear no se invoca', async () => {
       await useCase.execute();
       expect(profileStorage.getClearCalls()).toBe(0);
+    });
+
+    it('identity null → scheduler.cancel() se invoca igual (idempotente)', async () => {
+      // El scheduler puede tener un timer huerfano de una sesion anterior (raro
+      // pero posible con hot reload en dev, o con multiples pestañas). Cancel
+      // es idempotente y barato — mejor prevenir que dejar un timer suelto.
+      await useCase.execute();
+      expect(refreshScheduler.cancelCalls).toBe(1);
+    });
+  });
+
+  describe('scheduler cancel', () => {
+    it('logout con identity activa cancela el scheduler PRIMERO (antes de repo.logout)', async () => {
+      await identityStorage.write(makeIdentity());
+      await useCase.execute();
+      expect(refreshScheduler.cancelCalls).toBe(1);
+      // Si el timer proactivo se disparaba durante el logout, RefreshIdentity
+      // volveria a hidratar storage con la identity que acabamos de limpiar —
+      // ruido inutil que confunde el debugging.
     });
   });
 });
