@@ -8,6 +8,7 @@ import { Exam } from '../../../../src/L1_domain/entities/exam';
 import { ServerTime } from '../../../../src/L1_domain/value-objects/server-time';
 import { InvalidExamError } from '../../../../src/L1_domain/errors/invalid-exam.error';
 import { NetworkError } from '../../../../src/L1_domain/errors/network.error';
+import { RateLimitError } from '../../../../src/L1_domain/errors/rate-limit.error';
 import { ExamsPermissionRevokedError } from '../../../../src/L1_domain/errors/exams-permission-revoked.error';
 import { StudentNotLinkedError } from '../../../../src/L1_domain/errors/student-not-linked.error';
 import { environment } from '../../../../src/environments/environment';
@@ -293,11 +294,11 @@ describe('HttpExamsApi', () => {
       await expect(pending).rejects.toBeInstanceOf(NetworkError);
     });
 
-    it('429 → NetworkError (backoff diferido a change futuro)', async () => {
+    it('429 → RateLimitError (permite que /home lo silencie sin banner)', async () => {
       const pending = adapter.getTodaysExams();
       const req = httpMock.expectOne(EXAMS_URL);
       req.flush({ message: 'rate' }, { status: 429, statusText: 'Too Many' });
-      await expect(pending).rejects.toBeInstanceOf(NetworkError);
+      await expect(pending).rejects.toBeInstanceOf(RateLimitError);
     });
 
     it('fallo de transporte (status 0) → NetworkError', async () => {

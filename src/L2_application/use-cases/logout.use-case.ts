@@ -1,5 +1,6 @@
 import { AuthRepository } from '../../L1_domain/ports/auth-repository';
 import { IdentityStorage } from '../../L1_domain/ports/identity-storage';
+import { SessionRefreshScheduler } from '../../L1_domain/ports/session-refresh-scheduler';
 import { TenantSlugCache } from '../../L1_domain/ports/tenant-slug-cache';
 import { ProfileStorage } from '../../L1_domain/ports/profile-storage';
 import { DraftDispatcher } from '../../L1_domain/ports/draft-dispatcher';
@@ -37,10 +38,18 @@ export class LogoutUseCase {
     private readonly profileStorage: ProfileStorage,
     private readonly draftDispatcher: DraftDispatcher,
     private readonly router: RouterPort,
+    private readonly refreshScheduler: SessionRefreshScheduler,
     private readonly swMessenger?: SwMessengerPort,
   ) {}
 
   async execute(): Promise<void> {
+    // Paso 0: cancelar cualquier refresh proactivo pendiente. Va PRIMERO
+    // porque si el timer se dispara despues del logout, `RefreshIdentityUseCase`
+    // volveria a hidratar storage e intentaria un refresh contra un backend
+    // que ya invalido las cookies — ruido innecesario en logs. Idempotente,
+    // sin efecto si no habia timer agendado.
+    this.refreshScheduler.cancel();
+
     // Paso 1: verificar si hay identity activa. Si no → solo navegar.
     const identity = await this.identityStorage.read();
     if (!identity) {

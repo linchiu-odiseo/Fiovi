@@ -21,6 +21,7 @@ import {
 } from '../../L1_domain/value-objects/admission-area';
 import { SubmissionAck } from '../../L1_domain/value-objects/submission-ack';
 import { NetworkError } from '../../L1_domain/errors/network.error';
+import { RateLimitError } from '../../L1_domain/errors/rate-limit.error';
 import { SessionExpiredError } from '../../L1_domain/errors/session-expired.error';
 import { SimulacroCerradoError } from '../../L1_domain/errors/simulacro-cerrado.error';
 import { SimulacroNoAsignadoError } from '../../L1_domain/errors/simulacro-no-asignado.error';
@@ -394,7 +395,11 @@ export class SimulacroPageViewModel {
         this.errorState.set('session-expired');
         void this.router.navigate(['/login']);
         return;
-      } else if (err instanceof NetworkError) {
+      } else if (err instanceof NetworkError || err instanceof RateLimitError) {
+        // 429 (RateLimitError) al abrir /simulacro/:id se trata como fallo
+        // de red genérico — el alumno vuelve a /home donde el banner ya está
+        // silenciado en 429 (ver home VM). Split RateLimit/Network en L3
+        // vive por el home, acá lo consumimos junto.
         this.errorState.set('network');
         void this.router.navigate(['/home']);
         return;

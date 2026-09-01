@@ -5,6 +5,7 @@ import { CLOCK, MARKINGS_STORAGE } from '../../app.config';
 import { Exam } from '../../L1_domain/entities/exam';
 import { SubmissionAck } from '../../L1_domain/value-objects/submission-ack';
 import { NetworkError } from '../../L1_domain/errors/network.error';
+import { RateLimitError } from '../../L1_domain/errors/rate-limit.error';
 import { SessionExpiredError } from '../../L1_domain/errors/session-expired.error';
 import { ExamsPermissionRevokedError } from '../../L1_domain/errors/exams-permission-revoked.error';
 import { StudentNotLinkedError } from '../../L1_domain/errors/student-not-linked.error';
@@ -102,7 +103,11 @@ export class StudentTasksListViewModel {
       } else if (err instanceof SessionExpiredError) {
         this.serverError.set('session-expired');
         void this.router.navigate(['/login']);
-      } else if (err instanceof NetworkError) {
+      } else if (err instanceof NetworkError || err instanceof RateLimitError) {
+        // 429 (RateLimitError) se trata como fallo de red genérico: la página
+        // de tareas no tiene alumnos golpeando "Reintentar" masivamente como
+        // /home, así que reusar el branch existente alcanza. Ver home VM para
+        // el motivo del split entre RateLimit y Network.
         this.serverError.set('network');
       } else {
         this.serverError.set('unknown');

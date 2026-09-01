@@ -26,6 +26,7 @@ import { NativeInstallPrompt } from './L1_domain/ports/native-install-prompt';
 import { ProfileStorage } from './L1_domain/ports/profile-storage';
 import { PwaCookieModeStore } from './L1_domain/ports/pwa-cookie-mode-store';
 import { RouterPort } from './L1_domain/ports/router-port';
+import { SessionRefreshScheduler } from './L1_domain/ports/session-refresh-scheduler';
 import { TenantSlugCache } from './L1_domain/ports/tenant-slug-cache';
 
 // L2 use cases — clases TS puras sin @Injectable, instanciadas por factory.
@@ -58,6 +59,7 @@ import { HttpTutorExamsApi } from './L3_periphery/http/http-tutor-exams-api';
 import { HttpTutorNavigationApi } from './L3_periphery/http/http-tutor-navigation-api';
 import { LocalStorageIdentityStorage } from './L3_periphery/storage/local-storage-identity-storage';
 import { LocalStoragePwaCookieModeStore } from './L3_periphery/storage/local-storage-pwa-cookie-mode-store';
+import { BrowserSessionRefreshScheduler } from './L3_periphery/session/browser-session-refresh-scheduler';
 import { IndexedDbProfileStorage } from './L3_periphery/storage/indexed-db-profile-storage';
 import { IndexedDbMarkingsStorage } from './L3_periphery/storage/indexed-db-markings-storage';
 import { ServerAnchoredClock } from './L3_periphery/clock/server-anchored-clock';
@@ -83,6 +85,7 @@ import {
   PROFILE_STORAGE,
   OUTBOX_STORAGE,
   PWA_COOKIE_MODE_STORE,
+  SESSION_REFRESH_SCHEDULER,
   TUTOR_EXAMS_API,
   TUTOR_NAVIGATION_API,
 } from './L3_periphery/tokens';
@@ -139,6 +142,7 @@ export const appConfig: ApplicationConfig = {
     { provide: AUTH_REPOSITORY, useExisting: HttpAuthRepository },
     { provide: IDENTITY_STORAGE, useExisting: LocalStorageIdentityStorage },
     { provide: PWA_COOKIE_MODE_STORE, useExisting: LocalStoragePwaCookieModeStore },
+    { provide: SESSION_REFRESH_SCHEDULER, useExisting: BrowserSessionRefreshScheduler },
     { provide: INSTALL_ENV_PROBE, useExisting: BrowserInstallEnvironmentProbe },
     { provide: INSTALL_PROMPT_STORE, useExisting: LocalStorageInstallPromptStore },
     { provide: NATIVE_INSTALL_PROMPT, useExisting: BeforeInstallPromptAdapter },
@@ -182,13 +186,15 @@ export const appConfig: ApplicationConfig = {
         slugCache: TenantSlugCache,
         getProfile: GetProfileUseCase,
         pwaCookieMode: PwaCookieModeStore,
-      ) => new LoginUseCase(repo, storage, slugCache, getProfile, pwaCookieMode),
+        refreshScheduler: SessionRefreshScheduler,
+      ) => new LoginUseCase(repo, storage, slugCache, getProfile, pwaCookieMode, refreshScheduler),
       deps: [
         AUTH_REPOSITORY,
         IDENTITY_STORAGE,
         TENANT_SLUG_CACHE,
         GetProfileUseCase,
         PWA_COOKIE_MODE_STORE,
+        SESSION_REFRESH_SCHEDULER,
       ],
     },
     {
@@ -199,13 +205,23 @@ export const appConfig: ApplicationConfig = {
         slugCache: TenantSlugCache,
         getProfile: GetProfileUseCase,
         pwaCookieMode: PwaCookieModeStore,
-      ) => new SelectTenantUseCase(repo, storage, slugCache, getProfile, pwaCookieMode),
+        refreshScheduler: SessionRefreshScheduler,
+      ) =>
+        new SelectTenantUseCase(
+          repo,
+          storage,
+          slugCache,
+          getProfile,
+          pwaCookieMode,
+          refreshScheduler,
+        ),
       deps: [
         AUTH_REPOSITORY,
         IDENTITY_STORAGE,
         TENANT_SLUG_CACHE,
         GetProfileUseCase,
         PWA_COOKIE_MODE_STORE,
+        SESSION_REFRESH_SCHEDULER,
       ],
     },
     {
@@ -222,6 +238,7 @@ export const appConfig: ApplicationConfig = {
         profileStorage: ProfileStorage,
         draftDispatcher: DraftAutoSaveDispatcher,
         routerPort: RouterPort,
+        refreshScheduler: SessionRefreshScheduler,
       ) =>
         new LogoutUseCase(
           repo,
@@ -230,6 +247,7 @@ export const appConfig: ApplicationConfig = {
           profileStorage,
           draftDispatcher,
           routerPort,
+          refreshScheduler,
         ),
       deps: [
         AUTH_REPOSITORY,
@@ -238,6 +256,7 @@ export const appConfig: ApplicationConfig = {
         PROFILE_STORAGE,
         DraftAutoSaveDispatcher,
         ROUTER_PORT,
+        SESSION_REFRESH_SCHEDULER,
       ],
     },
     {
@@ -252,8 +271,15 @@ export const appConfig: ApplicationConfig = {
         storage: IdentityStorage,
         slugCache: TenantSlugCache,
         logout: LogoutUseCase,
-      ) => new RefreshIdentityUseCase(repo, storage, slugCache, logout),
-      deps: [AUTH_REPOSITORY, IDENTITY_STORAGE, TENANT_SLUG_CACHE, LogoutUseCase],
+        refreshScheduler: SessionRefreshScheduler,
+      ) => new RefreshIdentityUseCase(repo, storage, slugCache, logout, refreshScheduler),
+      deps: [
+        AUTH_REPOSITORY,
+        IDENTITY_STORAGE,
+        TENANT_SLUG_CACHE,
+        LogoutUseCase,
+        SESSION_REFRESH_SCHEDULER,
+      ],
     },
     {
       provide: InitializeSessionUseCase,
@@ -262,8 +288,15 @@ export const appConfig: ApplicationConfig = {
         storage: IdentityStorage,
         slugCache: TenantSlugCache,
         getProfile: GetProfileUseCase,
-      ) => new InitializeSessionUseCase(repo, storage, slugCache, getProfile),
-      deps: [AUTH_REPOSITORY, IDENTITY_STORAGE, TENANT_SLUG_CACHE, GetProfileUseCase],
+        refreshScheduler: SessionRefreshScheduler,
+      ) => new InitializeSessionUseCase(repo, storage, slugCache, getProfile, refreshScheduler),
+      deps: [
+        AUTH_REPOSITORY,
+        IDENTITY_STORAGE,
+        TENANT_SLUG_CACHE,
+        GetProfileUseCase,
+        SESSION_REFRESH_SCHEDULER,
+      ],
     },
     {
       provide: GetTodaysExamsUseCase,
@@ -433,7 +466,20 @@ export const appConfig: ApplicationConfig = {
       inject(SsoCallbackBootstrap).run();
     }),
 
-    // AppInitializer #1: re-valida identity contra learnex al arrancar (cookie
+    // AppInitializer #1a (SÍNCRONO, antes de #1b): wire del handler del
+    // scheduler proactivo. La resolucion lazy del use case rompe el ciclo
+    // DI scheduler <-> RefreshIdentityUseCase: el scheduler solo conoce una
+    // funcion opaca `() => Promise<void>`, sin tipar el use case. Wire debe
+    // ir ANTES de que #1b llame `InitializeSessionUseCase.execute()`, porque
+    // ese use case puede agendar el primer timer y necesitamos el handler
+    // listo si el timer se dispara en 0ms (JWT dentro del lead time).
+    provideAppInitializer(() => {
+      const scheduler = inject(SESSION_REFRESH_SCHEDULER);
+      const refresh = inject(RefreshIdentityUseCase);
+      scheduler.setRefreshHandler(() => refresh.execute().then(() => undefined));
+    }),
+
+    // AppInitializer #1b: re-valida identity contra learnex al arrancar (cookie
     // HttpOnly puede seguir viva entre sesiones, o venimos de un callback SSO
     // que dejó cookies + hidrató SlugStore). Si OK, identity queda disponible
     // para guards y view-models antes del primer render.

@@ -9,6 +9,7 @@ import { Exam } from '../../L1_domain/entities/exam';
 import { StudentProfile } from '../../L1_domain/value-objects/student-profile';
 import { SubmissionAck } from '../../L1_domain/value-objects/submission-ack';
 import { NetworkError } from '../../L1_domain/errors/network.error';
+import { RateLimitError } from '../../L1_domain/errors/rate-limit.error';
 import { SessionExpiredError } from '../../L1_domain/errors/session-expired.error';
 import { ProfileNotAvailableError } from '../../L1_domain/errors/profile-not-available.error';
 import { OfflineStorageUnavailableError } from '../../L1_domain/errors/offline-storage-unavailable.error';
@@ -51,6 +52,13 @@ const POST_CIERRE_REFRESH_MS = 10_000;
 // el mismo examen al mismo segundo. Sin jitter, 500 clientes pegan al back en
 // el mismo ms (thundering herd).
 const POST_CIERRE_JITTER_MS = 3_000;
+
+// Piso entre dos refreshes disparados por `visibilitychange`. En móvil real,
+// el evento rebota (notificaciones, apagar/prender pantalla, alt-tab) y sin
+// throttle cada rebote gasta cuota del rate limit compartido del aula. 30s es
+// holgado — el poll base ya corre cada 180s, así que un refresh "on-focus"
+// suprimido no atrasa la lista más allá del ciclo normal.
+const VISIBILITY_REFRESH_THROTTLE_MS = 30_000;
 
 // View-model de /home. Provider-local al HomePage (no providedIn root) para que
 // cada montaje arranque limpio sus timers y listeners.
@@ -142,6 +150,7 @@ export class HomePageViewModel {
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private countdownTimer: ReturnType<typeof setInterval> | null = null;
   private visibilityListener: (() => void) | null = null;
+  private lastVisibilityRefreshAt = 0;
   private started = false;
   private stopped = false;
 
@@ -233,6 +242,11 @@ export class HomePageViewModel {
         void this.router.navigate(['/login']);
       } else if (err instanceof NetworkError) {
         this.serverError.set('network');
+      } else if (err instanceof RateLimitError) {
+        // 429 en el aula: silencio total. No prendemos banner ni limpiamos
+        // `exams` — si había cards renderizadas se preservan; si es el primer
+        // load caemos al empty-state genérico. Evita que 500 alumnos toquen
+        // "Reintentar" y disparen otra ronda de 429 al backend compartido.
       } else {
         this.serverError.set('unknown');
         // Bug del programador o error no modelado: re-lanzar para no silenciar.
@@ -362,7 +376,16 @@ export class HomePageViewModel {
     const handler = (): void => {
       if (this.stopped) return;
       if (document.visibilityState === 'visible') {
-        void this.refresh();
+        // Throttle leading-edge: el primer refresh tras volver a foreground pasa,
+        // los siguientes dentro de VISIBILITY_REFRESH_THROTTLE_MS se descartan
+        // (rebotes de notificaciones / apagar pantalla en móvil). El re-arranque
+        // del poll queda fuera del throttle porque es idempotente y necesario si
+        // se pausó al ocultarse.
+        const now = this.clock.now().getTime();
+        if (now - this.lastVisibilityRefreshAt >= VISIBILITY_REFRESH_THROTTLE_MS) {
+          this.lastVisibilityRefreshAt = now;
+          void this.refresh();
+        }
         this.startPollingIfVisible();
       } else {
         this.stopPolling();
