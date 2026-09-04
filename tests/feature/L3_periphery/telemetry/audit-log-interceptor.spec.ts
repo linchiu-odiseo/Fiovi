@@ -12,6 +12,8 @@ import { AuditLogStore } from '../../../../src/L3_periphery/telemetry/audit-log-
 import { auditLogInterceptor } from '../../../../src/L3_periphery/telemetry/audit-log.interceptor';
 import { ERROR_CODE_IDS } from '../../../../src/L3_periphery/telemetry/audit-log-dictionaries';
 import {
+  DRAFT_DELTA_TOKEN,
+  DRAFT_VERSION_TOKEN,
   ENDPOINT_ID_TOKEN,
   MARKS_COUNT_TOKEN,
   SESSION_ID_TOKEN,
@@ -210,6 +212,57 @@ describe('auditLogInterceptor', () => {
     if (nw?.e === 'NW') {
       expect(nw.u).toBe(22);
       expect(nw.s).toBe('abcdefgh');
+    }
+  });
+
+  // Sub-bloque C (design.md Revision Log 2026-09-04): DRAFT_VERSION_TOKEN y
+  // DRAFT_DELTA_TOKEN los setea HttpExamsApi.guardarDraft -- el interceptor
+  // solo los propaga al evento H cuando estan presentes en el context.
+  it('propagates v and chg to the H event when DRAFT_VERSION_TOKEN/DRAFT_DELTA_TOKEN are set', async () => {
+    const http = TestBed.inject(HttpClient);
+    const httpMock = TestBed.inject(HttpTestingController);
+    const store = TestBed.inject(AuditLogStore);
+
+    const context = new HttpContext()
+      .set(ENDPOINT_ID_TOKEN, 22)
+      .set(SESSION_ID_TOKEN, 'a1b2c3d4')
+      .set(DRAFT_VERSION_TOKEN, 3)
+      .set(DRAFT_DELTA_TOKEN, [[1, 'B']] as const);
+    const promise = firstValueFrom(http.post('/draft', {}, { context }));
+
+    httpMock.expectOne('/draft').flush(null, { status: 204, statusText: 'No Content' });
+    await promise;
+    await flushMicrotasks();
+
+    const batch = await store.currentDayBatch();
+    const h = batch.find((ev) => ev.e === 'H');
+    if (h?.e === 'H') {
+      expect(h.v).toBe(3);
+      expect(h.chg).toEqual([[1, 'B']]);
+    } else {
+      throw new Error('expected an H event');
+    }
+  });
+
+  it('omits v and chg from the H event when the draft tokens are not set', async () => {
+    const http = TestBed.inject(HttpClient);
+    const httpMock = TestBed.inject(HttpTestingController);
+    const store = TestBed.inject(AuditLogStore);
+
+    const context = new HttpContext().set(ENDPOINT_ID_TOKEN, 12);
+    const promise = firstValueFrom(http.get('/exam-sessions', { context }));
+
+    httpMock.expectOne('/exam-sessions').flush({ ok: true });
+    await promise;
+    await flushMicrotasks();
+
+    const batch = await store.currentDayBatch();
+    const h = batch.find((ev) => ev.e === 'H');
+    if (h?.e === 'H') {
+      expect(h.v).toBeUndefined();
+      expect(h.chg).toBeUndefined();
+    } else {
+      throw new Error('expected an H event');
     }
   });
 });

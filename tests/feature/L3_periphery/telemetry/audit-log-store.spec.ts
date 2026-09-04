@@ -155,4 +155,46 @@ describe('AuditLogStore', () => {
     const batch = await store.currentDayBatch();
     expect(batch).toHaveLength(0);
   });
+
+
+  // Sub-bloque E (design.md Revision Log 2026-09-04): puente a Fase 1 --
+  // clearRange borra solo el rango [sinceMs, untilMs), sin afectar eventos
+  // fuera de esa ventana (a diferencia de clearDay, que es day-granular).
+  describe('clearRange', () => {
+    it('deletes only events within [sinceMs, untilMs)', async () => {
+      const store = TestBed.inject(AuditLogStore);
+      store.append({ t: 1000, e: 'AO', cold: 1 });
+      store.append({ t: 5000, e: 'VC', v: 1 });
+      store.append({ t: 9000, e: 'VC', v: 0 });
+      await flushMicrotasks();
+
+      await store.clearRange(4000, 9000);
+
+      const batch = await store.currentDayBatch();
+      expect(batch.map((e) => e.t)).toEqual([1000, 9000]);
+    });
+
+    it('is a no-op when no events fall inside the range', async () => {
+      const store = TestBed.inject(AuditLogStore);
+      store.append({ t: 1000, e: 'AO', cold: 1 });
+      await flushMicrotasks();
+
+      await store.clearRange(50000, 60000);
+
+      const batch = await store.currentDayBatch();
+      expect(batch).toHaveLength(1);
+    });
+
+    it('excludes the event exactly at untilMs (half-open range)', async () => {
+      const store = TestBed.inject(AuditLogStore);
+      store.append({ t: 4000, e: 'VC', v: 1 });
+      store.append({ t: 10000, e: 'AO', cold: 0 });
+      await flushMicrotasks();
+
+      await store.clearRange(4000, 10000);
+
+      const batch = await store.currentDayBatch();
+      expect(batch.map((e) => e.t)).toEqual([10000]);
+    });
+  });
 });

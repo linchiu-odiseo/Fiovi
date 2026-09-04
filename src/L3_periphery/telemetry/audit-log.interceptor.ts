@@ -8,21 +8,32 @@ import { inject } from '@angular/core';
 import { catchError, tap, throwError } from 'rxjs';
 import { AuditLogStore } from './audit-log-store.service';
 import { lookupErrorCode, lookupMethod } from './audit-log-dictionaries';
-import { ENDPOINT_ID_TOKEN, MARKS_COUNT_TOKEN, SESSION_ID_TOKEN } from './tokens';
+import {
+  DRAFT_DELTA_TOKEN,
+  DRAFT_VERSION_TOKEN,
+  ENDPOINT_ID_TOKEN,
+  MARKS_COUNT_TOKEN,
+  SESSION_ID_TOKEN,
+} from './tokens';
 import type { HEvent, NWEvent } from './audit-log-event';
 
-// audit-log.interceptor — emite evento H por cada request HTTP.
+// audit-log.interceptor -- emite evento H por cada request HTTP.
 //
-// Chained DESPUÉS de credentialsInterceptor (design Decision 2): así ve el
-// flujo final (200 tras refresh exitoso o 401 final si refresh falló),
+// Chained DESPUES de credentialsInterceptor (design Decision 2): asi ve el
+// flujo final (200 tras refresh exitoso o 401 final si refresh fallo),
 // evita duplicar el request de refresh como si fuera independiente.
 //
-// El `tap` sobre la observable NO transforma nada — solo observa. Si el
+// El tap sobre la observable NO transforma nada -- solo observa. Si el
 // store crashea, el usuario del HttpClient no lo nota.
 //
 // Endpoints no marcados con ENDPOINT_ID_TOKEN caen en u:0 (unknown).
-// Códigos de error no catalogados caen en c:0. Ambos son señales útiles
-// en el log crudo (indican "acá falta instrumentar / catalogar").
+// Codigos de error no catalogados caen en c:0. Ambos son senales utiles
+// en el log crudo (indican "aca falta instrumentar / catalogar").
+//
+// v/chg (Sub-bloque C, design.md Revision Log 2026-09-04): DRAFT_VERSION_TOKEN
+// y DRAFT_DELTA_TOKEN solo los setea HttpExamsApi.guardarDraft -- el
+// interceptor unicamente los lee y los propaga al evento H cuando estan
+// presentes en el context.
 
 interface ErrorBody {
   code?: unknown;
@@ -34,6 +45,8 @@ export const auditLogInterceptor: HttpInterceptorFn = (req, next) => {
   const endpointId = req.context.get(ENDPOINT_ID_TOKEN);
   const marksCount = req.context.get(MARKS_COUNT_TOKEN);
   const sessionId = req.context.get(SESSION_ID_TOKEN);
+  const draftVersion = req.context.get(DRAFT_VERSION_TOKEN);
+  const draftDelta = req.context.get(DRAFT_DELTA_TOKEN);
   const methodId = lookupMethod(req.method);
 
   return next(req).pipe(
@@ -49,6 +62,8 @@ export const auditLogInterceptor: HttpInterceptorFn = (req, next) => {
         dur: Date.now() - start,
         ...(marksCount !== undefined ? { d: marksCount } : {}),
         ...(sessionId !== undefined ? { s: sessionId } : {}),
+        ...(draftVersion !== undefined ? { v: draftVersion } : {}),
+        ...(draftDelta !== undefined ? { chg: draftDelta } : {}),
       };
       store.append(h);
     }),
@@ -65,12 +80,14 @@ export const auditLogInterceptor: HttpInterceptorFn = (req, next) => {
           ...(codeId !== 0 ? { c: codeId } : {}),
           ...(marksCount !== undefined ? { d: marksCount } : {}),
           ...(sessionId !== undefined ? { s: sessionId } : {}),
+          ...(draftVersion !== undefined ? { v: draftVersion } : {}),
+          ...(draftDelta !== undefined ? { chg: draftDelta } : {}),
         };
         store.append(h);
 
         if (err.status === 0) {
-          // NetworkError — la request nunca llegó al back. Se emite un NW
-          // adicional para simplificar detección server-side.
+          // NetworkError -- la request nunca llego al back. Se emite un NW
+          // adicional para simplificar deteccion server-side.
           const nw: NWEvent = {
             t: Date.now(),
             e: 'NW',

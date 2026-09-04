@@ -108,3 +108,22 @@ export function lookupErrorCode(code: string | null | undefined): number {
 export function lookupMethod(method: string): number {
   return (METHOD_IDS as Record<string, number>)[method.toUpperCase()] ?? 0;
 }
+
+// Códigos de error de SSO (`?sso_error=X` en el callback de bootstrap) —
+// Sub-bloque F.1 (design.md § Revision Log 2026-09-04 iteration 2). Mismo
+// convenio 0 = unknown que los diccionarios de arriba.
+export const SSO_ERROR_IDS = {
+  access_denied: 1,
+  email_not_authorized: 2,
+  provider_error: 3,
+  callback_failed: 4,
+  invalid_state: 5,
+  session_creation_failed: 6,
+  tenant_selection_required: 7,
+  account_not_active: 8,
+} as const;
+
+export function lookupSsoError(code: string | null | undefined): number {
+  if (!code) return 0;
+  return (SSO_ERROR_IDS as Record<string, number>)[code] ?? 0;
+}

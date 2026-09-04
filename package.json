@@ -1,6 +1,6 @@
 {
   "name": "fiovi",
-  "version": "1.7.2 hydrogen-alpha",
+  "version": "1.7.5 hydrogen-alpha",
   "scripts": {
     "ng": "ng",
     "build-env": "node scripts/build-env.mjs",

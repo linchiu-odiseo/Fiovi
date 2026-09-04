@@ -82,6 +82,37 @@ export class AuditLogStore {
     }
   }
 
+  // Puente a Fase 1 (Sub-bloque E, design.md Revision Log 2026-09-04):
+  // borra solo los eventos cuyo `t` cae en [sinceMs, untilMs) -- half-open,
+  // simetrico con AuditLogSerializer.serializeSlice. Usado por el futuro
+  // AuditLogUploadDispatcher tras confirmar 2xx de un slice subido, sin
+  // afectar eventos fuera de esa ventana (a diferencia de clearDay).
+  async clearRange(sinceMs: number, untilMs: number): Promise<void> {
+    try {
+      const db = await this.db();
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE_EVENTS, 'readwrite');
+        const store = tx.objectStore(STORE_EVENTS);
+        const req = store.openCursor();
+        req.onsuccess = () => {
+          const cursor = req.result;
+          if (!cursor) return;
+          const ev = cursor.value as AuditLogEvent;
+          if (ev.t >= sinceMs && ev.t < untilMs) {
+            cursor.delete();
+          }
+          cursor.continue();
+        };
+        req.onerror = () => reject(req.error ?? new Error('IDB cursor error'));
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error ?? new Error('IDB clearRange error'));
+        tx.onabort = () => reject(tx.error ?? new Error('IDB tx aborted'));
+      });
+    } catch {
+      // Silencioso -- no propagamos errores de IDB.
+    }
+  }
+
   // --- privados ---
 
   private async doAppend(event: AuditLogEvent): Promise<void> {

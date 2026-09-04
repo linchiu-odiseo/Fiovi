@@ -1,5 +1,6 @@
 import { AuditLogStore } from './audit-log-store.service';
-import type { AIEvent, DPEvent } from './audit-log-event';
+import type { AIEvent, AOEvent, DPEvent } from './audit-log-event';
+import { lookupSsoError } from './audit-log-dictionaries';
 
 // Instala listeners globales para eventos de aplicación (VC, OF, AI-prompt).
 // Emite AO al bootstrap (cold vs warm) y, si es el primer bootstrap del día,
@@ -18,7 +19,14 @@ export function installAuditLogListeners(store: AuditLogStore): void {
   // 'reload' → warm (0), cualquier otro → cold (1).
   const navEntries = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
   const isReload = navEntries[0]?.type === 'reload';
-  store.append({ t: Date.now(), e: 'AO', cold: isReload ? 0 : 1 });
+  const seId = readSsoErrorId();
+  const ao: AOEvent = {
+    t: Date.now(),
+    e: 'AO',
+    cold: isReload ? 0 : 1,
+    ...(seId !== undefined ? { se: seId } : {}),
+  };
+  store.append(ao);
 
   // DP + AI-standalone se emiten solo si no están ya en el batch de hoy
   // (evita duplicados en reloads del mismo día). Async fire-and-forget.
@@ -87,5 +95,22 @@ function safeMatchMedia(query: string): boolean {
     return window.matchMedia(query).matches;
   } catch {
     return false;
+  }
+}
+
+// Lee `?sso_error=X` de la URL de bootstrap (Sub-bloque F.3). Defensivo: si
+// `window.location` no está disponible o el parseo falla, no emite `se`
+// (undefined) en vez de lanzar — el bootstrap de la app no puede fallar por
+// esto.
+function readSsoErrorId(): number | undefined {
+  try {
+    const search = window.location?.search;
+    if (!search) return undefined;
+    const params = new URLSearchParams(search);
+    const code = params.get('sso_error');
+    if (!code) return undefined;
+    return lookupSsoError(code);
+  } catch {
+    return undefined;
   }
 }

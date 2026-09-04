@@ -16,19 +16,15 @@ export interface SSEvent {
   readonly s: string;
 }
 
-// MK — mark. Emitido en cada marcación/desmarcación de pregunta.
-export interface MKEvent {
-  readonly t: number;
-  readonly e: 'MK';
-  readonly s: string;
-  readonly q: number;
-  readonly a: AlternativaCode;
-}
-
 // H — HTTP request. Emitido por el interceptor para toda request saliente.
 // `c` opcional: código de error numérico (solo cuando st >= 400 y body trae `code`).
 // `d` opcional: marks count al momento del fire (solo draft/submit).
 // `s` opcional: sessionId (solo endpoints session-scoped).
+// `v` opcional: versión incremental del draft para ese sessionId (solo POST
+// /draft — Sub-bloque C, design.md § Revision Log 2026-09-04).
+// `chg` opcional: delta de composición vs el draft anterior — [pregunta, letra]
+// para added/changed, [pregunta, '0'] para cleared. Array vacío = draft sin
+// cambios de composición (evento real igual, ver design.md).
 export interface HEvent {
   readonly t: number;
   readonly e: 'H';
@@ -39,6 +35,8 @@ export interface HEvent {
   readonly c?: number;
   readonly d?: number;
   readonly s?: string;
+  readonly v?: number;
+  readonly chg?: readonly [number, AlternativaCode][];
 }
 
 // NW — network error. Emitido cuando la request falla sin llegar al back
@@ -74,10 +72,15 @@ export interface RTEvent {
 }
 
 // AO — app open. cold:1 cold-start, cold:0 warm (reload).
+// `se` opcional: SSO error id (Sub-bloque F.2, design.md § Revision Log
+// 2026-09-04 iteration 2) leído de `?sso_error=X` en la URL de bootstrap.
+// `0` = unknown code (no catalogado en `SSO_ERROR_IDS`); el campo está
+// ausente cuando la URL no traía `sso_error` en absoluto.
 export interface AOEvent {
   readonly t: number;
   readonly e: 'AO';
   readonly cold: 0 | 1;
+  readonly se?: number;
 }
 
 // AI — app install. mode "standalone" (se está corriendo instalada) o
@@ -110,9 +113,19 @@ export interface ASEvent {
   readonly s: string;
 }
 
+// CLK — clock calibration. Emitido desde `HttpExamsApi.getTodaysExams()` a lo
+// sumo 1 vez cada `CLOCK_CHECK_INTERVAL_MS` (4h) por instancia de app, y solo
+// cuando el offset (srv - t) cambió más de `CLOCK_DRIFT_THRESHOLD_MS` (500ms)
+// vs el último offset emitido. El consumidor reconstruye:
+// offset = srv - t; realT = t + offset.
+export interface CLKEvent {
+  readonly t: number;
+  readonly e: 'CLK';
+  readonly srv: number;
+}
+
 export type AuditLogEvent =
   | SSEvent
-  | MKEvent
   | HEvent
   | NWEvent
   | VCEvent
@@ -121,6 +134,7 @@ export type AuditLogEvent =
   | AOEvent
   | AIEvent
   | DPEvent
-  | ASEvent;
+  | ASEvent
+  | CLKEvent;
 
 export type EventCode = AuditLogEvent['e'];

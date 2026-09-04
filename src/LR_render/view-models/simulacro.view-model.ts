@@ -14,7 +14,6 @@ import { CLOCK, MARKINGS_STORAGE } from '../../app.config';
 import { DraftAutoSaveDispatcher } from '../../L3_periphery/envio/draft-auto-save-dispatcher.service';
 import { AuditLogStore } from '../../L3_periphery/telemetry/audit-log-store.service';
 import { shortSessionId } from '../../L3_periphery/telemetry/day-key';
-import type { AlternativaCode } from '../../L3_periphery/telemetry/audit-log-event';
 import { Exam } from '../../L1_domain/entities/exam';
 import { Alternativa } from '../../L1_domain/value-objects/alternativa';
 import { AlternativaValue, AnswersMap } from '../../L1_domain/ports/markings-storage';
@@ -640,14 +639,6 @@ export class SimulacroPageViewModel {
     });
 
     this.marcaciones.update((prev) => ({ ...prev, [String(pregunta)]: proxima }));
-    // Audit-log: emitir MK. Fire-and-forget. `null` → '0' (clear).
-    this.auditLog.append({
-      t: Date.now(),
-      e: 'MK',
-      s: shortSessionId(this.sessionId),
-      q: pregunta,
-      a: mkAlt(proxima),
-    });
     // Notificar al dispatcher que hay cambios para auto-save. Se llama DESPUÉS
     // de la escritura exitosa en IDB — el dispatcher leerá el snapshot de IDB
     // cuando el debounce expire. Si el flag está apagado, el Noop absorbe la
@@ -684,14 +675,6 @@ export class SimulacroPageViewModel {
         alternativa: Alternativa.fromString(proxima),
       });
       nuevoMap[String(pregunta)] = proxima;
-      // Audit-log: emitir MK por cada pregunta del batch aleatorio.
-      this.auditLog.append({
-        t: Date.now(),
-        e: 'MK',
-        s: shortSessionId(this.sessionId),
-        q: pregunta,
-        a: mkAlt(proxima),
-      });
     }
 
     this.marcaciones.set(nuevoMap);
@@ -1066,12 +1049,6 @@ export class SimulacroPageViewModel {
       this.countdownTimer = null;
     }
   }
-}
-
-// Mapea AlternativaValue (null | 'A'..'E') al AlternativaCode del audit-log
-// ('0' | 'A'..'E'). null (clear) → '0'.
-function mkAlt(v: AlternativaValue): AlternativaCode {
-  return v === null ? '0' : v;
 }
 
 function formatHHMM(d: Date): string {

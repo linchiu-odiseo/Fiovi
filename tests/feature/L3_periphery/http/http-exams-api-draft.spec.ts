@@ -5,6 +5,10 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { HttpExamsApi } from '../../../../src/L3_periphery/http/http-exams-api';
 import { SlugStore } from '../../../../src/L3_periphery/http/slug-store';
 import { DraftRequest } from '../../../../src/L1_domain/ports/exams-api';
+import {
+  DRAFT_DELTA_TOKEN,
+  DRAFT_VERSION_TOKEN,
+} from '../../../../src/L3_periphery/telemetry/tokens';
 
 const TEST_SLUG = 'vonex';
 import { InvalidPayloadError } from '../../../../src/L1_domain/errors/invalid-payload.error';
@@ -306,6 +310,118 @@ describe('HttpExamsApi.guardarDraft (POST /draft)', () => {
       const req = httpMock.expectOne(DRAFT_URL);
       req.flush({ message: 'PRE_SESSION_NOT_FOUND' }, { status: 404, statusText: 'Not Found' });
       await expect(pending).rejects.toBeInstanceOf(NetworkError);
+    });
+  });
+
+  // Sub-bloque C (design.md § Revision Log 2026-09-04): v+chg en eventos H
+  // de draft. El adapter computa el delta de composición vs el último draft
+  // emitido con ÉXITO y lo setea en HttpContext vía DRAFT_VERSION_TOKEN /
+  // DRAFT_DELTA_TOKEN — el interceptor solo los lee (cubierto en
+  // audit-log-interceptor.spec.ts).
+  describe('DRAFT_VERSION_TOKEN + DRAFT_DELTA_TOKEN (Sub-bloque C)', () => {
+    it('primer draft de la sesión: v=1 y chg = composición completa', async () => {
+      const pending = adapter.guardarDraft({ ...validRequest(), responses: 'AB-C' });
+      const req = httpMock.expectOne(DRAFT_URL);
+
+      expect(req.request.context.get(DRAFT_VERSION_TOKEN)).toBe(1);
+      expect(req.request.context.get(DRAFT_DELTA_TOKEN)).toEqual([
+        [1, 'A'],
+        [2, 'B'],
+        [4, 'C'],
+      ]);
+
+      req.flush(null, { status: 204, statusText: 'No Content' });
+      await pending;
+    });
+
+    it('segundo draft con q1 cambiado de A a B: v=2 y chg=[[1,"B"]]', async () => {
+      const first = adapter.guardarDraft({ ...validRequest(), responses: 'A---' });
+      httpMock.expectOne(DRAFT_URL).flush(null, { status: 204, statusText: 'No Content' });
+      await first;
+
+      const second = adapter.guardarDraft({ ...validRequest(), responses: 'B---' });
+      const req = httpMock.expectOne(DRAFT_URL);
+      expect(req.request.context.get(DRAFT_VERSION_TOKEN)).toBe(2);
+      expect(req.request.context.get(DRAFT_DELTA_TOKEN)).toEqual([[1, 'B']]);
+
+      req.flush(null, { status: 204, statusText: 'No Content' });
+      await second;
+    });
+
+    it('draft con q1 desmarcado (cleared): chg=[[1,"0"]]', async () => {
+      const first = adapter.guardarDraft({ ...validRequest(), responses: 'A---' });
+      httpMock.expectOne(DRAFT_URL).flush(null, { status: 204, statusText: 'No Content' });
+      await first;
+
+      const second = adapter.guardarDraft({ ...validRequest(), responses: '----' });
+      const req = httpMock.expectOne(DRAFT_URL);
+      expect(req.request.context.get(DRAFT_VERSION_TOKEN)).toBe(2);
+      expect(req.request.context.get(DRAFT_DELTA_TOKEN)).toEqual([[1, '0']]);
+
+      req.flush(null, { status: 204, statusText: 'No Content' });
+      await second;
+    });
+
+    it('draft sin cambio de composición: chg=[] pero v se incrementa igual (evento real)', async () => {
+      const first = adapter.guardarDraft({ ...validRequest(), responses: 'A-C-' });
+      httpMock.expectOne(DRAFT_URL).flush(null, { status: 204, statusText: 'No Content' });
+      await first;
+
+      const second = adapter.guardarDraft({ ...validRequest(), responses: 'A-C-' });
+      const req = httpMock.expectOne(DRAFT_URL);
+      expect(req.request.context.get(DRAFT_VERSION_TOKEN)).toBe(2);
+      expect(req.request.context.get(DRAFT_DELTA_TOKEN)).toEqual([]);
+
+      req.flush(null, { status: 204, statusText: 'No Content' });
+      await second;
+    });
+
+    // Fallo NO debe adelantar el baseline ni la versión confirmada: el
+    // próximo intento reenvía el MISMO v y el MISMO chg (o uno más fresco si
+    // la composición cambió mientras tanto).
+    it('si el POST falla, el siguiente intento reusa el mismo v y el mismo chg', async () => {
+      const failed = adapter.guardarDraft({ ...validRequest(), responses: 'A---' });
+      const failReq = httpMock.expectOne(DRAFT_URL);
+      expect(failReq.request.context.get(DRAFT_VERSION_TOKEN)).toBe(1);
+      expect(failReq.request.context.get(DRAFT_DELTA_TOKEN)).toEqual([[1, 'A']]);
+      failReq.flush('boom', { status: 500, statusText: 'Internal Server Error' });
+      await expect(failed).rejects.toBeInstanceOf(NetworkError);
+
+      const retry = adapter.guardarDraft({ ...validRequest(), responses: 'A---' });
+      const retryReq = httpMock.expectOne(DRAFT_URL);
+      expect(retryReq.request.context.get(DRAFT_VERSION_TOKEN)).toBe(1);
+      expect(retryReq.request.context.get(DRAFT_DELTA_TOKEN)).toEqual([[1, 'A']]);
+      retryReq.flush(null, { status: 204, statusText: 'No Content' });
+      await retry;
+    });
+  });
+
+  // C.7: aislamiento del versionado por sessionId. El versionCounter y
+  // lastEmittedComposition viven en un Map keyed por sessionId — una sesión
+  // nueva NO debe heredar el baseline ni el contador de otra.
+  describe('aislamiento de versionado entre sesiones (C.7)', () => {
+    it('un sessionId nuevo arranca versionCounter en 1 y no ve la composición de otra sesión como baseline', async () => {
+      const SESSION_A = SESSION_ID;
+      const SESSION_B = 'b6a1e6a0-0000-4ef0-bf41-98352d21c2cf';
+      const urlB = `${environment.apiBaseUrl}/t/${TEST_SLUG}/student/exam-sessions/${SESSION_B}/draft`;
+
+      // sessionA llega a v=2 con q1=A marcado.
+      const a1 = adapter.guardarDraft({ ...validRequest(), examId: SESSION_A, responses: 'A---' });
+      httpMock.expectOne(DRAFT_URL).flush(null, { status: 204, statusText: 'No Content' });
+      await a1;
+      const a2 = adapter.guardarDraft({ ...validRequest(), examId: SESSION_A, responses: 'A---' });
+      httpMock.expectOne(DRAFT_URL).flush(null, { status: 204, statusText: 'No Content' });
+      await a2;
+
+      // sessionB es nueva: mismo composición 'A---' pero debe verse como
+      // "added" (chg no vacío) y v=1 — si heredara el baseline de sessionA
+      // esto daría chg=[] y v=3.
+      const b1 = adapter.guardarDraft({ ...validRequest(), examId: SESSION_B, responses: 'A---' });
+      const reqB = httpMock.expectOne(urlB);
+      expect(reqB.request.context.get(DRAFT_VERSION_TOKEN)).toBe(1);
+      expect(reqB.request.context.get(DRAFT_DELTA_TOKEN)).toEqual([[1, 'A']]);
+      reqB.flush(null, { status: 204, statusText: 'No Content' });
+      await b1;
     });
   });
 });

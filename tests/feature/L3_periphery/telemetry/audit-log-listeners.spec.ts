@@ -152,4 +152,84 @@ describe('installAuditLogListeners', () => {
     const ai = batch.find((e) => e.e === 'AI' && e.mode === 'prompt-accepted');
     expect(ai).toBeDefined();
   });
+
+
+  // Sub-bloque F.8 (design.md Revision Log 2026-09-04 iteration 2): AO.se se
+  // lee de ?sso_error=X en la URL de bootstrap -- codigo conocido resuelve a
+  // su id en SSO_ERROR_IDS, codigo desconocido resuelve a 0, y el campo esta
+  // ausente cuando la URL no trae el param en absoluto.
+  describe('AO.se (SSO error id)', () => {
+    function withLocationSearch(search: string): () => void {
+      const originalLocation = window.location;
+      Object.defineProperty(window, 'location', {
+        writable: true,
+        configurable: true,
+        value: { ...originalLocation, search },
+      });
+      return () => {
+        Object.defineProperty(window, 'location', {
+          writable: true,
+          configurable: true,
+          value: originalLocation,
+        });
+      };
+    }
+
+    it('includes se with the catalogued id when ?sso_error is a known code', async () => {
+      const restore = withLocationSearch('?sso_error=access_denied');
+      try {
+        const store = TestBed.inject(AuditLogStore);
+        installAuditLogListeners(store);
+        await flushMicrotasks();
+
+        const batch = await store.currentDayBatch();
+        const ao = batch.find((e) => e.e === 'AO');
+        if (ao?.e === 'AO') {
+          expect(ao.se).toBe(1);
+        } else {
+          throw new Error('expected an AO event');
+        }
+      } finally {
+        restore();
+      }
+    });
+
+    it('includes se:0 when ?sso_error is an uncatalogued code', async () => {
+      const restore = withLocationSearch('?sso_error=some_future_code');
+      try {
+        const store = TestBed.inject(AuditLogStore);
+        installAuditLogListeners(store);
+        await flushMicrotasks();
+
+        const batch = await store.currentDayBatch();
+        const ao = batch.find((e) => e.e === 'AO');
+        if (ao?.e === 'AO') {
+          expect(ao.se).toBe(0);
+        } else {
+          throw new Error('expected an AO event');
+        }
+      } finally {
+        restore();
+      }
+    });
+
+    it('omits se when the URL has no sso_error param', async () => {
+      const restore = withLocationSearch('');
+      try {
+        const store = TestBed.inject(AuditLogStore);
+        installAuditLogListeners(store);
+        await flushMicrotasks();
+
+        const batch = await store.currentDayBatch();
+        const ao = batch.find((e) => e.e === 'AO');
+        if (ao?.e === 'AO') {
+          expect(ao.se).toBeUndefined();
+        } else {
+          throw new Error('expected an AO event');
+        }
+      } finally {
+        restore();
+      }
+    });
+  });
 });
