@@ -1,13 +1,26 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { timeout } from 'rxjs/operators';
 import { AuditLogSerializer } from './audit-log-serializer';
 import { AuditLogStore } from './audit-log-store.service';
 import { startOfTodayLocalMs } from './day-key';
+import { ENDPOINT_ID_TOKEN } from './tokens';
+import { ENDPOINT_IDS } from './audit-log-dictionaries';
 import { apiPath } from '../http/api-paths';
 import { SlugStore } from '../http/slug-store';
 import { environment } from '../../environments/environment';
+
+// Nombre del lock de Web Locks API — coordina el upload entre pestañas del
+// mismo origen (PWA instalada + navegador abierto es un caso realista) Y
+// entre ticks del propio setInterval si uno tarda más que el intervalo
+// (reentrancia intra-tab). Sin esto, dos llamadas concurrentes pueden leer
+// el mismo cursor, armar slices con ventana solapada, y subir los mismos
+// eventos dos veces bajo batchId distintos (el dedup server-side por
+// batchId no lo detecta). `ifAvailable: true` = si ya hay un upload en
+// curso, esta invocación no espera ni reintenta — el próximo intervalo
+// vuelve a intentar con el cursor que haya quedado.
+const UPLOAD_LOCK_NAME = 'fiovi-audit-log-upload';
 
 // AuditLogUploadDispatcher — Fase 1 del audit-log: sube periódicamente al
 // back los eventos capturados localmente (Fase 0), vía el puente
@@ -40,6 +53,22 @@ export class AuditLogUploadDispatcherService {
   private readonly slugStore = inject(SlugStore);
 
   async uploadPending(): Promise<void> {
+    if (typeof navigator === 'undefined' || !('locks' in navigator)) {
+      // Sin Web Locks API disponible (navegador viejo): corré sin
+      // coordinación — best-effort, mismo riesgo de duplicado que antes,
+      // pero no rompe nada (el dedup por batchId sigue siendo defensa
+      // parcial del lado server).
+      await this.uploadPendingLocked();
+      return;
+    }
+
+    await navigator.locks.request(UPLOAD_LOCK_NAME, { ifAvailable: true }, async (lock) => {
+      if (!lock) return; // otra pestaña/tick ya está subiendo — no reintentamos ahora.
+      await this.uploadPendingLocked();
+    });
+  }
+
+  private async uploadPendingLocked(): Promise<void> {
     try {
       const slug = this.slugStore.current();
       if (!slug) return; // Sin identity activa — nada que subir todavía.
@@ -60,12 +89,11 @@ export class AuditLogUploadDispatcherService {
       const payloadGz = await gzipToBase64(payload);
       await firstValueFrom(
         this.http
-          .post<void>(apiPath.auditLogBatch(slug), {
-            batchId,
-            payload: payloadGz,
-            eventCount,
-            appVersion,
-          })
+          .post<void>(
+            apiPath.auditLogBatch(slug),
+            { batchId, payload: payloadGz, eventCount, appVersion },
+            { context: new HttpContext().set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.auditLogBatch) },
+          )
           .pipe(timeout(15_000)),
       );
 
@@ -91,7 +119,12 @@ export class AuditLogUploadDispatcherService {
     try {
       const raw = localStorage.getItem(CURSOR_KEY);
       const parsed = raw !== null ? Number(raw) : NaN;
-      return Number.isFinite(parsed) ? parsed : startOfTodayLocalMs();
+      // Cursor en el futuro (reloj del dispositivo retrocedido, o valor
+      // corrupto previo) queda atascado para siempre sin este chequeo:
+      // untilMs - sinceMs nunca supera MIN_WINDOW_MS. Fallback al mismo
+      // default que "sin cursor".
+      if (!Number.isFinite(parsed) || parsed > Date.now()) return startOfTodayLocalMs();
+      return parsed;
     } catch {
       return startOfTodayLocalMs();
     }

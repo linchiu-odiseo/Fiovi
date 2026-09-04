@@ -42,6 +42,7 @@ export const ENDPOINT_IDS = {
   studentExamDraft: 22,
   studentExamSubmitHomework: 23,
   studentMySubmission: 24,
+  auditLogBatch: 25,
 
   // Tutor
   tutorVirtualExams: 30,

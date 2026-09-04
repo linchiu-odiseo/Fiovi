@@ -146,6 +146,75 @@ describe('AuditLogUploadDispatcherService.uploadPending', () => {
     const [sinceMs] = serializeSliceSpy.mock.calls[0] as [number, number];
     expect(sinceMs).toBe(startOfTodayLocalMs());
   });
+
+  it('cursor in the future (clock skew / corrupt value) falls back to start of today local', async () => {
+    localStorage.setItem(CURSOR_KEY, String(Date.now() + 3_600_000));
+    serializeSliceSpy.mockResolvedValue({ payload: '', batchId: 'b', eventCount: 0, bytesRaw: 0 });
+
+    await dispatcher.uploadPending();
+
+    const [sinceMs] = serializeSliceSpy.mock.calls[0] as [number, number];
+    expect(sinceMs).toBe(startOfTodayLocalMs());
+  });
+
+  describe('con Web Locks API disponible', () => {
+    let originalLocks: unknown;
+
+    beforeEach(() => {
+      originalLocks = (navigator as unknown as { locks?: unknown }).locks;
+    });
+
+    afterEach(() => {
+      Object.defineProperty(navigator, 'locks', {
+        value: originalLocks,
+        configurable: true,
+        writable: true,
+      });
+    });
+
+    it('otra pestaña/tick con el lock tomado: no llama serializeSlice ni hace POST', async () => {
+      const request = vi.fn(
+        async (_name: string, _opts: { ifAvailable: boolean }, cb: (lock: null) => unknown) =>
+          cb(null),
+      );
+      Object.defineProperty(navigator, 'locks', {
+        value: { request },
+        configurable: true,
+        writable: true,
+      });
+      serializeSliceSpy.mockResolvedValue(SLICE);
+
+      await dispatcher.uploadPending();
+
+      expect(request).toHaveBeenCalledWith(
+        'fiovi-audit-log-upload',
+        { ifAvailable: true },
+        expect.any(Function),
+      );
+      expect(serializeSliceSpy).not.toHaveBeenCalled();
+      httpMock.expectNone(() => true);
+    });
+
+    it('lock disponible: procede con el upload normal', async () => {
+      const request = vi.fn(
+        async (
+          _name: string,
+          _opts: { ifAvailable: boolean },
+          cb: (lock: object) => Promise<unknown>,
+        ) => cb({}),
+      );
+      Object.defineProperty(navigator, 'locks', {
+        value: { request },
+        configurable: true,
+        writable: true,
+      });
+      serializeSliceSpy.mockResolvedValue({ payload: '', batchId: 'b', eventCount: 0, bytesRaw: 0 });
+
+      await dispatcher.uploadPending();
+
+      expect(serializeSliceSpy).toHaveBeenCalled();
+    });
+  });
 });
 
 // Inversa de bytesToBase64+gzip del dispatcher, con las mismas APIs browser
