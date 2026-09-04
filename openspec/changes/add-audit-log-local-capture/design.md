@@ -1,3 +1,5 @@
+> **Revised 2026-09-04.** See section "Revision Log" at bottom for the design pivot.
+
 ## Context
 
 Fase 0 del audit-log de Fiovi. El objetivo es capturar en el dispositivo del alumno una traza mínima pero completa de todo lo que le pasa a Fiovi (peticiones HTTP + eventos de aplicación) para poder responder reclamos post-facto del tipo "marqué X y no aparece nota".
@@ -280,6 +282,8 @@ Ver `proposal.md` — no repetir acá.
 
 ## Puente a Fase 1
 
+> SUPERSEDED (2026-09-04): esta sección describía el puente en términos de `currentDayBatch()` + `clearDay()` (day-granular). El Revision Log al final de este documento reemplaza el mecanismo concreto por `serializeSlice(sinceMs, untilMs)` + `clearRange(sinceMs, untilMs)` (slice-granular), necesario para un dispatcher que sube y confirma ventanas más chicas que "el día completo". El texto original queda abajo como registro histórico de la intención (upload gzip, dedup, feature flag), que no cambia — solo cambia la forma de la interfaz de puente.
+
 Cuando se implemente Fase 1 (upload al back), la interfaz pública del `AuditLogStore` SHALL permanecer estable:
 
 ```ts
@@ -300,3 +304,129 @@ El `AuditLogUploadDispatcher` de Fase 1 vivirá en `src/L3_periphery/telemetry/a
 **Nada en el `AuditLogStore` cambia**. El schema de eventos permanece idéntico. Los diccionarios se extienden con endpoints nuevos pero no reindexan los existentes.
 
 Feature flag de Fase 1 (opcional): localStorage con URL param `?audit=1` para canary + cohort seleccionado por back con `GET /me/flags`. Se decide en `design.md` de Fase 1.
+
+## Revision Log — 2026-09-04
+
+### Rationale
+
+Se testeó Fase 0 con datos reales de una sesión de examen: ~11 KB en 8 minutos. Al inspeccionar el NDJSON, el volumen estaba dominado por eventos `MK` — una línea por cada click de marcación, incluyendo bursts de correcciones rápidas (ej. 100 clicks arreglando la pregunta 1 en pocos segundos). Un revisor senior de código, al ver estos datos, recomendó pivotear antes de mergear PR #77: `MK` es redundante porque los eventos `H` de draft ya disparan solo ante cambios reales de estado (el `draft-auto-save-dispatcher` tiene debounce + throttle incorporados), y esos eventos ya viajan con `d` (marks count). Lo único que faltaba para hacerlos suficientes como evidencia era saber QUÉ cambió, no solo CUÁNTO. De ahí Cambio 2 (v+chg).
+
+### Updated event schema
+
+- `MKEvent` se elimina del union `AuditLogEvent`. El código en `simulacro.view-model.ts` (setAlt/clearAlt) deja de emitir `MK`.
+- `HEvent` gana dos campos opcionales, poblados SOLO para los endpoints de draft/submit:
+  - `v?: number` — versión incremental scoped a `sessionId`. Arranca en 1, incrementa en cada draft exitoso. Resetea (vuelve a 1) cuando aparece un `sessionId` nuevo.
+  - `chg?: readonly [number, string][]` — tuplas `[questionNumber, alternativaCode]` de SOLO las preguntas que cambiaron desde el último draft H emitido para esa sesión. `alternativaCode === "0"` significa que la pregunta fue borrada (clear).
+- Reconstrucción de la composición completa en cualquier `v`: replay de todos los `chg` en orden desde `v:1` hasta la `v` objetivo, aplicando cada tupla como un upsert (o delete si `a==="0"`) sobre un mapa `questionNumber → alternativaCode`.
+- El union pasa de 11 a 10 tipos: `SS | H | NW | VC | OF | RT | AO | AI | DP | AS`.
+
+### Decision: batch-on-serialize, not batch-on-append
+
+**Decisión:** `AuditLogStore.append` NO cambia — sigue escribiendo 1 registro por evento a IDB, fire-and-forget, sin timers ni buffers en memoria. El agrupamiento (batching) ocurre exclusivamente dentro de `AuditLogSerializer`, en el momento de producir el NDJSON de salida (descarga manual o `serializeSlice` para Fase 1). El agrupamiento junta eventos consecutivos por `(e, s?, ventana de tiempo de `windowMs`)` en una sola línea NDJSON con formato `{"t": baseline, "e": tipo, "s"?: session, "x": [[dt, ...campos], ...]}`.
+
+**Por qué NO en append:**
+- Bufferear en memoria y flushear con un timer (ej. cada 2s) introduce una ventana de pérdida de datos: si el usuario navega away o el tab se cierra (`pagehide`) dentro de esa ventana, los eventos bufferizados nunca llegan a IDB. El IDB write async del `pagehide` handler tampoco es confiable — varios navegadores lo cortan antes de que la promesa resuelva.
+- El objetivo explícito de Fase 0 es "cero pérdida de datos" (ver Decision 8 original: fire-and-forget pero SIEMPRE hacia IDB, nunca hacia un buffer intermedio). Mover el batching a append rompería esa garantía por una ganancia de tamaño que de todos modos se logra igual en el momento de serializar.
+- Batchear en serialize es más simple: no hay estado de buffer que sincronizar entre pestañas/tabs, no hay timers que limpiar, no hay riesgo de reordenar eventos si dos tabs escriben a la vez (IDB ya serializa eso).
+
+**Alternativa descartada:** buffer en memoria en `AuditLogStore.append` con flush por tamaño o timer, más flush forzado en `pagehide`. Descartada por el riesgo de pérdida descrito arriba — el peso ganado (bytes) no justifica el riesgo perdido (completitud), que es el valor central del audit log.
+
+### Decision: v+chg vive en el adapter L3, no en un puerto L1 nuevo
+
+**Decisión:** el estado necesario para computar `v` y `chg` (`lastEmittedComposition: Map<sessionId, Map<questionNumber, alternativaCode>>` y `versionCounter: Map<sessionId, number>`) vive dentro de `HttpExamsApi.saveDraft` (L3), NO en un puerto L1 nuevo (`AuditLog`) ni en el use case `GuardarDraftUseCase` (L2).
+
+**Por qué:**
+- Se evaluó primero un puerto L1 `AuditLog { append(event) }` con el use case L2 llamándolo directamente. Requiere mover `AuditLogEvent` (y sus tipos) de L3 a L1 — viable porque son datos puros sin dependencias de framework, pero es un cambio de superficie mayor (mover tipos usados por interceptor, listeners, serializer, view-model) para un beneficio que no es necesario acá.
+- La alternativa más liviana es que `GuardarDraftUseCase` (L2) sete `HttpContext` tokens antes de disparar la request. Pero **`HttpContext` es Angular-specific** (`@angular/common/http`) — importarlo en L2 viola la regla dura del proyecto de que L1/L2 son TypeScript puro, cero `@angular/*` (CLAUDE.md regla #2, `architecture-rules.md`).
+- Resolución: el estado de versión/delta se calcula donde YA se puede tocar `HttpContext` sin romper boundaries: el adapter HTTP L3 (`HttpExamsApi.saveDraft`). Este adapter inyecta `MarkingsStorage` (puerto L1 que YA existe y ya se inyecta en otros lugares del código, ej. `simulacro.view-model.ts`) para leer la composición actual de marcaciones, compara contra `lastEmittedComposition` para esa sesión, computa el delta (`chg`), incrementa `versionCounter`, y setea `DRAFT_VERSION_TOKEN` + `DRAFT_DELTA_TOKEN` en el `HttpContext` de la request antes de dispararla. El `audit-log.interceptor.ts` (que ya lee otros tokens del mismo context, ej. `MARKS_COUNT_TOKEN`) lee estos dos nuevos y los agrega al evento `H` emitido.
+- Esto mantiene el change 100% dentro de L3 (consistente con la afirmación original de la propuesta: "L1: nada, L2: nada"), sin abrir un puerto L1 nuevo que solo tendría un consumidor.
+
+**Alternativa descartada (A):** puerto L1 `AuditLog` + tipos de evento movidos a L1, consumido directamente por `GuardarDraftUseCase`. Descartada por alcance: mueve tipos usados en 4+ archivos L3/LR para un beneficio marginal (el único motivo real era "L2 podría querer loguear directo", que no es un requisito de este change).
+
+**Alternativa descartada (B):** `GuardarDraftUseCase` (L2) setea `HttpContext` tokens directamente. Descartada de plano: viola pureza de L2, `hexagonal-guard` la marcaría como violación dura.
+
+### Fase 1 bridge design
+
+El mismo `AuditLogSerializer` que produce el NDJSON para la descarga manual (Fase 0) alimenta también el futuro upload automático (Fase 1) vía `serializeSlice(sinceMs, untilMs)` — construido sobre el mismo `groupIntoBatches` que usa `serializeBatchedNdjson`, solo que acotado por rango de tiempo en vez de "todo el día actual". `serializeSlice` genera un `batchId` por invocación; el futuro `AuditLogUploadDispatcher` de Fase 1 sube ese payload al back con `POST /t/{slug}/telemetry/audit-log-batch`, y el back deduplica por `batchId` para tolerar reintentos sin duplicar filas. Tras confirmar 2xx, el dispatcher llama `AuditLogStore.clearRange(sinceMs, untilMs)` — puente simétrico que borra solo los eventos IDB del rango confirmado, sin afectar eventos fuera de esa ventana (a diferencia de `clearDay`, que es day-granular). Esto habilita un dispatcher periódico (ej. cada N minutos) en vez de uno que solo puede subir "el día anterior completo".
+
+### Batched output shape (Sub-bloque D)
+
+**Decisión:** cada evento agrupado dentro de `x` es un OBJETO (`{dt, ...campos}`), no una tupla posicional (`[dt, ...campos]`). Ejemplo real:
+
+```jsonc
+// Burst de 3 POSTs de draft de la misma sesión, dentro de 2000ms entre sí:
+{"t":1788470275006,"e":"H","s":"62dc0018","x":[
+  {"dt":0,"m":2,"u":22,"st":204,"dur":640,"d":4,"v":1,"chg":[]},
+  {"dt":8363,"m":2,"u":22,"st":204,"dur":316,"d":3,"v":2,"chg":[[1,"B"]]},
+  {"dt":15006,"m":2,"u":22,"st":204,"dur":637,"d":4,"v":3,"chg":[]}
+]}
+// Evento aislado (fuera de cualquier burst de 2000ms) — forma plana, sin `x`:
+{"t":1788469897331,"e":"H","m":1,"u":12,"st":200,"dur":997}
+```
+
+**Por qué objeto y no tupla:** el texto original de este Revision Log (arriba) describe el formato como `[[dt, ...campos], ...]`. Al implementar (Sub-bloque D), esa forma resultó frágil apenas se la confrontó con la heterogeneidad real de campos opcionales de `HEvent` (`c?`, `d?`, `v?`, `chg?`): una tupla exige una posición fija por campo, así que cualquier evento del grupo que no tenga un campo opcional presente en OTRO evento del mismo grupo necesita un `null` de relleno en esa posición — y el consumidor (humano leyendo NDJSON crudo, o el back de Fase 1) tiene que memorizar el mapeo posición→campo por tipo de evento para poder leerlo. El objeto evita ambos problemas: cada campo aparece solo cuando el evento lo tiene, autoexplicado por su key, sin relleno. El costo en bytes es marginal (keys cortas de 1-3 chars, ya elegidas así en el schema base) y ya fue asumido como irrelevante en Decision 4 arriba ("el peso crudo estimado es 4-16 KB/día... optimizar bytes... ahorraría <10 KB/día — irrelevante").
+
+**Grouping:** por `(e, s?)`, encadenado — un evento entra al grupo abierto de su key si su `t` está a ≤2000ms del ÚLTIMO evento ya agregado a ese grupo (no del baseline `t` del grupo). Esto permite bursts sostenidos (varios eventos separados por <2000ms entre sí, aunque el burst completo dure más de 2000ms) sin partirlos artificialmente. Un grupo de tamaño 1 se emite como el evento original, plano, sin `x` — mantiene "1 evento = 1 línea" para el caso común (la mayoría de `AO`, `VC`, `DP`, `H` sueltos) y reserva la forma batcheada para bursts reales.
+
+## Revision Log — 2026-09-04 (iteration 2 — senior format)
+
+### Rationale
+
+Un testeo real adicional (posterior al de Sub-bloque D) sobre el escenario objetivo — 10h/día × 20 exámenes por alumno en temporada de simulacros — mostró que el formato batcheado por ventana de 2000ms seguía siendo demasiado verboso: la ventana corta hace que ráfagas de `H` de la misma sesión pero separadas por más de 2s (tiempo normal entre preguntas) sigan emitiéndose como líneas sueltas, y cada línea batcheada repite `s`/`u`/campos constantes por evento agrupado. Un revisor senior, al ver el volumen resultante, prescribió un pivote más agresivo: eliminar la ventana de tiempo por completo y agrupar TODO evento que comparta `(e, s?, u?)` — sin importar cuánto tiempo pase entre ellos dentro del mismo batch — más un mecanismo de auto-hoist genérico que promueve al grupo cualquier campo cuyo valor sea idéntico en todas las entradas agrupadas (no solo `s`/`u`, que ya eran candidatos obvios).
+
+### Format spec
+
+Cada línea NDJSON es un grupo con esta forma:
+
+```
+{ e: string, s?: string, u?: number, t0: number, [...campos hoisteados]: any, x: [...entradas] }
+```
+
+- `e`, `s?`, `u?` — igual que antes, pero ahora determinados POR INSTANCIA: un evento sin `s` NO se agrupa con uno que sí lo trae, aunque compartan `e`.
+- `t0` — mínimo `t` del grupo (reemplaza el `t: baseline` de Sub-bloque D).
+- Cada entrada de `x` lleva `dt = t - t0` más los campos que NO fueron hoisteados (porque variaron entre entradas del grupo).
+- Auto-hoist: cualquier campo (además de `s`/`u`, que siempre se hoistean cuando forman parte de la key) presente con el MISMO valor (deep-equal — cubre arrays como `chg`) en TODAS las entradas del grupo se promueve al nivel del grupo y se borra de cada entrada.
+
+Ejemplo real (3 POSTs de draft de la misma sesión, sin restricción de ventana — pueden estar separados por minutos):
+
+```jsonc
+{"e":"H","s":"62dc0018","u":22,"t0":1788470275006,"m":2,"st":204,"x":[
+  {"dt":0,"dur":640,"d":4,"v":1,"chg":[]},
+  {"dt":8363,"dur":316,"d":3,"v":2,"chg":[[1,"B"]]},
+  {"dt":123456,"dur":637,"d":4,"v":3,"chg":[]}
+]}
+```
+
+`m:2` y `st:204` son idénticos en las 3 entradas → se hoistean al grupo. `dur`, `d`, `v`, `chg` varían → quedan per-entry.
+
+### Reversibility guarantee
+
+El requisito duro es reversibilidad 100%: `parseBatchedNdjson(serializeBatchedNdjson(events))` debe devolver exactamente los eventos originales (mismo set, mismo orden cronológico). `parseBatchedNdjson` (nueva función exportada, símil inverso de `serializeBatchedNdjson`) reconstruye cada evento fusionando los campos del grupo (`e`, `s?`, `u?`, campos hoisteados) con los de su entrada (`t = t0 + dt`, más los campos no hoisteados), y devuelve la lista ordenada por `t`. Este par de funciones es la base que usará Fase 1 (el back) y sus tests de verify para reconstruir el evento crudo a partir de lo que Fiovi sube — probado con un test de round-trip sobre un array heterogéneo (H de draft/submit/sin sesión, VC, AO con `se`, OF, SS, AS, DP, NW, RT, AI) en `audit-log-serializer.spec.ts`.
+
+### New `SSO_ERROR_IDS` dictionary + `AO.se`
+
+Se agrega `SSO_ERROR_IDS` (mismo convenio 0=unknown que los demás diccionarios) y `AOEvent.se?: number`, poblado por `installAuditLogListeners` leyendo `?sso_error=X` de `window.location.search` al emitir el `AO` de bootstrap. Motivación: el flujo SSO puede fallar en el callback ANTES de que exista una sesión de auditoría normal (no hay `login` ni `sessionId` todavía), así que el único punto de captura fiable es el evento de arranque de la app. Permite detectar en el análisis post-facto cuántos alumnos llegan a la app con un fallo de SSO sin depender de que el back lo loguee por su cuenta.
+
+### Singleton special case reversed
+
+Sub-bloque D emitía grupos de 1 entrada como el evento plano original (sin `x`), para minimizar bytes en el caso común. Esta iteración lo revierte deliberadamente: TODOS los grupos, incluidos los de 1 entrada, usan la forma batcheada `{..., x:[...]}`. Motivación: uniformidad de schema — un consumidor (humano o el back de Fase 1) parsea una sola forma de línea en todo el archivo, sin un caso especial "a veces plano, a veces con x". El costo en bytes es marginal (el auto-hoist ya promueve TODOS los campos de un grupo de 1 entrada al nivel del grupo — ver `computeHoistedFields`/`toGroup` en `audit-log-serializer.ts` — así que la entrada colapsa a `{dt:0}` de todos modos).
+
+### Empirical result
+
+~85% de compactación total vs el NDJSON crudo (`serializeToNdjson`) de Fase 0, medido sobre el mismo log de referencia usado en Sub-bloque D — la eliminación de la ventana de 2000ms permite agrupar sesiones completas de examen (varias decenas de minutos) en una sola línea por `(e, s?, u?)`, y el auto-hoist elimina la repetición de `m`/`st` (que casi siempre son constantes dentro de un mismo endpoint) en cada entrada.
+
+**`batchId` (`serializeSlice`):** se usa `crypto.randomUUID()` en vez de implementar un ULID a mano. La propiedad distintiva de un ULID sobre un UUID v4 — ser lexicográficamente ordenable por tiempo de creación — no tiene ningún consumidor en Fase 0 (nadie lista ni ordena `batchId`s; el back de Fase 1 solo lo usa como clave de dedup, para lo cual un UUID v4 es suficiente). Implementar el bit-packing Crockford base32 a mano para una propiedad que nadie consume es sobreingeniería evitable — mismo criterio que Decision 3/6 de este documento (no pagar complejidad por una necesidad hipotética). Si Fase 1 necesita ordenamiento temporal de batches, se resuelve ordenando por el `t` del primer evento del batch (ya disponible en el payload), no por el propio `batchId`.
+
+## Revision Log — 2026-09-04 (iteration 3 — clock calibration event)
+
+**Rationale:** el reloj del dispositivo del alumno puede driftear respecto al reloj NTP-sincronizado del back. Los reclamos de auditoría necesitan correlacionar timestamps de cliente con logs del back — un skew de pocos segundos ya alcanza para que "enviaste a las 14:32" (cliente) vs. "recibido a las 14:27" (back) sean imposibles de conciliar sin un ancla de calibración.
+
+**Mecanismo:** `HttpExamsApi.getTodaysExams()` ya recibe `serverTime` en cada response — se aprovecha ese valor sin agregar ningún nuevo endpoint ni polling dedicado. `maybeCalibrateClock` guarda `lastCalibrationCheckAt` y `lastEmittedOffset` como estado de instancia (no en IDB — perderlo en un reload es aceptable, el próximo poll recalibra) y aplica dos guards: (1) a lo sumo 1 recálculo cada `CLOCK_CHECK_INTERVAL_MS` (4h); (2) de los recálculos permitidos por (1), solo emite `CLK` si el offset (`srv - t`) cambió más de `CLOCK_DRIFT_THRESHOLD_MS` (500ms) vs. el último offset emitido.
+
+**Expectativa empírica:** ~1 línea `CLK` por día en un dispositivo normal (offset estable); 2-3 líneas máximo en dispositivos con drift activo (reloj sin NTP, hardware clock corrido).
+
+**Fórmula de reconstrucción:** `offset = srv - t; realT = anyEvent.t + offset` — cualquier evento del mismo día puede recalibrarse contra el `CLK` más cercano en el tiempo.
+
+**Trade-off aceptado:** drift ocurrido DENTRO de una ventana de 4h queda sin detectar hasta el próximo poll que caiga fuera de esa ventana. Aceptable para el horizonte típico de un reclamo (skew usual <60s; casos raros de minutos) — el objetivo es descartar "el dispositivo tenía el reloj mal puesto por horas/días", no medir drift de sub-segundo en tiempo real.
+
+**Desviación respecto al enunciado original:** `maybeCalibrateClock` recibe `serverTime` en millis (`ServerTime.toMillis()`), no el string ISO crudo de `dto.serverTime` — el cálculo de offset (`srv - t`) es aritmética numérica y el string no es restable directamente.

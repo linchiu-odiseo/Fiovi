@@ -98,3 +98,62 @@ Nada. Este change no agrega use cases.
 - [ ] 12.6 Verificación manual mínima: `npm run dev` → login → abrir un examen → marcar 3 preguntas → cerrar sesión → ir a /profile → click "Descargar logs" → abrir archivo descargado → confirmar líneas NDJSON con eventos SS + MK + H (login, exam-sessions, marcaciones marcadas).
 - [ ] 12.7 Verificación de tamaño: contar bytes del NDJSON descargado tras un flujo típico. Confirmar < 6 KB crudos (per Success Criteria del proposal).
 - [ ] 12.8 Verificación anti-PII: `grep` del archivo NDJSON descargado por: emails (regex `[a-z]+@[a-z]+`), tokens (regex `Bearer|Authorization`), slug del tenant (`vonex`). Todos deben retornar 0 matches.
+
+## Design Revision Tasks (2026-09-04)
+
+> Tareas del pivote de diseño acordado tras testear Fase 0 con datos reales (~11 KB en 8 min, dominado por `MK`) + recomendación de revisor senior. Ver `proposal.md` § Design Revision (2026-09-04) y `design.md` § Revision Log — 2026-09-04 para el contexto completo. Estas tareas se suman a — no reemplazan — las 40 tareas de arriba, que quedan como registro histórico del diseño original.
+
+### Sub-bloque A — Drop MK
+
+- [x] A.1 Remover el emit de `MK` en `src/LR_render/view-models/simulacro.view-model.ts` (`setAlt`/`clearAlt`).
+- [x] A.2 Remover `MKEvent` del union `AuditLogEvent` en `src/L3_periphery/telemetry/audit-log-event.ts`.
+- [x] A.3 Actualizar/eliminar en `tests/feature/LR_render/view-models/simulacro.view-model.spec.ts` los casos que aseveran emisión de `MK`.
+- [x] A.4 Actualizar `tests/feature/L3_periphery/telemetry/audit-log-store.spec.ts` si referencia `MK`.
+
+### Sub-bloque C — v+chg en eventos H de draft
+
+- [x] C.1 Agregar `DRAFT_VERSION_TOKEN` y `DRAFT_DELTA_TOKEN` a `src/L3_periphery/telemetry/tokens.ts`.
+- [x] C.2 En `HttpExamsApi.guardarDraft`: mantener `lastEmittedComposition: Map<sessionId, Map<questionNumber, alternativaCode>>` y `versionCounter: Map<sessionId, number>`, computar el delta vs `lastEmittedComposition`, setear ambos tokens en el `HttpContext` antes de disparar la request. Desviación del plan original: NO se inyecta `MarkingsStorage` — `req.responses` (el string compacto que ya arma `GuardarDraftUseCase`) es la composición completa vigente para ese POST, así que se parsea directamente en vez de releer IDB (evita un segundo read que podría desincronizarse del body enviado).
+- [x] C.3 En `audit-log.interceptor.ts`: leer los 2 tokens nuevos, agregar `v` y `chg` al evento `H` emitido (solo cuando están seteados).
+- [x] C.4 Actualizar la interfaz `HEvent` en `audit-log-event.ts`: agregar `v?: number` y `chg?: readonly [number, string][]`.
+- [x] C.5 Actualizar `http-exams-api-draft.spec.ts` para verificar que los tokens se setean con el delta correcto.
+- [x] C.6 Actualizar `audit-log-interceptor.spec.ts` para verificar que `v`+`chg` se propagan al evento `H`.
+- [x] C.7 Agregar test de reset de versionado cuando aparece un `sessionId` nuevo.
+
+### Sub-bloque D — Batch-on-serialize en AuditLogSerializer
+
+- [x] D.1 Extender `AuditLogSerializer` con el helper privado `groupIntoBatches(events, windowMs=2000)`.
+- [x] D.2 Modificar `downloadCurrentDay` para llamar a `serializeBatchedNdjson` en vez del serializer plano actual.
+- [x] D.3 Agregar `serializeBatchedNdjson(events)` exportado, junto al `serializeToNdjson` existente.
+- [x] D.4 Agregar `serializeSlice(sinceMs, untilMs): Promise<{payload, batchId, eventCount, bytesRaw}>` — `batchId` es `crypto.randomUUID()` (no ULID hecho a mano — ver design.md § "Batched output shape" para la justificación); `payload` es el NDJSON batcheado.
+- [x] D.5 Actualizar `audit-log-serializer.spec.ts`: verificar que el batching agrupa eventos por `(e, s?, window)`, verificar que eventos singleton quedan como líneas planas, verificar que `batchId` se genera.
+
+### Sub-bloque E — clearRange puente a Fase 1
+
+- [x] E.1 Agregar `clearRange(sinceMs, untilMs): Promise<void>` a `AuditLogStore`.
+- [x] E.2 Comportamiento: abre una tx `readwrite`, recorre con cursor `STORE_EVENTS`, borra las filas cuyo `t` cae en el rango.
+- [x] E.3 Actualizar `audit-log-store.spec.ts` para verificar que `clearRange` afecta solo el rango indicado.
+
+## Sub-bloque F — Senior format iteration 2 (2026-09-04)
+
+> Testeo real mostró que el formato batcheado por ventana de 2s (Sub-bloque D) seguía siendo demasiado verboso para el escenario 10h/día × 20 exámenes. Revisor senior + usuario prescribieron un formato más agresivo: collapse por `(e, s?, u?)` sin ventana de tiempo, `t0`/`dt` por grupo/entrada, y auto-hoist de campos constantes. Ver `design.md` § Revision Log — 2026-09-04 (iteration 2 — senior format).
+
+- [x] F.1 Agregar diccionario `SSO_ERROR_IDS` + helper `lookupSsoError(code)` a `src/L3_periphery/telemetry/audit-log-dictionaries.ts`.
+- [x] F.2 Agregar campo opcional `se?: number` a `AOEvent` en `src/L3_periphery/telemetry/audit-log-event.ts`.
+- [x] F.3 En `src/L3_periphery/telemetry/audit-log-listeners.ts`, leer `window.location.search` (`?sso_error=X`) al emitir `AO` en el bootstrap; incluir `se` solo cuando el param está presente. Defensivo ante URL ausente/malformada.
+- [x] F.4 Reescribir `groupIntoBatches` en `src/L3_periphery/telemetry/audit-log-serializer.ts` con el nuevo formato senior: sin ventana de tiempo, key `(e, s?, u?)` por instancia, `t0`/`dt`, auto-hoist de campos idénticos, singletons SIEMPRE en forma batcheada (`x`).
+- [x] F.5 Agregar `parseBatchedNdjson(ndjson): AuditLogEvent[]` exportado — inversa exacta de `serializeBatchedNdjson`.
+- [x] F.6 Actualizar `serializeSlice(sinceMs, untilMs)` para usar el nuevo formato (batchId y rango half-open sin cambios).
+- [x] F.7 Reescribir `tests/feature/L3_periphery/telemetry/audit-log-serializer.spec.ts` para el nuevo formato, incluyendo el test de reversibilidad round-trip (el más importante del archivo).
+- [x] F.8 Agregar tests de `AO.se` en `tests/feature/L3_periphery/telemetry/audit-log-listeners.spec.ts` (código conocido → id; código desconocido → 0; sin param → campo ausente).
+
+## Sub-bloque G — CLK clock calibration event (2026-09-04)
+
+> El reloj del dispositivo del alumno puede driftear respecto al reloj NTP-sincronizado del back; los reclamos de auditoría necesitan un ancla de calibración para correlacionar timestamps de cliente con logs del back. Se aprovecha el `serverTime` que ya viaja en cada response de `HttpExamsApi.getTodaysExams()` — sin nuevo endpoint ni polling dedicado. Ver `design.md` § Revision Log — 2026-09-04 (iteration 3 — clock calibration event).
+
+- [x] G.1 Agregar `CLKEvent` a `src/L3_periphery/telemetry/audit-log-event.ts` y sumarlo al union `AuditLogEvent`.
+- [x] G.2 En `src/L3_periphery/http/http-exams-api.ts`: constantes `CLOCK_CHECK_INTERVAL_MS` (4h) y `CLOCK_DRIFT_THRESHOLD_MS` (500ms), campos de instancia `lastCalibrationCheckAt`/`lastEmittedOffset`, inject de `AuditLogStore`, método privado `maybeCalibrateClock(serverTime: number)`.
+- [x] G.3 Invocar `maybeCalibrateClock` desde `getTodaysExams()` inmediatamente después de construir el `ServerTime` (pasando `serverTime.toMillis()`).
+- [x] G.4 Agregar 4 tests a `tests/feature/L3_periphery/http/http-exams-api.spec.ts`: primer poll emite CLK; segundo poll dentro de 4h no emite; poll tras 4h sin drift no emite; poll tras 4h con drift >500ms emite con el nuevo `srv`.
+- [x] G.5 Actualizar `design.md` con la Revision Log de esta iteración.
+- [x] G.6 Actualizar este archivo (`tasks.md`) marcando G.1-G.6.
