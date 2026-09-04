@@ -84,6 +84,13 @@ const draftEnabled = (env['DRAFT_ENABLED'] ?? '').toLowerCase() === 'true';
 // activas — pero en el build de release corresponde dejar DEV_TOOLS=false en .env.
 const devTools = (env['DEV_TOOLS'] ?? '').toLowerCase() === 'true';
 
+// AUDIT_LOG_UPLOAD_ENABLED: habilita el AuditLogUploadDispatcher (Fase 1 del
+// audit-log — sube periódicamente los logs capturados en Fase 0 al back).
+// Default false hasta que learnex tenga desplegado
+// POST /t/{slug}/student/telemetry/audit-log-batch. Misma coerción
+// conservadora que DRAFT_ENABLED: solo 'true' activa.
+const auditLogUploadEnabled = (env['AUDIT_LOG_UPLOAD_ENABLED'] ?? '').toLowerCase() === 'true';
+
 // CAPTCHA_PROVIDER / PUBLIC_CAPTCHA_SITE_KEY: config del captcha anti-bot
 // del login. Ambas opcionales:
 //   - Sin PUBLIC_CAPTCHA_SITE_KEY (o vacía) → el adapter L3
@@ -123,6 +130,7 @@ writeFileSync(
     `  appVersion: ${appVersion},\n` +
     `  draftEnabled: ${draftEnabled},\n` +
     `  devTools: ${devTools},\n` +
+    `  auditLogUploadEnabled: ${auditLogUploadEnabled},\n` +
     `  captchaProvider: ${captchaProviderLit},\n` +
     `  captchaSiteKey: ${captchaSiteKeyLit},\n` +
     `};\n`,
@@ -136,6 +144,7 @@ writeFileSync(
     `  appVersion: ${appVersion},\n` +
     `  draftEnabled: ${draftEnabled},\n` +
     `  devTools: ${devTools},\n` +
+    `  auditLogUploadEnabled: ${auditLogUploadEnabled},\n` +
     `  captchaProvider: ${captchaProviderLit},\n` +
     `  captchaSiteKey: ${captchaSiteKeyLit},\n` +
     `};\n`,

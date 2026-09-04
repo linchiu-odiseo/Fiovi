@@ -19,3 +19,13 @@ export function todayLocalKey(now: Date = new Date()): string {
 export function shortSessionId(sessionId: string): string {
   return sessionId.length <= 8 ? sessionId : sessionId.slice(-8);
 }
+
+// Epoch ms de las 00:00 LOCAL del día actual del dispositivo. Cursor inicial
+// de AuditLogUploadDispatcher (Fase 1): la retención es de 1 día, así que no
+// tiene sentido arrancar el cursor "desde siempre" — mismo corte que usa la
+// rotación diaria de AuditLogStore.
+export function startOfTodayLocalMs(now: Date = new Date()): number {
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  return start.getTime();
+}

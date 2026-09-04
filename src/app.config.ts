@@ -71,6 +71,7 @@ import { credentialsInterceptor } from './L3_periphery/interceptors/credentials.
 import { auditLogInterceptor } from './L3_periphery/telemetry/audit-log.interceptor';
 import { AuditLogStore } from './L3_periphery/telemetry/audit-log-store.service';
 import { installAuditLogListeners } from './L3_periphery/telemetry/audit-log-listeners';
+import { AuditLogUploadDispatcherService } from './L3_periphery/telemetry/audit-log-upload-dispatcher.service';
 import { BeforeInstallPromptAdapter } from './L3_periphery/pwa/before-install-prompt.adapter';
 import { BrowserInstallEnvironmentProbe } from './L3_periphery/pwa/browser-install-environment-probe';
 import { PwaUpdateService } from './L3_periphery/pwa/pwa-update.service';
@@ -473,6 +474,18 @@ export const appConfig: ApplicationConfig = {
     // bootstrap. Ver design.md Decisions 5, 8 y REQ-AL-02.
     provideAppInitializer(() => {
       installAuditLogListeners(inject(AuditLogStore));
+    }),
+
+    // Audit-log Fase 1: dispatcher periódico que sube al back los eventos
+    // capturados en Fase 0 (design.md § Fase 1 Bridge). Apagado por defecto
+    // (AUDIT_LOG_UPLOAD_ENABLED=false) hasta que learnex tenga desplegado
+    // POST /t/{slug}/student/telemetry/audit-log-batch. Con el flag en false
+    // no se instancia timer ni tráfico — mismo criterio que DraftAutoSaveDispatcher.
+    provideAppInitializer(() => {
+      if (environment.auditLogUploadEnabled) {
+        const dispatcher = inject(AuditLogUploadDispatcherService);
+        setInterval(() => void dispatcher.uploadPending(), 5 * 60_000);
+      }
     }),
   ],
 };
