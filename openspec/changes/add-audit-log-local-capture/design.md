@@ -430,3 +430,114 @@ Sub-bloque D emitía grupos de 1 entrada como el evento plano original (sin `x`)
 **Trade-off aceptado:** drift ocurrido DENTRO de una ventana de 4h queda sin detectar hasta el próximo poll que caiga fuera de esa ventana. Aceptable para el horizonte típico de un reclamo (skew usual <60s; casos raros de minutos) — el objetivo es descartar "el dispositivo tenía el reloj mal puesto por horas/días", no medir drift de sub-segundo en tiempo real.
 
 **Desviación respecto al enunciado original:** `maybeCalibrateClock` recibe `serverTime` en millis (`ServerTime.toMillis()`), no el string ISO crudo de `dto.serverTime` — el cálculo de offset (`srv - t`) es aritmética numérica y el string no es restable directamente.
+
+## Revision Log — 2026-09-07 (Fase 1 operativa)
+
+Al ejercitar la subida contra learnex por primera vez aparecieron cinco
+bugs. Ninguno lo agarraba un test, y el motivo es común a los cinco: **los
+specs mockeaban justo la pieza que fallaba**. El spec del controller mockea
+el use case, el del use case mockea la cola, y el del dispatcher mockeaba el
+store. Cada capa estaba probada contra una ficción de la de al lado.
+
+### Decisión 9 — Retener hasta subir, no borrar por día
+
+El store borraba todo en el primer `append` de cada día. Servía cuando la
+única salida era la descarga manual ("los logs de hoy"), pero rompía la
+subida de la peor forma: los listeners emiten un `AO` al arrancar la app, así
+que el alumno que cerraba a las 6pm y abría a las 8am perdía lo pendiente
+ANTES de que el dispatcher pudiera correr. No era una carrera improbable: la
+pérdida era segura.
+
+Ahora el evento vive hasta que alguien confirme que llegó, con un techo de 7
+días para acotar el IDB si las subidas nunca prosperan. La poda se dispara
+con el mismo mecanismo barato de antes (el cambio de day-key en meta).
+
+**Alternativa descartada:** un `setInterval` de limpieza. Mismo argumento que
+la Decisión 5 original — overhead sin beneficio.
+
+### Decisión 10 — Paquetes sellados e inmutables
+
+El `batchId` se generaba en cada intento de subida, y el back deduplica por
+`batchId`. Un POST que llegaba pero cuya respuesta se perdía insertaba una
+segunda fila al reintentar. Ahora el id se asigna AL SELLAR y el paquete es
+inmutable: el reintento manda exactamente los mismos bytes bajo el mismo id.
+
+El sellado guarda el paquete y borra sus eventos por clave primaria en la
+MISMA transacción de IDB. Antes se borraba por rango de tiempo, con lo que un
+evento que aterrizaba durante el POST caía adentro del rango y se perdía sin
+haberse subido nunca.
+
+**Corolario:** no se puede "agrandar" un paquete pendiente. Si se le agregan
+eventos manteniendo el id, el back lo ve como duplicado y descarta los
+nuevos; si se le cambia el id, vuelven los duplicados. Por eso, para no
+generar un paquete por intento fallido, lo que se hace es **no sellar
+mientras la cola no esté vacía** (Decisión 13).
+
+### Decisión 11 — Tope de 48KB, no 100kb
+
+`fetch(keepalive)` —única vía que sobrevive al cierre de la pestaña— topea
+en 64KB por spec, y el body parser de Express default son 100kb. Un solo
+número por debajo de ambos hace que el mismo paquete sirva para las dos vías
+sin lógica partida. El tope se mide sobre el body ya comprimido y en base64,
+porque el ratio de compresión no se sabe hasta comprimir.
+
+Medido en vivo: 2.7x de compresión, no los 3-5x estimados — el formato
+compacto ya sacó la redundancia a mano. 48KB ≈ 2000 eventos por paquete.
+
+### Decisión 12 — Descartar solo si el problema es el payload
+
+Se descarta un paquete ante 400, 413 y 422: reenviar los mismos bytes no
+puede dar otro resultado. 401, 403 y 404 se conservan.
+
+La tentación era tratar cualquier 4xx como definitivo. Lo desmintió la
+realidad: el primer 403 contra learnex era una migración de permisos sin
+aplicar, y el 404 de alumno no vinculado se arregla cuando lo vinculan.
+Descartarlos tiraría justo los logs del período en que el sistema estaba mal
+configurado, que es cuando más falta hacen.
+
+### Decisión 13 — Cadencia de 5h con dispersión de 30 min
+
+El `setInterval` de 5 minutos era el peor caso posible para el back: los
+timers arrancan al abrir la app y todos los alumnos abren a la misma hora,
+así que disparaban juntos. A 10 000 alumnos, picos de 10 000 requests en el
+mismo segundo.
+
+La cita se sortea dentro de una ventana de 30 min y se guarda como timestamp
+ABSOLUTO en localStorage — no un `setTimeout`, que muere al cerrar la app.
+Si la cita venció con la app cerrada, se **re-sortea** en vez de disparar al
+abrir: disparar ahí sería volver a juntar a todos en el momento de entrada.
+
+A 10 000 alumnos: ~0.23 rps promedio, ~5.5 rps en el peor pico, contra ~50
+rps de base.
+
+### Decisión 14 — La subida se calla durante un examen
+
+No tiene ninguna urgencia (uso forense, cadencia de horas), mientras que el
+auto-guardado del borrador es lo que protege las respuestas del alumno. Ante
+una conexión móvil mala no queremos que un POST de telemetría le robe ancho
+de banda ni que el gzip le coma CPU.
+
+Se marca donde realmente arranca el examen —al armar cronómetro y
+auto-envío, no al abrir la pantalla, porque en modo tarea la sesión puede
+quedar esperando confirmación— y se apaga tanto en `stop()` como en
+`submit()`, que no pasa por `stop()`.
+
+### Decisión 15 — Fallback sin CompressionStream
+
+Safari < 16.4 no lo implementa. El código lo usaba sin feature-detect: el
+`ReferenceError` moría en un catch silencioso y la subida fallaba para
+siempre en esos equipos sin que nadie se enterara — justo la franja de
+equipos viejos donde más hay que investigar. Ahora se manda el NDJSON crudo
+con `enc: 'none'` y comprime el back, así la columna sigue siendo siempre
+gzip: sin columna nueva, sin migración, y quien la lea después no tiene que
+preguntarse de qué cliente vino.
+
+### Decisión 16 — La UI dice el resultado real
+
+`uploadPending` es best-effort y nunca lanza, así que un `await` a secas
+siempre parecía exitoso: el botón de Soporte decía "llegó a soporte" aunque
+el paquete no hubiera salido. Al alumno que entra justamente porque algo no
+le funciona, eso lo deja peor que antes. Ahora la subida devuelve qué pasó
+(`ok` / `partial` / `empty` / `busy`) sin dejar de ser best-effort, y se
+distingue el caso en que la cola quedó vacía porque el back rechazó y
+descartó el paquete — que no es una entrega.
