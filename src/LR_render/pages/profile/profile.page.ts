@@ -229,6 +229,13 @@ export class ProfilePage {
 
     switch (outcome.status) {
       case 'ok':
+        // `ok` con sent 0 = la cola quedó vacía pero NO porque se entregara:
+        // el back rechazó el paquete y se descartó. Decirle "llegó a soporte"
+        // sería justo la mentira que veníamos a sacar.
+        if (outcome.sent === 0) {
+          this.supportState.set('error');
+          break;
+        }
         writeSupportSentAt(Date.now());
         this.supportState.set('ok');
         break;

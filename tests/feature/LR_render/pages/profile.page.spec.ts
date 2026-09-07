@@ -108,6 +108,20 @@ describe('ProfilePage — Soporte', () => {
     expect(page.supportState()).toBe('error');
   });
 
+  // La cola puede quedar vacía sin que se haya entregado nada: el back
+  // rechazó el paquete (400/413) y se descartó. Es un fallo, no un éxito.
+  it('un paquete rechazado y descartado NO se reporta como enviado', async () => {
+    flushSpy.mockResolvedValue({ status: 'ok', sent: 0 });
+    const page = createPage() as unknown as {
+      onSupportModalConfirm(): Promise<void>;
+      supportState(): string;
+    };
+
+    await page.onSupportModalConfirm();
+
+    expect(page.supportState()).toBe('error');
+  });
+
   it('otra pestaña subiendo tampoco cuenta como enviado', async () => {
     flushSpy.mockResolvedValue({ status: 'busy' });
     const page = createPage() as unknown as {

@@ -77,8 +77,25 @@ export class AuditLogUploadDispatcherService {
 
   private async runLocked(): Promise<UploadOutcome> {
     try {
+      // 1. Drenar primero lo que ya quedó sellado de intentos anteriores.
+      const drained = await this.drainPending();
+
+      // 2. Si algo quedó sin confirmar, NO se sella nada nuevo.
+      //
+      // Un paquete sellado es inmutable — su `batchId` es la clave con la que
+      // el back deduplica, así que no se le pueden agregar eventos después.
+      // Pero sí se puede evitar sellar de más: mientras la cola no se vacíe,
+      // los eventos nuevos se quedan sueltos acumulándose, y salen todos
+      // juntos en UN paquete cuando esto se destrabe.
+      //
+      // Sin esto, cada intento fallido sellaba un paquete nuevo: una caída de
+      // un rato dejaba una fila y un request por intento, en vez de uno solo
+      // con todo lo acumulado.
+      if (drained.status === 'partial') return drained;
+
+      // 3. Cola limpia: sellar lo acumulado y mandarlo.
       await this.sealPending();
-      return await this.drainPending();
+      return mergeOutcomes(drained, await this.drainPending());
     } catch {
       // Nunca romper la app por telemetría. Lo que no se pudo sellar o subir
       // queda en IDB para el próximo intento.
@@ -201,6 +218,23 @@ export class AuditLogUploadDispatcherService {
         .pipe(timeout(15_000)),
     );
   }
+}
+
+// Junta el resultado de los dos drenajes de un mismo ciclo (lo que venía
+// sellado de antes + lo que se selló recién).
+function mergeOutcomes(first: UploadOutcome, second: UploadOutcome): UploadOutcome {
+  const sent = sentOf(first) + sentOf(second);
+  if (second.status === 'partial') return { status: 'partial', sent, pending: second.pending };
+  // `empty` solo si de verdad no había nada. Un paquete que el back rechazó y
+  // se descartó deja la cola vacía pero NO se entregó: colapsarlo en `empty`
+  // le diría al alumno "no había nada para enviar" cuando en realidad su
+  // registro se perdió. Sale como `ok` con sent 0, que el llamador distingue.
+  if (first.status === 'empty' && second.status === 'empty') return { status: 'empty' };
+  return { status: 'ok', sent };
+}
+
+function sentOf(outcome: UploadOutcome): number {
+  return outcome.status === 'ok' || outcome.status === 'partial' ? outcome.sent : 0;
 }
 
 // Se descarta un paquete SOLO cuando el problema es el paquete mismo:

@@ -262,6 +262,61 @@ describe('AuditLogUploadDispatcherService', () => {
     expect(await store.pendingPackages()).toHaveLength(1);
   });
 
+  // Sin esto, cada intento fallido sellaba un paquete nuevo: una caída de un
+  // rato dejaba una fila y un request por intento en vez de uno solo con todo
+  // lo acumulado. Un paquete sellado no se puede agrandar (su batchId es la
+  // clave de dedup del back), pero sí se puede no sellar de más.
+  describe('mientras haya un paquete sin enviar', () => {
+    it('NO sella uno nuevo — los eventos siguen acumulándose sueltos', async () => {
+      await seedEvents(2);
+
+      // Primer intento: sella y falla.
+      const first = dispatcher.uploadPending();
+      await flushMicrotasks();
+      httpMock.expectOne(URL).error(new ProgressEvent('error'));
+      await first;
+      expect(await store.pendingPackages()).toHaveLength(1);
+
+      // Llegan eventos nuevos y se reintenta.
+      await seedEvents(3);
+      const second = dispatcher.uploadPending();
+      await flushMicrotasks();
+      httpMock.expectOne(URL).error(new ProgressEvent('error'));
+      await second;
+
+      // Sigue habiendo UN solo paquete, no dos.
+      expect(await store.pendingPackages()).toHaveLength(1);
+      // Y los 3 eventos nuevos siguen sueltos, esperando.
+      expect(await store.eventsInRange(0, Number.MAX_SAFE_INTEGER)).toHaveLength(3);
+    });
+
+    it('al destrabarse, lo acumulado sale en UN solo paquete', async () => {
+      await seedEvents(2);
+
+      const first = dispatcher.uploadPending();
+      await flushMicrotasks();
+      httpMock.expectOne(URL).error(new ProgressEvent('error'));
+      await first;
+
+      await seedEvents(3);
+
+      // Ahora el back responde bien: sale el paquete viejo y después uno
+      // nuevo con TODO lo acumulado desde entonces.
+      const third = dispatcher.uploadPending();
+      await flushMicrotasks();
+      httpMock.expectOne(URL).flush(null, { status: 202, statusText: 'Accepted' });
+      await flushMicrotasks();
+      const fresh = httpMock.expectOne(URL);
+      expect(fresh.request.body.eventCount).toBe(3);
+      fresh.flush(null, { status: 202, statusText: 'Accepted' });
+      const outcome = await third;
+
+      expect(outcome).toEqual({ status: 'ok', sent: 2 });
+      expect(await store.pendingPackages()).toHaveLength(0);
+      expect(await store.eventsInRange(0, Number.MAX_SAFE_INTEGER)).toHaveLength(0);
+    });
+  });
+
   it('un fallo transitorio corta el drenaje — no machaca al back con el resto', async () => {
     // Dos paquetes sellados a mano, para controlar el orden.
     await store.sealPackage(
