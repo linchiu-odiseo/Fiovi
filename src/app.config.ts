@@ -71,7 +71,7 @@ import { credentialsInterceptor } from './L3_periphery/interceptors/credentials.
 import { auditLogInterceptor } from './L3_periphery/telemetry/audit-log.interceptor';
 import { AuditLogStore } from './L3_periphery/telemetry/audit-log-store.service';
 import { installAuditLogListeners } from './L3_periphery/telemetry/audit-log-listeners';
-import { AuditLogUploadDispatcherService } from './L3_periphery/telemetry/audit-log-upload-dispatcher.service';
+import { AuditLogUploadScheduler } from './L3_periphery/telemetry/audit-log-upload-scheduler.service';
 import { BeforeInstallPromptAdapter } from './L3_periphery/pwa/before-install-prompt.adapter';
 import { BrowserInstallEnvironmentProbe } from './L3_periphery/pwa/browser-install-environment-probe';
 import { PwaUpdateService } from './L3_periphery/pwa/pwa-update.service';
@@ -476,15 +476,18 @@ export const appConfig: ApplicationConfig = {
       installAuditLogListeners(inject(AuditLogStore));
     }),
 
-    // Audit-log Fase 1: dispatcher periódico que sube al back los eventos
-    // capturados en Fase 0 (design.md § Fase 1 Bridge). Apagado por defecto
-    // (AUDIT_LOG_UPLOAD_ENABLED=false) hasta que learnex tenga desplegado
-    // POST /t/{slug}/student/telemetry/audit-log-batch. Con el flag en false
-    // no se instancia timer ni tráfico — mismo criterio que DraftAutoSaveDispatcher.
+    // Audit-log Fase 1: scheduler que sube al back los eventos capturados en
+    // Fase 0. Cadencia de 5h con dispersión de 30 min y cita persistida, más
+    // un flush al ocultarse la app; se calla mientras hay un examen en curso.
+    // Ver audit-log-upload-scheduler.service.ts.
+    //
+    // Apagado por defecto (AUDIT_LOG_UPLOAD_ENABLED=false) hasta que learnex
+    // tenga desplegado POST /t/{slug}/student/telemetry/audit-log-batch. Con
+    // el flag en false no se instancia timer ni tráfico — mismo criterio que
+    // DraftAutoSaveDispatcher.
     provideAppInitializer(() => {
       if (environment.auditLogUploadEnabled) {
-        const dispatcher = inject(AuditLogUploadDispatcherService);
-        setInterval(() => void dispatcher.uploadPending(), 5 * 60_000);
+        inject(AuditLogUploadScheduler).start();
       }
     }),
   ],

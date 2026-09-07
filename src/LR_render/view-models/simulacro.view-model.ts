@@ -13,6 +13,7 @@ import { SeleccionarAdmissionAreaUseCase } from '../../L2_application/use-cases/
 import { CLOCK, MARKINGS_STORAGE } from '../../app.config';
 import { DraftAutoSaveDispatcher } from '../../L3_periphery/envio/draft-auto-save-dispatcher.service';
 import { AuditLogStore } from '../../L3_periphery/telemetry/audit-log-store.service';
+import { ExamActivity } from '../../L3_periphery/telemetry/exam-activity.service';
 import { shortSessionId } from '../../L3_periphery/telemetry/day-key';
 import { Exam } from '../../L1_domain/entities/exam';
 import { Alternativa } from '../../L1_domain/value-objects/alternativa';
@@ -104,6 +105,7 @@ export class SimulacroPageViewModel {
   // apagado. El view-model llama métodos sin condicional (design.md D7).
   private readonly draftDispatcher = inject(DraftAutoSaveDispatcher);
   private readonly auditLog = inject(AuditLogStore);
+  private readonly examActivity = inject(ExamActivity);
 
   readonly exam = signal<Exam | null>(null);
   readonly marcaciones = signal<AnswersMap>({});
@@ -457,6 +459,9 @@ export class SimulacroPageViewModel {
       }
     }
     await this.loadMarcaciones(encontrado);
+    // Marca el examen como en curso: mientras dure, la subida de logs se
+    // calla para no competir con el auto-guardado del borrador.
+    this.examActivity.markStarted();
     this.startCountdownTicker();
     // Auto-envío queda pendiente si el alumno debe elegir área primero
     // (EXAMEN con subset restrictivo). `seleccionarArea()` lo agenda al
@@ -487,6 +492,9 @@ export class SimulacroPageViewModel {
     this.sealHomeworkStartedAt(exam.id);
     this.awaitingHomeworkStart.set(false);
     await this.loadMarcaciones(exam);
+    // Marca el examen como en curso: mientras dure, la subida de logs se
+    // calla para no competir con el auto-guardado del borrador.
+    this.examActivity.markStarted();
     this.startCountdownTicker();
     // Mismo guard que en start(): sin área elegida no se agenda auto-envío.
     if (!this.needsAreaSelection()) {
@@ -538,6 +546,7 @@ export class SimulacroPageViewModel {
 
   stop(): void {
     this.stopped = true;
+    this.examActivity.markEnded();
     // Cancela el debounce del dispatcher para prevenir timer leak (design.md R1).
     // Si el alumno navega fuera de /simulacro sin enviar, no queremos que el
     // debounce dispare un POST espurio desde /home.
@@ -764,6 +773,10 @@ export class SimulacroPageViewModel {
     this.draftDispatcher.cancelarDraftsPendientes(this.sessionId);
     this.cancelAutoEnvio();
     this.cancelTareaAutoEnvio();
+    // `submit()` NO pasa por `stop()` — cancela los timers uno por uno — así
+    // que el examen hay que darlo por terminado también acá. Si no, la
+    // subida de logs seguiría suprimida hasta que se destruya la página.
+    this.examActivity.markEnded();
     this.isSubmitting.set(true);
     this.submissionState.set('sending');
 
