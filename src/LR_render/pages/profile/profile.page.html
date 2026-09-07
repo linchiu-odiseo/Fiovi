@@ -88,15 +88,33 @@
       </button>
     </li>
 
+    @if (showDownloadLogs) {
+      <li>
+        <button
+          type="button"
+          class="menu-item"
+          (click)="onDescargarLogsClick()"
+          data-testid="descargar-logs-link"
+        >
+          <span class="material-symbols-outlined menu-item__icon" aria-hidden="true">download</span>
+          <span class="menu-item__label">Descargar logs</span>
+        </button>
+      </li>
+    }
+
     <li>
-      <button
-        type="button"
-        class="menu-item"
-        (click)="onDescargarLogsClick()"
-        data-testid="descargar-logs-link"
-      >
-        <span class="material-symbols-outlined menu-item__icon" aria-hidden="true">download</span>
-        <span class="menu-item__label">Descargar logs</span>
+      <button type="button" class="menu-item" (click)="onSoporteClick()" data-testid="soporte-link">
+        <span class="material-symbols-outlined menu-item__icon" aria-hidden="true"
+          >support_agent</span
+        >
+        <span class="menu-item__label">Soporte</span>
+        @if (supportState() === 'sending') {
+          <span class="menu-item__hint">Enviando…</span>
+        } @else if (supportState() === 'sent') {
+          <span class="menu-item__hint">Enviado</span>
+        } @else if (supportState() === 'error') {
+          <span class="menu-item__hint">No se pudo enviar</span>
+        }
       </button>
     </li>
   </ul>
@@ -129,5 +147,13 @@
 
   @if (showAboutModal()) {
     <app-about-modal [appVersion]="appVersion" (dismiss)="onAboutModalDismiss()" />
+  }
+
+  @if (showSupportModal()) {
+    <app-support-logs-modal
+      [cooldownMinutes]="supportCooldownMinutes()"
+      (dismiss)="onSupportModalDismiss()"
+      (accept)="onSupportModalConfirm()"
+    />
   }
 </main>

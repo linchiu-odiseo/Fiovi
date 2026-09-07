@@ -1,0 +1,34 @@
+<div class="modal-overlay" (click)="dismiss.emit()" aria-hidden="true"></div>
+<div
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="support-modal-title"
+  aria-describedby="support-modal-explain"
+  class="modal"
+>
+  <h2 id="support-modal-title" class="modal__title">Enviar a soporte</h2>
+  <p id="support-modal-explain" class="modal__explain">
+    Se envía el registro de tu actividad en la app para que soporte pueda revisar tu caso. No
+    incluye tus respuestas ni datos personales.
+  </p>
+  @if (cooldownMinutes > 0) {
+    <p class="modal__cooldown" data-testid="support-cooldown">
+      Ya enviaste hace poco. Puedes volver a enviar en {{ cooldownMinutes }} min.
+    </p>
+  }
+  <div class="modal__actions">
+    <button type="button" class="modal__btn modal__btn--ghost" (click)="dismiss.emit()">
+      Cancelar
+    </button>
+    <button
+      #primaryButton
+      type="button"
+      class="modal__btn modal__btn--primary"
+      [disabled]="cooldownMinutes > 0"
+      data-testid="support-send"
+      (click)="accept.emit()"
+    >
+      Enviar
+    </button>
+  </div>
+</div>
