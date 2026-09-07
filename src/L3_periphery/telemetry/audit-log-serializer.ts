@@ -48,8 +48,11 @@ export class AuditLogSerializer {
     untilMs: number,
   ): Promise<{ payload: string; batchId: string; eventCount: number; bytesRaw: number }> {
     const batchId = generateBatchId();
-    const all = await this.store.currentDayBatch();
-    const sliced = all.filter((ev) => ev.t >= sinceMs && ev.t < untilMs);
+    // `eventsInRange` y no `currentDayBatch`: la subida tiene que poder mirar
+    // más atrás del día actual. Es exactamente el caso del alumno que cerró
+    // la app a las 6pm y la abre a la mañana siguiente — lo de ayer todavía
+    // está en el store y tiene que salir.
+    const sliced = await this.store.eventsInRange(sinceMs, untilMs);
     if (sliced.length === 0) {
       return { payload: '', batchId, eventCount: 0, bytesRaw: 0 };
     }
@@ -173,7 +176,9 @@ function toGroup(group: readonly AuditLogEvent[]): BatchGroup {
 // Auto-hoist: un campo (que no sea dt) se promueve al nivel del grupo
 // cuando esta presente en TODAS las entradas con el MISMO valor (deep-equal
 // -- cubre chg, arrays de tuplas).
-function computeHoistedFields(entries: readonly Record<string, unknown>[]): Record<string, unknown> {
+function computeHoistedFields(
+  entries: readonly Record<string, unknown>[],
+): Record<string, unknown> {
   const keysUnion = new Set<string>();
   for (const entry of entries) {
     for (const key of Object.keys(entry)) {

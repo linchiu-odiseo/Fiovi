@@ -1,20 +1,28 @@
 import { Injectable } from '@angular/core';
 import { AuditLogEvent } from './audit-log-event';
-import { todayLocalKey } from './day-key';
+import { startOfTodayLocalMs, todayLocalKey } from './day-key';
 
-// AuditLogStore — captura local de eventos audit-log (Fase 0).
+// AuditLogStore — captura local de eventos audit-log.
 //
-// Retención = 1 día natural (00:00 local del dispositivo). La rotación
-// ocurre INLINE en el primer `append` del día siguiente: sin scheduler
-// dedicado, sin setInterval (design Decision 5).
+// Retención = "hasta que se suban", con un techo de MAX_AGE_DAYS.
+//
+// El modelo anterior (Fase 0) borraba TODO el store en el primer append de
+// cada día. Eso era correcto mientras la única salida era el botón de
+// descarga manual ("los logs de hoy"), pero rompe Fase 1 de la peor forma:
+// el alumno que cierra la app a las 6pm y la abre a las 8am del día
+// siguiente perdía lo no subido ANTES de que el dispatcher pudiera correr,
+// porque los listeners emiten un AO en el arranque y ese append disparaba
+// la rotación. La pérdida no era una carrera improbable: era segura.
+//
+// Ahora el evento vive hasta que alguien confirme que llegó al back
+// (`clearRange`), y el techo de edad existe solo para que el store no
+// crezca sin límite si las subidas nunca prosperan. La poda se dispara con
+// el mismo mecanismo barato de antes — el cambio de day-key en meta — así
+// que sigue corriendo como mucho una vez por día, sin scheduler.
 //
 // `append` es fire-and-forget async: el llamador no espera IDB, las
 // excepciones (incluso QuotaExceededError) se cachan silenciosamente.
 // La telemetría es best-effort por diseño (design Decision 8).
-//
-// Puente a Fase 1: `currentDayBatch()` y `clearDay()` son el API público
-// que consumirá el futuro `AuditLogUploadDispatcher`. Ningún cambio al
-// store cuando llegue Fase 1 (spec REQ-AL-06, design Puente).
 
 const DB_NAME = 'fiovi-audit-log';
 const DB_VERSION = 1;
@@ -22,23 +30,94 @@ const STORE_EVENTS = 'events';
 const STORE_META = 'meta';
 const META_DAY_KEY = 'dayKey';
 
+// Techo de retención local. Un evento que no se pudo subir en una semana ya
+// no le sirve a nadie: los reclamos que esto respalda aparecen el mismo día
+// o al siguiente. Existe para acotar el IndexedDB del alumno cuando las
+// subidas fallan de forma sostenida (sin conexión, backend caído, cliente
+// sin soporte de compresión), no como política de negocio.
+const MAX_AGE_DAYS = 7;
+const MAX_AGE_MS = MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+
 @Injectable({ providedIn: 'root' })
 export class AuditLogStore {
   private dbPromise: Promise<IDBDatabase> | null = null;
 
+  // Cola serial de appends. Sin esto, varios `append` disparados de corrido
+  // (el arranque emite AO + DP + AI casi en el mismo tick) corren en paralelo,
+  // todos leen el day-key ANTES de que el primero lo actualice, y todos creen
+  // que les toca podar — con lo que una poda puede pasar por encima de un
+  // evento que otro append ya escribió. Encadenarlos también es lo que hace
+  // que el orden de inserción sea el cronológico y no el del scheduler.
+  private tail: Promise<void> = Promise.resolve();
+
   // Fire-and-forget. No retorna Promise: el llamador (view-model, interceptor,
   // listener) no debe esperar IDB. Excepciones cachadas silenciosamente.
   append(event: AuditLogEvent): void {
-    void this.doAppend(event).catch(() => {
-      // Silenciamos QuotaExceededError, VersionError, y cualquier fallo de IDB.
-      // La telemetría es best-effort por diseño — perder un evento no rompe la app.
-    });
+    this.tail = this.tail.then(() =>
+      this.doAppend(event).catch(() => {
+        // Silenciamos QuotaExceededError, VersionError, y cualquier fallo de IDB.
+        // La telemetría es best-effort por diseño — perder un evento no rompe la app.
+        // El catch va acá adentro para que un fallo no corte la cola.
+      }),
+    );
   }
 
-  // Retorna todos los eventos del día actual en orden cronológico ascendente.
-  // Idempotente y read-only: puede invocarse por múltiples consumidores (botón
-  // de descarga HOY, upload dispatcher en Fase 1) sin consumir el batch.
+  // Eventos de HOY (desde las 00:00 locales), en orden cronológico ascendente.
+  //
+  // Filtra de verdad por día: desde que el store retiene varios días, no
+  // alcanza con devolver todo y confiar en que la rotación dejó solo lo de
+  // hoy. Sin este filtro, la descarga manual mezclaría días y el chequeo de
+  // "¿ya emití DP hoy?" de los listeners daría true para siempre, apagando
+  // esos eventos a partir del segundo día.
   async currentDayBatch(): Promise<AuditLogEvent[]> {
+    const startOfToday = startOfTodayLocalMs();
+    return this.readEvents((ev) => ev.t >= startOfToday);
+  }
+
+  // Eventos en [sinceMs, untilMs) — half-open, simétrico con `clearRange`.
+  // Es lo que consume el camino de subida, que necesita mirar más atrás del
+  // día actual (justamente el caso "cerró a las 6pm, abre al día siguiente").
+  async eventsInRange(sinceMs: number, untilMs: number): Promise<AuditLogEvent[]> {
+    return this.readEvents((ev) => ev.t >= sinceMs && ev.t < untilMs);
+  }
+
+  // Borra los eventos más viejos que MAX_AGE_DAYS. Público para que un test
+  // pueda dispararlo sin depender del cambio de día; en runtime lo invoca
+  // `doAppend` cuando detecta que rotó el day-key.
+  async pruneExpired(now: number = Date.now()): Promise<void> {
+    await this.deleteEvents((ev) => ev.t < now - MAX_AGE_MS);
+  }
+
+  // Puente a Fase 1 (Sub-bloque E, design.md Revision Log 2026-09-04):
+  // borra solo los eventos cuyo `t` cae en [sinceMs, untilMs) -- half-open,
+  // simetrico con AuditLogSerializer.serializeSlice. Usado por el futuro
+  // AuditLogUploadDispatcher tras confirmar 2xx de un slice subido, sin
+  // afectar eventos fuera de esa ventana (a diferencia de clearDay).
+  async clearRange(sinceMs: number, untilMs: number): Promise<void> {
+    await this.deleteEvents((ev) => ev.t >= sinceMs && ev.t < untilMs);
+  }
+
+  // --- privados ---
+
+  private async doAppend(event: AuditLogEvent): Promise<void> {
+    const db = await this.db();
+    const currentKey = todayLocalKey();
+    const storedKey = await this.readMetaDayKey(db);
+    if (storedKey !== currentKey) {
+      // Cambió el día (o es el primer append de la instalación). Único
+      // momento en que se poda: barato, como mucho una vez por día.
+      await this.writeMetaDayKey(db, currentKey);
+      try {
+        await this.pruneExpired();
+      } catch {
+        // Una poda fallida NO puede costarnos el evento que veníamos a
+        // guardar — el put sigue igual abajo.
+      }
+    }
+    await this.putEvent(db, event);
+  }
+
+  private async readEvents(keep: (ev: AuditLogEvent) => boolean): Promise<AuditLogEvent[]> {
     try {
       const db = await this.db();
       return await new Promise<AuditLogEvent[]>((resolve, reject) => {
@@ -52,7 +131,8 @@ export class AuditLogStore {
             resolve(out);
             return;
           }
-          out.push(cursor.value as AuditLogEvent);
+          const ev = cursor.value as AuditLogEvent;
+          if (keep(ev)) out.push(ev);
           cursor.continue();
         };
         req.onerror = () => reject(req.error ?? new Error('IDB cursor error'));
@@ -62,32 +142,7 @@ export class AuditLogStore {
     }
   }
 
-  // Borra todos los eventos del store. Si `dayKey` es provisto y difiere del
-  // day-key actual almacenado en meta, es no-op (protege contra clears
-  // cross-day accidentales de un consumidor futuro que confirma upload).
-  // Sin argumento borra siempre (uso interno de rotación).
-  async clearDay(dayKey?: string): Promise<void> {
-    try {
-      const db = await this.db();
-      if (dayKey !== undefined) {
-        const storedKey = await this.readMetaDayKey(db);
-        if (storedKey !== null && storedKey !== dayKey) {
-          return;
-        }
-      }
-      await this.wipeEvents(db);
-      await this.writeMetaDayKey(db, todayLocalKey());
-    } catch {
-      // Silencioso — no propagamos errores de IDB.
-    }
-  }
-
-  // Puente a Fase 1 (Sub-bloque E, design.md Revision Log 2026-09-04):
-  // borra solo los eventos cuyo `t` cae en [sinceMs, untilMs) -- half-open,
-  // simetrico con AuditLogSerializer.serializeSlice. Usado por el futuro
-  // AuditLogUploadDispatcher tras confirmar 2xx de un slice subido, sin
-  // afectar eventos fuera de esa ventana (a diferencia de clearDay).
-  async clearRange(sinceMs: number, untilMs: number): Promise<void> {
+  private async deleteEvents(matches: (ev: AuditLogEvent) => boolean): Promise<void> {
     try {
       const db = await this.db();
       await new Promise<void>((resolve, reject) => {
@@ -97,34 +152,19 @@ export class AuditLogStore {
         req.onsuccess = () => {
           const cursor = req.result;
           if (!cursor) return;
-          const ev = cursor.value as AuditLogEvent;
-          if (ev.t >= sinceMs && ev.t < untilMs) {
+          if (matches(cursor.value as AuditLogEvent)) {
             cursor.delete();
           }
           cursor.continue();
         };
         req.onerror = () => reject(req.error ?? new Error('IDB cursor error'));
         tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error ?? new Error('IDB clearRange error'));
+        tx.onerror = () => reject(tx.error ?? new Error('IDB delete error'));
         tx.onabort = () => reject(tx.error ?? new Error('IDB tx aborted'));
       });
     } catch {
       // Silencioso -- no propagamos errores de IDB.
     }
-  }
-
-  // --- privados ---
-
-  private async doAppend(event: AuditLogEvent): Promise<void> {
-    const db = await this.db();
-    const currentKey = todayLocalKey();
-    const storedKey = await this.readMetaDayKey(db);
-    if (storedKey === null || storedKey !== currentKey) {
-      // Rotación: día cambió (o primer append de la instalación).
-      await this.wipeEvents(db);
-      await this.writeMetaDayKey(db, currentKey);
-    }
-    await this.putEvent(db, event);
   }
 
   private async db(): Promise<IDBDatabase> {
@@ -160,17 +200,6 @@ export class AuditLogStore {
       store.add(event);
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error ?? new Error('IDB put error'));
-      tx.onabort = () => reject(tx.error ?? new Error('IDB tx aborted'));
-    });
-  }
-
-  private wipeEvents(db: IDBDatabase): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_EVENTS, 'readwrite');
-      const store = tx.objectStore(STORE_EVENTS);
-      store.clear();
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error ?? new Error('IDB wipe error'));
       tx.onabort = () => reject(tx.error ?? new Error('IDB tx aborted'));
     });
   }

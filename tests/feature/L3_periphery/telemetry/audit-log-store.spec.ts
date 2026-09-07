@@ -1,10 +1,24 @@
-// Feature tests del AuditLogStore — cubre append, currentDayBatch, rotación
-// diaria y comportamiento fire-and-forget ante errores de IDB.
+// Feature tests del AuditLogStore — cubre append, filtrado por día, retención
+// multi-día con techo de edad, y comportamiento fire-and-forget ante errores
+// de IDB.
 
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { AuditLogStore } from '../../../../src/L3_periphery/telemetry/audit-log-store.service';
+import { startOfTodayLocalMs } from '../../../../src/L3_periphery/telemetry/day-key';
+
+// Timestamps anclados al día local real, porque `currentDayBatch` filtra por
+// las 00:00 locales. Un `t: 1000` (enero de 1970) nunca es "hoy".
+const TODAY_AM = startOfTodayLocalMs() + 60_000;
+const YESTERDAY_PM = startOfTodayLocalMs() - 60_000;
+const LONG_EXPIRED = Date.now() - 8 * 24 * 60 * 60 * 1000; // más de los 7 días de techo
+
+// Lee TODO el store sin filtrar por día — para aseverar sobre lo retenido de
+// días anteriores, que es justamente lo que `currentDayBatch` esconde.
+function readAll(store: AuditLogStore) {
+  return store.eventsInRange(0, Number.MAX_SAFE_INTEGER);
+}
 
 const DB_NAME = 'fiovi-audit-log';
 const STORES = ['events', 'meta'] as const;
@@ -95,106 +109,137 @@ describe('AuditLogStore', () => {
 
   it('append persists event and currentDayBatch retrieves it', async () => {
     const store = TestBed.inject(AuditLogStore);
-    store.append({ t: 1000, e: 'AO', cold: 1 });
+    store.append({ t: TODAY_AM, e: 'AO', cold: 1 });
     await flushMicrotasks();
 
     const batch = await store.currentDayBatch();
     expect(batch).toHaveLength(1);
-    expect(batch[0]).toMatchObject({ e: 'AO', cold: 1, t: 1000 });
+    expect(batch[0]).toMatchObject({ e: 'AO', cold: 1, t: TODAY_AM });
   });
 
   it('currentDayBatch returns events in chronological insertion order', async () => {
     const store = TestBed.inject(AuditLogStore);
-    store.append({ t: 100, e: 'AO', cold: 1 });
+    store.append({ t: TODAY_AM, e: 'AO', cold: 1 });
     await flushMicrotasks();
-    store.append({ t: 200, e: 'VC', v: 0 });
+    store.append({ t: TODAY_AM + 100, e: 'VC', v: 0 });
     await flushMicrotasks();
-    store.append({ t: 300, e: 'VC', v: 1 });
+    store.append({ t: TODAY_AM + 200, e: 'VC', v: 1 });
     await flushMicrotasks();
 
     const batch = await store.currentDayBatch();
-    expect(batch.map((e) => e.t)).toEqual([100, 200, 300]);
+    expect(batch.map((e) => e.t)).toEqual([TODAY_AM, TODAY_AM + 100, TODAY_AM + 200]);
   });
 
-  it('rotates automatically when stored dayKey differs from current', async () => {
-    // Pre-condición: la DB tiene events viejos y meta con dayKey stale.
+  // El test que más importa de todo el archivo. El modelo viejo borraba el
+  // store entero en el primer append del día nuevo, y como los listeners
+  // emiten un AO al arrancar la app, lo de ayer moría antes de que el
+  // dispatcher tuviera oportunidad de subirlo. Escenario real: el alumno
+  // cierra a las 6pm y abre a las 8am del día siguiente.
+  it('NO borra lo pendiente de ayer cuando cambia el día', async () => {
+    const store = TestBed.inject(AuditLogStore);
+    store.append({ t: YESTERDAY_PM, e: 'VC', v: 0 });
+    await flushMicrotasks();
+
+    // Simula que la app se abre al día siguiente: el day-key guardado quedó
+    // viejo y el primer append del arranque es el AO de los listeners.
     await writeMetaDayKey('1999-01-01');
-    const store = TestBed.inject(AuditLogStore);
-
-    // Simulamos que había eventos "viejos" apendeando ANTES de rotar.
-    // Como append internamente detecta el mismatch de dayKey vs hoy real,
-    // el propio append hace el wipe. Verificamos que el batch tras el
-    // primer append solo tiene 1 evento (el nuevo).
-    store.append({ t: 100, e: 'AO', cold: 1 });
+    store.append({ t: TODAY_AM, e: 'AO', cold: 1 });
     await flushMicrotasks();
 
-    const batch = await store.currentDayBatch();
-    expect(batch).toHaveLength(1);
-    expect(batch[0].e).toBe('AO');
+    const all = await readAll(store);
+    expect(all.map((e) => e.t)).toEqual([YESTERDAY_PM, TODAY_AM]);
   });
 
-  it('clearDay with dayKey different from current is a no-op', async () => {
+  it('currentDayBatch esconde los eventos de días anteriores', async () => {
     const store = TestBed.inject(AuditLogStore);
-    store.append({ t: 100, e: 'AO', cold: 1 });
+    store.append({ t: YESTERDAY_PM, e: 'VC', v: 0 });
+    store.append({ t: TODAY_AM, e: 'AO', cold: 1 });
     await flushMicrotasks();
 
-    await store.clearDay('1999-01-01');
-
+    // La descarga manual es "los logs de hoy", y el chequeo de "¿ya emití DP
+    // hoy?" de los listeners depende de esto: sin el filtro daría true para
+    // siempre y esos eventos se apagarían a partir del segundo día.
     const batch = await store.currentDayBatch();
-    expect(batch).toHaveLength(1);
+    expect(batch.map((e) => e.t)).toEqual([TODAY_AM]);
   });
 
-  it('clearDay without argument wipes all events', async () => {
+  it('eventsInRange sí ve días anteriores — es lo que consume la subida', async () => {
     const store = TestBed.inject(AuditLogStore);
-    store.append({ t: 100, e: 'AO', cold: 1 });
-    store.append({ t: 200, e: 'VC', v: 1 });
+    store.append({ t: YESTERDAY_PM, e: 'VC', v: 0 });
+    store.append({ t: TODAY_AM, e: 'AO', cold: 1 });
     await flushMicrotasks();
 
-    await store.clearDay();
-
-    const batch = await store.currentDayBatch();
-    expect(batch).toHaveLength(0);
+    const range = await store.eventsInRange(YESTERDAY_PM, TODAY_AM + 1);
+    expect(range.map((e) => e.t)).toEqual([YESTERDAY_PM, TODAY_AM]);
   });
 
+  describe('techo de retención', () => {
+    it('pruneExpired borra lo más viejo que el techo y deja el resto', async () => {
+      const store = TestBed.inject(AuditLogStore);
+      store.append({ t: LONG_EXPIRED, e: 'VC', v: 0 });
+      store.append({ t: YESTERDAY_PM, e: 'VC', v: 1 });
+      store.append({ t: TODAY_AM, e: 'AO', cold: 1 });
+      await flushMicrotasks();
 
-  // Sub-bloque E (design.md Revision Log 2026-09-04): puente a Fase 1 --
-  // clearRange borra solo el rango [sinceMs, untilMs), sin afectar eventos
-  // fuera de esa ventana (a diferencia de clearDay, que es day-granular).
+      await store.pruneExpired();
+
+      const all = await readAll(store);
+      expect(all.map((e) => e.t)).toEqual([YESTERDAY_PM, TODAY_AM]);
+    });
+
+    it('el cambio de día dispara la poda del vencido', async () => {
+      const store = TestBed.inject(AuditLogStore);
+      store.append({ t: LONG_EXPIRED, e: 'VC', v: 0 });
+      await flushMicrotasks();
+
+      await writeMetaDayKey('1999-01-01');
+      store.append({ t: TODAY_AM, e: 'AO', cold: 1 });
+      await flushMicrotasks();
+
+      const all = await readAll(store);
+      expect(all.map((e) => e.t)).toEqual([TODAY_AM]);
+    });
+  });
+
+  // clearRange borra solo el rango [sinceMs, untilMs) — es lo que confirma
+  // una subida exitosa, y por eso no puede llevarse nada de afuera.
+  // Se aseveran con readAll y no con currentDayBatch: acá interesa el rango,
+  // no el día.
   describe('clearRange', () => {
     it('deletes only events within [sinceMs, untilMs)', async () => {
       const store = TestBed.inject(AuditLogStore);
-      store.append({ t: 1000, e: 'AO', cold: 1 });
-      store.append({ t: 5000, e: 'VC', v: 1 });
-      store.append({ t: 9000, e: 'VC', v: 0 });
+      store.append({ t: TODAY_AM + 1000, e: 'AO', cold: 1 });
+      store.append({ t: TODAY_AM + 5000, e: 'VC', v: 1 });
+      store.append({ t: TODAY_AM + 9000, e: 'VC', v: 0 });
       await flushMicrotasks();
 
-      await store.clearRange(4000, 9000);
+      await store.clearRange(TODAY_AM + 4000, TODAY_AM + 9000);
 
-      const batch = await store.currentDayBatch();
-      expect(batch.map((e) => e.t)).toEqual([1000, 9000]);
+      const all = await readAll(store);
+      expect(all.map((e) => e.t)).toEqual([TODAY_AM + 1000, TODAY_AM + 9000]);
     });
 
     it('is a no-op when no events fall inside the range', async () => {
       const store = TestBed.inject(AuditLogStore);
-      store.append({ t: 1000, e: 'AO', cold: 1 });
+      store.append({ t: TODAY_AM + 1000, e: 'AO', cold: 1 });
       await flushMicrotasks();
 
-      await store.clearRange(50000, 60000);
+      await store.clearRange(TODAY_AM + 50000, TODAY_AM + 60000);
 
-      const batch = await store.currentDayBatch();
-      expect(batch).toHaveLength(1);
+      const all = await readAll(store);
+      expect(all).toHaveLength(1);
     });
 
     it('excludes the event exactly at untilMs (half-open range)', async () => {
       const store = TestBed.inject(AuditLogStore);
-      store.append({ t: 4000, e: 'VC', v: 1 });
-      store.append({ t: 10000, e: 'AO', cold: 0 });
+      store.append({ t: TODAY_AM + 4000, e: 'VC', v: 1 });
+      store.append({ t: TODAY_AM + 10000, e: 'AO', cold: 0 });
       await flushMicrotasks();
 
-      await store.clearRange(4000, 10000);
+      await store.clearRange(TODAY_AM + 4000, TODAY_AM + 10000);
 
-      const batch = await store.currentDayBatch();
-      expect(batch.map((e) => e.t)).toEqual([10000]);
+      const all = await readAll(store);
+      expect(all.map((e) => e.t)).toEqual([TODAY_AM + 10000]);
     });
   });
 });

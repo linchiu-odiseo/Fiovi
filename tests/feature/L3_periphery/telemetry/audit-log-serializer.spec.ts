@@ -19,6 +19,7 @@ import {
   parseBatchedNdjson,
 } from '../../../../src/L3_periphery/telemetry/audit-log-serializer';
 import type { AuditLogEvent } from '../../../../src/L3_periphery/telemetry/audit-log-event';
+import { startOfTodayLocalMs } from '../../../../src/L3_periphery/telemetry/day-key';
 
 const DB_NAME = 'fiovi-audit-log';
 const STORES = ['events', 'meta'] as const;
@@ -137,8 +138,10 @@ describe('AuditLogSerializer.downloadCurrentDay', () => {
 
   it('triggers download with fiovi-audit-YYYY-MM-DD.ndjson filename when batch has events', async () => {
     const store = TestBed.inject(AuditLogStore);
-    store.append({ t: 1, e: 'AO', cold: 1 });
-    store.append({ t: 2, e: 'VC', v: 1 });
+    // Timestamps de HOY: la descarga manual es day-scoped, así que un `t: 1`
+    // (1970) ya no cuenta como parte del batch del día.
+    store.append({ t: startOfTodayLocalMs() + 1, e: 'AO', cold: 1 });
+    store.append({ t: startOfTodayLocalMs() + 2, e: 'VC', v: 1 });
     await flushMicrotasks();
 
     const serializer = TestBed.inject(AuditLogSerializer);

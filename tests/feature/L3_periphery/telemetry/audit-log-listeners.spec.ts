@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { AuditLogStore } from '../../../../src/L3_periphery/telemetry/audit-log-store.service';
 import { installAuditLogListeners } from '../../../../src/L3_periphery/telemetry/audit-log-listeners';
+import { startOfTodayLocalMs } from '../../../../src/L3_periphery/telemetry/day-key';
 
 const DB_NAME = 'fiovi-audit-log';
 const STORES = ['events', 'meta'] as const;
@@ -102,6 +103,28 @@ describe('installAuditLogListeners', () => {
     expect(dps).toHaveLength(1); // sigue habiendo solo 1
   });
 
+  it('SÍ emite un DP nuevo si el DP que hay en el store es de ayer', async () => {
+    const store = TestBed.inject(AuditLogStore);
+    // Un DP retenido de ayer (ahora el store guarda varios días). Si el
+    // chequeo de "¿ya emití hoy?" mirara todo el store en vez del día
+    // actual, este evento apagaría los DP para siempre desde el segundo día.
+    store.append({
+      t: startOfTodayLocalMs() - 60_000,
+      e: 'DP',
+      ram: 4,
+      cores: 4,
+      screen: '390x844',
+      dpr: 3,
+    });
+    await flushMicrotasks();
+
+    installAuditLogListeners(store);
+    await flushMicrotasks();
+
+    const today = await store.currentDayBatch();
+    expect(today.filter((e) => e.e === 'DP')).toHaveLength(1);
+  });
+
   it('emits VC on visibilitychange', async () => {
     const store = TestBed.inject(AuditLogStore);
     installAuditLogListeners(store);
@@ -152,7 +175,6 @@ describe('installAuditLogListeners', () => {
     const ai = batch.find((e) => e.e === 'AI' && e.mode === 'prompt-accepted');
     expect(ai).toBeDefined();
   });
-
 
   // Sub-bloque F.8 (design.md Revision Log 2026-09-04 iteration 2): AO.se se
   // lee de ?sso_error=X en la URL de bootstrap -- codigo conocido resuelve a
