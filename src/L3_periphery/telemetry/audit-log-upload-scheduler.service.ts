@@ -1,5 +1,8 @@
 import { Injectable, inject } from '@angular/core';
-import { AuditLogUploadDispatcherService } from './audit-log-upload-dispatcher.service';
+import {
+  AuditLogUploadDispatcherService,
+  type UploadOutcome,
+} from './audit-log-upload-dispatcher.service';
 import { ExamActivity } from './exam-activity.service';
 
 // Cadencia base entre subidas. Alta a propósito: los logs son forenses, no
@@ -86,15 +89,20 @@ export class AuditLogUploadScheduler {
     await this.run(now);
   }
 
-  // Se invoca al ocultarse la app y desde el botón de Soporte.
-  async flushNow(now: number = Date.now()): Promise<void> {
+  // Se invoca al ocultarse la app y desde el botón de Soporte. Devuelve el
+  // resultado para que la UI pueda decirle al alumno si su paquete llegó.
+  async flushNow(now: number = Date.now()): Promise<UploadOutcome> {
     clearStamp(NEXT_ATTEMPT_KEY);
-    await this.run(now);
+    return this.run(now);
   }
 
-  private async run(now: number): Promise<void> {
-    await this.dispatcher.uploadPending();
+  private async run(now: number): Promise<UploadOutcome> {
+    const outcome = await this.dispatcher.uploadPending();
+    // El reloj se reancla incluso si quedó algo pendiente: si no, un alumno
+    // sin conexión quedaría permanentemente vencido y reintentando en cada
+    // heartbeat. Lo que no salió sigue en la cola para el próximo ciclo.
     writeStamp(LAST_UPLOAD_KEY, now);
+    return outcome;
   }
 
   private dueAt(now: number): number {

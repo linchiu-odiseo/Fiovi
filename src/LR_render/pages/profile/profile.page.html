@@ -108,13 +108,6 @@
           >support_agent</span
         >
         <span class="menu-item__label">Soporte</span>
-        @if (supportState() === 'sending') {
-          <span class="menu-item__hint">Enviando…</span>
-        } @else if (supportState() === 'sent') {
-          <span class="menu-item__hint">Enviado</span>
-        } @else if (supportState() === 'error') {
-          <span class="menu-item__hint">No se pudo enviar</span>
-        }
       </button>
     </li>
   </ul>
@@ -152,6 +145,7 @@
   @if (showSupportModal()) {
     <app-support-logs-modal
       [cooldownMinutes]="supportCooldownMinutes()"
+      [state]="supportState()"
       (dismiss)="onSupportModalDismiss()"
       (accept)="onSupportModalConfirm()"
     />

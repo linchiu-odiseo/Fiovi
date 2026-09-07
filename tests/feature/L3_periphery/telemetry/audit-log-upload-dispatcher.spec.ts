@@ -102,9 +102,13 @@ describe('AuditLogUploadDispatcherService', () => {
     await flushMicrotasks();
   }
 
-  it('sin eventos no hace ningún POST', async () => {
-    await dispatcher.uploadPending();
+  it('sin eventos no hace ningún POST y lo reporta como vacío', async () => {
+    const outcome = await dispatcher.uploadPending();
+
     httpMock.expectNone(URL);
+    // `empty` y no `ok`: decirle "enviado" a alguien que no tenía nada
+    // pendiente es mentirle.
+    expect(outcome).toEqual({ status: 'empty' });
   });
 
   it('sin slug activo no sube, pero el paquete queda sellado esperando', async () => {
@@ -131,8 +135,9 @@ describe('AuditLogUploadDispatcherService', () => {
     // El payload es base64 de gzip, no el NDJSON en claro.
     expect(req.request.body.payload).not.toContain('"e"');
     req.flush(null, { status: 202, statusText: 'Accepted' });
-    await promise;
+    const outcome = await promise;
 
+    expect(outcome).toEqual({ status: 'ok', sent: 1 });
     expect(await store.pendingPackages()).toHaveLength(0);
     // Los eventos ya se habían borrado al sellar, dentro de la misma tx.
     expect(await store.eventsInRange(0, Number.MAX_SAFE_INTEGER)).toHaveLength(0);
@@ -194,18 +199,67 @@ describe('AuditLogUploadDispatcherService', () => {
     expect(await store.pendingPackages()).toHaveLength(1);
   });
 
-  it('4xx definitivo descarta el paquete — si no, traba la cola para siempre', async () => {
+  it('400 descarta el paquete — el back nunca va a aceptar esos bytes', async () => {
     await seedEvents(1);
 
     const promise = dispatcher.uploadPending();
     await flushMicrotasks();
-    // 404 TELEMETRY_STUDENT_NOT_LINKED: reintentarlo no lo va a vincular.
+    httpMock.expectOne(URL).flush(null, { status: 400, statusText: 'Bad Request' });
+    const outcome = await promise;
+
+    expect(await store.pendingPackages()).toHaveLength(0);
+    // Descartado NO es enviado.
+    expect(outcome).toEqual({ status: 'ok', sent: 0 });
+  });
+
+  it('413 descarta el paquete', async () => {
+    await seedEvents(1);
+
+    const promise = dispatcher.uploadPending();
+    await flushMicrotasks();
+    httpMock.expectOne(URL).flush(null, { status: 413, statusText: 'Payload Too Large' });
+    await promise;
+
+    expect(await store.pendingPackages()).toHaveLength(0);
+  });
+
+  // Lo aprendimos en el testeo manual: el 403 era una migración de permisos
+  // sin aplicar, no un rechazo real. Descartarlo habría tirado justo los logs
+  // del período en que el sistema estaba mal configurado.
+  it('403 CONSERVA el paquete — puede ser un permiso todavía no desplegado', async () => {
+    await seedEvents(1);
+
+    const promise = dispatcher.uploadPending();
+    await flushMicrotasks();
+    httpMock.expectOne(URL).flush(null, { status: 403, statusText: 'Forbidden' });
+    const outcome = await promise;
+
+    expect(await store.pendingPackages()).toHaveLength(1);
+    expect(outcome.status).toBe('partial');
+  });
+
+  it('404 alumno no vinculado CONSERVA el paquete — lo pueden vincular después', async () => {
+    await seedEvents(1);
+
+    const promise = dispatcher.uploadPending();
+    await flushMicrotasks();
     httpMock
       .expectOne(URL)
       .flush({ code: 'TELEMETRY_STUDENT_NOT_LINKED' }, { status: 404, statusText: 'Not Found' });
     await promise;
 
-    expect(await store.pendingPackages()).toHaveLength(0);
+    expect(await store.pendingPackages()).toHaveLength(1);
+  });
+
+  it('401 CONSERVA el paquete', async () => {
+    await seedEvents(1);
+
+    const promise = dispatcher.uploadPending();
+    await flushMicrotasks();
+    httpMock.expectOne(URL).flush(null, { status: 401, statusText: 'Unauthorized' });
+    await promise;
+
+    expect(await store.pendingPackages()).toHaveLength(1);
   });
 
   it('un fallo transitorio corta el drenaje — no machaca al back con el resto', async () => {

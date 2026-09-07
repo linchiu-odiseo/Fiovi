@@ -32,7 +32,7 @@ describe('ProfilePage — Soporte', () => {
 
   beforeEach(() => {
     localStorage.clear();
-    flushSpy = vi.fn().mockResolvedValue(undefined);
+    flushSpy = vi.fn().mockResolvedValue({ status: 'ok', sent: 1 });
 
     TestBed.configureTestingModule({
       providers: [
@@ -76,7 +76,7 @@ describe('ProfilePage — Soporte', () => {
     expect(flushSpy).not.toHaveBeenCalled();
   });
 
-  it('confirmar envía y cierra el modal', async () => {
+  it('confirmar envía y el modal queda mostrando que llegó', async () => {
     const page = createPage() as unknown as {
       onSoporteClick(): void;
       onSupportModalConfirm(): Promise<void>;
@@ -88,8 +88,70 @@ describe('ProfilePage — Soporte', () => {
     await page.onSupportModalConfirm();
 
     expect(flushSpy).toHaveBeenCalledTimes(1);
-    expect(page.showSupportModal()).toBe(false);
-    expect(page.supportState()).toBe('sent');
+    // El modal NO se cierra: el alumno tiene que ver el resultado.
+    expect(page.showSupportModal()).toBe(true);
+    expect(page.supportState()).toBe('ok');
+  });
+
+  // El bug que esto previene: `uploadPending` es best-effort y NUNCA lanza,
+  // así que un `await` a secas siempre parecía exitoso y el botón decía
+  // "Enviado" aunque el paquete no hubiera salido.
+  it('si el paquete no salió, NO dice que se envió', async () => {
+    flushSpy.mockResolvedValue({ status: 'partial', sent: 0, pending: 1 });
+    const page = createPage() as unknown as {
+      onSupportModalConfirm(): Promise<void>;
+      supportState(): string;
+    };
+
+    await page.onSupportModalConfirm();
+
+    expect(page.supportState()).toBe('error');
+  });
+
+  it('otra pestaña subiendo tampoco cuenta como enviado', async () => {
+    flushSpy.mockResolvedValue({ status: 'busy' });
+    const page = createPage() as unknown as {
+      onSupportModalConfirm(): Promise<void>;
+      supportState(): string;
+    };
+
+    await page.onSupportModalConfirm();
+
+    expect(page.supportState()).toBe('error');
+  });
+
+  it('sin nada pendiente lo dice, en vez de fingir un envío', async () => {
+    flushSpy.mockResolvedValue({ status: 'empty' });
+    const page = createPage() as unknown as {
+      onSoporteClick(): void;
+      onSupportModalConfirm(): Promise<void>;
+      supportState(): string;
+      supportCooldownMinutes(): number;
+    };
+
+    await page.onSupportModalConfirm();
+    expect(page.supportState()).toBe('empty');
+
+    // Y no gasta cooldown: no consumió ningún envío.
+    page.onSoporteClick();
+    expect(page.supportCooldownMinutes()).toBe(0);
+  });
+
+  it('tras un fallo se puede reintentar aunque el cooldown no aplique todavía', async () => {
+    flushSpy.mockResolvedValue({ status: 'partial', sent: 0, pending: 1 });
+    const page = createPage() as unknown as {
+      onSupportModalConfirm(): Promise<void>;
+      supportState(): string;
+    };
+
+    await page.onSupportModalConfirm();
+    expect(page.supportState()).toBe('error');
+
+    flushSpy.mockResolvedValue({ status: 'ok', sent: 1 });
+    await page.onSupportModalConfirm();
+
+    expect(page.supportState()).toBe('ok');
+    expect(flushSpy).toHaveBeenCalledTimes(2);
   });
 
   it('cancelar cierra el modal sin enviar', () => {
@@ -104,18 +166,6 @@ describe('ProfilePage — Soporte', () => {
 
     expect(page.showSupportModal()).toBe(false);
     expect(flushSpy).not.toHaveBeenCalled();
-  });
-
-  it('un fallo de envío se refleja en el estado y no rompe la pantalla', async () => {
-    flushSpy.mockRejectedValue(new Error('sin red'));
-    const page = createPage() as unknown as {
-      onSupportModalConfirm(): Promise<void>;
-      supportState(): string;
-    };
-
-    await page.onSupportModalConfirm();
-
-    expect(page.supportState()).toBe('error');
   });
 
   describe('cooldown', () => {

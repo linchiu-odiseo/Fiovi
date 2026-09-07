@@ -37,7 +37,7 @@
     letter-spacing: -0.01em;
   }
 
-  &__cooldown {
+  &__result {
     margin: 0;
     padding: var(--space-sm) var(--space-md);
     background: var(--color-surface-container-low);
@@ -45,6 +45,15 @@
     font-size: 0.85rem;
     line-height: 1.4;
     color: var(--color-on-surface-variant);
+
+    &--ok {
+      color: var(--color-on-surface);
+      font-weight: 600;
+    }
+
+    &--error {
+      color: var(--color-error, var(--color-on-surface));
+    }
   }
 
   &__explain {

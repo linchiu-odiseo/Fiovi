@@ -11,7 +11,10 @@ import { StudentProfile } from '../../../L1_domain/value-objects/student-profile
 import { TutorProfile } from '../../../L1_domain/value-objects/tutor-profile';
 import { Role } from '../../../L1_domain/entities/identity';
 import { AboutModalComponent } from '../../components/about-modal/about-modal.component';
-import { SupportLogsModalComponent } from '../../components/support-logs-modal/support-logs-modal.component';
+import {
+  SupportLogsModalComponent,
+  type SupportModalState,
+} from '../../components/support-logs-modal/support-logs-modal.component';
 import { UpdateConfirmModalComponent } from '../../components/update-confirm-modal/update-confirm-modal.component';
 import { VersionFooterComponent } from '../../components/version-footer/version-footer.component';
 
@@ -20,8 +23,6 @@ import { VersionFooterComponent } from '../../components/version-footer/version-
 // creyendo que "no pasó nada" cuando en realidad ya se mandó.
 const SUPPORT_COOLDOWN_MS = 10 * 60 * 1000;
 const SUPPORT_LAST_SENT_KEY = 'fiovi-support-last-sent-at';
-
-type SupportSendState = 'idle' | 'sending' | 'sent' | 'error';
 
 // Estados de la fila "Actualizaciones":
 //   idle       — sin acción reciente. Muestra la versión actual como hint.
@@ -64,7 +65,7 @@ export class ProfilePage {
   protected readonly showUpdateModal = signal(false);
   protected readonly showAboutModal = signal(false);
   protected readonly showSupportModal = signal(false);
-  protected readonly supportState = signal<SupportSendState>('idle');
+  protected readonly supportState = signal<SupportModalState>('confirm');
   protected readonly supportCooldownMinutes = signal(0);
 
   // "Descargar logs" baja el archivo crudo al dispositivo: es una herramienta
@@ -203,7 +204,7 @@ export class ProfilePage {
   // Salida manual para cuando el alumno reclama y sus logs de las últimas
   // horas todavía no salieron por el ciclo normal.
   protected onSoporteClick(): void {
-    this.supportState.set('idle');
+    this.supportState.set('confirm');
     this.supportCooldownMinutes.set(remainingCooldownMinutes());
     this.showSupportModal.set(true);
   }
@@ -213,19 +214,34 @@ export class ProfilePage {
   }
 
   protected async onSupportModalConfirm(): Promise<void> {
-    if (remainingCooldownMinutes() > 0) return;
+    if (this.supportState() !== 'error' && remainingCooldownMinutes() > 0) return;
     this.supportState.set('sending');
-    try {
-      // `flushNow` sella lo pendiente en este momento y drena la cola: sin el
-      // sellado no se irían justamente las últimas horas, que son las que el
-      // alumno viene a reclamar.
-      await this.uploadScheduler.flushNow();
-      writeSupportSentAt(Date.now());
-      this.supportState.set('sent');
-    } catch {
-      this.supportState.set('error');
+
+    // `flushNow` sella lo pendiente en este momento y drena la cola: sin el
+    // sellado no se irían justamente las últimas horas, que son las que el
+    // alumno viene a reclamar.
+    //
+    // Se mira el resultado y no basta con que no haya excepción: la subida es
+    // best-effort y no lanza nunca, así que un `await` a secas siempre
+    // parecería exitoso. El alumno vino porque algo no le funcionaba —
+    // decirle "enviado" sin saberlo sería dejarlo peor que antes.
+    const outcome = await this.uploadScheduler.flushNow();
+
+    switch (outcome.status) {
+      case 'ok':
+        writeSupportSentAt(Date.now());
+        this.supportState.set('ok');
+        break;
+      case 'empty':
+        // No se marca cooldown: no gastó ningún envío.
+        this.supportState.set('empty');
+        break;
+      default:
+        // `partial` (algo quedó sin confirmar) y `busy` (otra pestaña está
+        // subiendo). En ambos casos el paquete sigue guardado.
+        this.supportState.set('error');
+        break;
     }
-    this.showSupportModal.set(false);
   }
 
   protected async onDescargarLogsClick(): Promise<void> {

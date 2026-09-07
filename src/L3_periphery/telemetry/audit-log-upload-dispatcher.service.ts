@@ -31,6 +31,17 @@ const UPLOAD_LOCK_NAME = 'fiovi-audit-log-upload';
 // reloj, no el tamaño. Un día de logs con el formato compacto entra holgado.
 const MAX_PACKAGE_BYTES = 48 * 1024;
 
+// Qué pasó en un intento de subida.
+//
+// `empty` no es un error: no había nada que mandar. Distinguirlo de `ok`
+// importa para el botón de Soporte — decirle "listo, enviado" a alguien que
+// no tenía nada pendiente es mentirle.
+export type UploadOutcome =
+  | { readonly status: 'ok'; readonly sent: number }
+  | { readonly status: 'partial'; readonly sent: number; readonly pending: number }
+  | { readonly status: 'empty' }
+  | { readonly status: 'busy' };
+
 @Injectable({ providedIn: 'root' })
 export class AuditLogUploadDispatcherService {
   private readonly http = inject(HttpClient);
@@ -40,28 +51,39 @@ export class AuditLogUploadDispatcherService {
   // Sella lo pendiente y sube todo lo que haya en cola. Es el único punto de
   // entrada: lo llaman el scheduler periódico, el flush al cerrar la app y el
   // botón de Soporte.
-  async uploadPending(): Promise<void> {
+  //
+  // Devuelve qué pasó en vez de tragarse todo en silencio: el scheduler
+  // ignora el resultado, pero el botón de Soporte necesita poder decirle al
+  // alumno si su paquete llegó o no. Aun así NUNCA lanza — un fallo de
+  // telemetría no puede romper la app.
+  async uploadPending(): Promise<UploadOutcome> {
     if (typeof navigator === 'undefined' || !('locks' in navigator)) {
       // Sin Web Locks API (navegador viejo): corre sin coordinación —
       // best-effort, y el dedup por batchId del back sigue cubriendo el
       // duplicado.
-      await this.runLocked();
-      return;
+      return this.runLocked();
     }
 
-    await navigator.locks.request(UPLOAD_LOCK_NAME, { ifAvailable: true }, async (lock) => {
-      if (!lock) return; // otra pestaña ya está subiendo.
-      await this.runLocked();
-    });
+    const outcome = await navigator.locks.request(
+      UPLOAD_LOCK_NAME,
+      { ifAvailable: true },
+      async (lock) => {
+        if (!lock) return { status: 'busy' } as const; // otra pestaña ya está subiendo.
+        return this.runLocked();
+      },
+    );
+    return outcome ?? { status: 'busy' };
   }
 
-  private async runLocked(): Promise<void> {
+  private async runLocked(): Promise<UploadOutcome> {
     try {
       await this.sealPending();
-      await this.drainPending();
+      return await this.drainPending();
     } catch {
-      // Best-effort: nunca romper la app por telemetría. Lo que no se pudo
-      // sellar o subir queda en IDB para el próximo intento.
+      // Nunca romper la app por telemetría. Lo que no se pudo sellar o subir
+      // queda en IDB para el próximo intento.
+      const pending = (await this.store.pendingPackages()).length;
+      return pending === 0 ? { status: 'empty' } : { status: 'partial', sent: 0, pending };
     }
   }
 
@@ -124,30 +146,42 @@ export class AuditLogUploadDispatcherService {
   }
 
   // Sube los paquetes en orden, del más viejo al más nuevo.
-  private async drainPending(): Promise<void> {
-    const slug = this.slugStore.current();
-    if (!slug) return; // Sin identity activa — nada que subir todavía.
+  private async drainPending(): Promise<UploadOutcome> {
+    const packages = await this.store.pendingPackages();
+    if (packages.length === 0) return { status: 'empty' };
 
-    for (const pkg of await this.store.pendingPackages()) {
+    const slug = this.slugStore.current();
+    // Sin identity activa no se puede armar la URL tenant-scoped. No es un
+    // fallo del paquete: queda esperando a que haya sesión.
+    if (!slug) return { status: 'partial', sent: 0, pending: packages.length };
+
+    let sent = 0;
+    let index = 0;
+
+    for (const pkg of packages) {
+      index++;
       try {
         await this.post(slug, pkg);
         // Solo acá se borra: el 2xx es la confirmación de que el back se
         // hizo cargo.
         await this.store.deletePackage(pkg.batchId);
+        sent++;
       } catch (err) {
         if (isPermanentRejection(err)) {
-          // Un 4xx no se arregla reintentando: el alumno no está vinculado,
-          // el payload es inválido o es demasiado grande. Reintentarlo para
-          // siempre dejaría la cola trabada y el IndexedDB creciendo.
+          // El back no va a aceptar estos bytes nunca. Se descarta para no
+          // trabar la cola ni hacer crecer el IndexedDB — pero NO cuenta
+          // como enviado.
           await this.store.deletePackage(pkg.batchId);
           continue;
         }
-        // Fallo transitorio (sin red, 5xx, 429): no seguimos con el resto —
-        // si este no salió, los que siguen tampoco. Quedan para el próximo
-        // intento.
-        return;
+        // Fallo transitorio (sin red, 5xx, 401/403/404): no seguimos con el
+        // resto — si este no salió, los que siguen tampoco.
+        return { status: 'partial', sent, pending: packages.length - index + 1 };
       }
     }
+
+    const pending = (await this.store.pendingPackages()).length;
+    return pending === 0 ? { status: 'ok', sent } : { status: 'partial', sent, pending };
   }
 
   private async post(slug: string, pkg: AuditLogPackage): Promise<void> {
@@ -169,13 +203,26 @@ export class AuditLogUploadDispatcherService {
   }
 }
 
-// Un 4xx significa que el back entendió el pedido y lo rechazó — reintentarlo
-// idéntico no puede cambiar el resultado. Las dos excepciones son 408
-// (timeout) y 429 (rate limit), que sí piden esperar y volver.
+// Se descarta un paquete SOLO cuando el problema es el paquete mismo:
+// reenviar exactamente los mismos bytes no puede dar otro resultado.
+//
+// Todo lo demás se conserva, incluidos 401/403/404. La tentación es tratar
+// cualquier 4xx como definitivo, pero esos tres hablan del estado del
+// sistema, no del payload, y ese estado cambia: un 403 puede ser una
+// migración de permisos que todavía no se aplicó, y un 404 de alumno no
+// vinculado se arregla cuando lo vinculan. Descartarlos tiraría a la basura
+// justo los logs del período en que algo estaba mal configurado — que es
+// cuando más falta hacen. Lo retenido está acotado por el techo de 7 días,
+// así que conservarlos no puede crecer sin control.
+const PAYLOAD_REJECTED_STATUSES = new Set([
+  400, // body inválido según el contrato
+  413, // demasiado grande para el server
+  422, // semánticamente inaceptable
+]);
+
 function isPermanentRejection(err: unknown): boolean {
   if (!(err instanceof HttpErrorResponse)) return false;
-  if (err.status === 408 || err.status === 429) return false;
-  return err.status >= 400 && err.status < 500;
+  return PAYLOAD_REJECTED_STATUSES.has(err.status);
 }
 
 // El body real es el JSON entero, no solo el payload; los otros campos suman
