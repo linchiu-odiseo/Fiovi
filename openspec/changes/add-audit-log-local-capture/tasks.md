@@ -1,4 +1,23 @@
-# Tasks: Add Audit Log Local Capture (Fase 0)
+# Tasks: Add Audit Log Local Capture (Fase 0 + Fase 1)
+
+## Estado real (2026-09-07)
+
+Las casillas de las Fases 3 a 12 quedaron sin tildar aunque el código se
+escribió el 2026-09-04: se implementó todo y no se volvió al archivo. Se
+deja constancia acá en vez de tildarlas retroactivamente, porque parte de
+ese plan quedó superado y marcarlo como hecho mentiría sobre qué hay en el
+repo.
+
+- **Fases 3 a 11 (captura local): implementadas.** Los archivos existen en
+  `src/L3_periphery/telemetry/`, el interceptor y los listeners están
+  cableados en `app.config.ts`, y el item de descarga está en `/profile`.
+- **Fase 9 (eventos `MK`): implementada y después REVERTIDA** por el
+  Sub-bloque A del pivote de diseño — los `MK` eran redundantes con los
+  `H(draft)`. No buscar ese código: no está, y no debe volver.
+- **Fase 12 (gates): verificada el 2026-09-07.** `npm test` 1393 verdes,
+  lint limpio, `tsc` limpio, `npm run build` OK. La verificación manual
+  (12.6), la de tamaño (12.7) y la anti-PII (12.8) se hicieron contra la
+  app real — resultados en la sección "Verificación en vivo" al final.
 
 ## Review Workload Forecast
 
@@ -157,3 +176,111 @@ Nada. Este change no agrega use cases.
 - [x] G.4 Agregar 4 tests a `tests/feature/L3_periphery/http/http-exams-api.spec.ts`: primer poll emite CLK; segundo poll dentro de 4h no emite; poll tras 4h sin drift no emite; poll tras 4h con drift >500ms emite con el nuevo `srv`.
 - [x] G.5 Actualizar `design.md` con la Revision Log de esta iteración.
 - [x] G.6 Actualizar este archivo (`tasks.md`) marcando G.1-G.6.
+
+## Sub-bloque H — Fase 1 operativa (2026-09-07)
+
+> El puente a Fase 1 existía pero la subida no funcionaba. Al ejercitarla de
+> verdad contra learnex aparecieron cinco bugs que ningún test agarraba,
+> porque los specs mockeaban justo la pieza que fallaba. Ver
+> `design.md` § Revision Log 2026-09-07.
+
+### Retención (el bug que motivó todo)
+
+- [x] H.1 `AuditLogStore.doAppend` dejaba de borrar TODO el store al cambiar
+      el día. El alumno que cerraba a las 6pm y abría a las 8am perdía lo no
+      subido ANTES de que el dispatcher pudiera correr, porque los listeners
+      emiten un `AO` al arrancar. No era una carrera: era pérdida segura.
+- [x] H.2 Techo de 7 días (`pruneExpired`), disparado por el mismo cambio de
+      day-key. Acota el IDB si las subidas nunca prosperan.
+- [x] H.3 `currentDayBatch` filtra de verdad por día. Antes devolvía el store
+      entero y "funcionaba" solo porque la rotación lo garantizaba; sin el
+      filtro, el chequeo de "¿ya emití DP hoy?" daría true para siempre.
+- [x] H.4 `eventsInRange` para el camino de subida, que necesita mirar más
+      atrás del día actual.
+- [x] H.5 Los `append` se encadenan en serie. Eran fire-and-forget
+      concurrentes: el arranque emite AO+DP+AI casi en el mismo tick y todos
+      leían el day-key antes de que el primero lo actualizara.
+- [x] H.6 Se elimina `clearDay` (sin llamadores, semántica peligrosa con
+      retención multi-día).
+
+### Paquetes sellados
+
+- [x] H.7 Object store `packages` (DB v2) con `batchId` estable asignado AL
+      SELLAR. Antes `serializeSlice` generaba uno nuevo en cada intento, así
+      que un reintento tras una respuesta perdida insertaba fila duplicada.
+- [x] H.8 El sellado guarda el paquete y borra los eventos por clave primaria
+      en la MISMA transacción. Antes se borraba por rango de tiempo y se
+      llevaba puesto lo que aterrizara durante el POST.
+- [x] H.9 Tope de 48KB por paquete, partiendo en varios. 48 y no 100kb porque
+      `fetch(keepalive)` topea en 64KB por spec.
+- [x] H.10 Fallback `enc:'none'` sin `CompressionStream` (Safari < 16.4):
+      antes tiraba un ReferenceError que moría en un catch silencioso.
+- [x] H.11 Se descarta el paquete SOLO ante 400/413/422. Un 403 o 404 puede
+      ser una migración sin aplicar o un alumno todavía sin vincular.
+- [x] H.12 Se eliminan `serializeSlice` y `clearRange` (sin llamadores;
+      codificaban los dos bugs de arriba).
+
+### Cadencia
+
+- [x] H.13 Scheduler con cadencia de 5h y dispersión de 30 min, cita
+      persistida como timestamp absoluto. El `setInterval` de 5 min anterior
+      hacía que todos los alumnos dispararan juntos: los timers arrancan al
+      abrir la app y todos abren a la misma hora.
+- [x] H.14 Si la cita venció con la app cerrada, se RE-SORTEA en vez de
+      disparar al abrir — si no, vuelve la estampida a la hora de entrada.
+- [x] H.15 Flush al ocultarse la app, solo si ya estaba vencido.
+      `visibilitychange` y no `pagehide`: en móvil la app se va a segundo
+      plano mucho más de lo que se cierra, y así la página sigue viva.
+- [x] H.16 La subida se calla durante un examen (`ExamActivity`), para no
+      competir con el auto-guardado del borrador. Se apaga tanto en `stop()`
+      como en `submit()`, que no pasa por `stop()`.
+- [x] H.17 No se sella un paquete nuevo mientras haya uno sin enviar: cada
+      intento fallido sellaba uno, y un rato de caída dejaba una fila y un
+      request por intento.
+
+### UI
+
+- [x] H.18 Botón "Soporte" en `/profile` con modal de confirmación y cooldown
+      de 10 min persistido.
+- [x] H.19 El modal informa el RESULTADO real. `uploadPending` es
+      best-effort y nunca lanza, así que el `try/catch` no se activaba nunca
+      y el botón decía "Enviado" aunque el paquete no hubiera salido.
+- [x] H.20 Un paquete rechazado y descartado deja la cola vacía sin haberse
+      entregado: se distingue de un envío exitoso.
+- [x] H.21 "Descargar logs" oculto en producción, gateado contra
+      `environment.production` y NO contra `devTools` — ese flag sale del
+      `.env` que vive en la VM de prod y desde el repo no se puede verificar.
+
+### Verificación en vivo (2026-09-07, contra learnex local)
+
+Hecha con el navegador sobre la app real, no solo con tests:
+
+- [x] H.22 Retención al cambiar de día: los 4 eventos previos sobrevivieron.
+- [x] H.23 Techo de 7 días: podó el de 8 días, conservó el de ayer.
+- [x] H.24 Captura durante examen: `SS` + draft con `chg` de las 4 marcas.
+- [x] H.25 Descarga day-scoped (10 grupos) vs subida que incluye días
+      anteriores (11 grupos) — la diferencia demuestra H.3 y H.4.
+- [x] H.26 Fila en Postgres con gzip válido y contenido idéntico al cliente.
+- [x] H.27 Anti-PII sobre el payload real: sin emails, tokens, slug ni claves.
+- [x] H.28 Tamaño real (cierra la 12.7): 25 eventos = 428 B gzip / 1142 B
+      crudos. Ratio 2.7x, no 3-5x como se estimó — el formato compacto ya
+      sacó la redundancia a mano. El tope de 48KB equivale a ~2000 eventos.
+- [x] H.29 Fallo de red conserva el paquete + mensaje honesto + Reintentar.
+- [x] H.30 Dos caídas seguidas → UN paquete, mismo `batchId` (verifica H.17).
+- [x] H.31 Al destrabarse salen dos filas: el viejo y lo acumulado.
+- [x] H.32 `enc:'none'`: el cliente mandó texto plano y el server lo guardó
+      gzipeado (magic bytes `1f 8b`), idéntico a un Chrome.
+- [x] H.33 Idempotencia: el server recibió el mismo batch dos veces (respuesta
+      perdida simulada) → **una sola fila**.
+- [x] H.34 Partido por tamaño: 141 eventos → 9 paquetes, todos bajo el tope,
+      suma exacta sin perder ni duplicar.
+
+### Pendiente
+
+- [ ] H.35 El envío AUTOMÁTICO no se verificó en vivo: depende de
+      `AUDIT_LOG_UPLOAD_ENABLED`, que gatea el arranque del scheduler. La
+      cañería está probada (Soporte usa el mismo `uploadPending`); falta ver
+      el gatillo — reloj de 5h, jitter, re-sorteo y supresión en examen.
+      Cubierto por 13 tests unitarios.
+- [ ] H.36 Load test acotado del endpoint antes de prender el flag en prod.
+- [ ] H.37 Confirmar que "Descargar logs" no aparece en un build de producción.
