@@ -1,7 +1,9 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { timeout } from 'rxjs/operators';
+import { ENDPOINT_IDS } from '../telemetry/audit-log-dictionaries';
+import { ENDPOINT_ID_TOKEN } from '../telemetry/tokens';
 import {
   TutorNavigationApi,
   type AulaSemanaExamenesResult,
@@ -114,7 +116,9 @@ export class HttpTutorNavigationApi implements TutorNavigationApi {
     try {
       const dto = await firstValueFrom(
         this.http
-          .get<AulaSemanasResponseDto>(apiPath.tutorAulaSemanas(this.requireSlug(), classroomId))
+          .get<AulaSemanasResponseDto>(apiPath.tutorAulaSemanas(this.requireSlug(), classroomId), {
+            context: new HttpContext().set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.tutorAulaSemanas),
+          })
           .pipe(timeout(10_000)),
       );
       return {
@@ -137,6 +141,12 @@ export class HttpTutorNavigationApi implements TutorNavigationApi {
         this.http
           .get<AulaSemanaExamenesResponseDto>(
             apiPath.tutorAulaSemanaExamenes(this.requireSlug(), classroomId, periodId),
+            {
+              context: new HttpContext().set(
+                ENDPOINT_ID_TOKEN,
+                ENDPOINT_IDS.tutorAulaSemanaExamenes,
+              ),
+            },
           )
           .pipe(timeout(10_000)),
       );
@@ -155,7 +165,9 @@ export class HttpTutorNavigationApi implements TutorNavigationApi {
     try {
       const dto = await firstValueFrom(
         this.http
-          .get<TutorExamsEnCursoResponseDto>(apiPath.tutorExamsEnCurso(this.requireSlug()))
+          .get<TutorExamsEnCursoResponseDto>(apiPath.tutorExamsEnCurso(this.requireSlug()), {
+            context: new HttpContext().set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.tutorExamsEnCurso),
+          })
           .pipe(timeout(10_000)),
       );
       return {

@@ -1,0 +1,93 @@
+<div class="modal-overlay" (click)="dismiss.emit()" aria-hidden="true"></div>
+<div role="dialog" aria-modal="true" aria-labelledby="support-modal-title" class="modal">
+  <h2 id="support-modal-title" class="modal__title">Enviar a soporte</h2>
+
+  @switch (state) {
+    @case ('sending') {
+      <p class="modal__explain" data-testid="support-sending">Enviando tu registro…</p>
+      <div class="modal__actions">
+        <button type="button" class="modal__btn modal__btn--primary" disabled>Enviando…</button>
+      </div>
+    }
+
+    @case ('ok') {
+      <p class="modal__result modal__result--ok" data-testid="support-result-ok">
+        Listo, tu registro llegó a soporte. Ya pueden revisar tu caso.
+      </p>
+      <div class="modal__actions">
+        <button
+          #primaryButton
+          type="button"
+          class="modal__btn modal__btn--primary"
+          (click)="dismiss.emit()"
+        >
+          Cerrar
+        </button>
+      </div>
+    }
+
+    @case ('empty') {
+      <p class="modal__result" data-testid="support-result-empty">
+        No había nada nuevo para enviar: tu actividad reciente ya se había enviado sola.
+      </p>
+      <div class="modal__actions">
+        <button
+          #primaryButton
+          type="button"
+          class="modal__btn modal__btn--primary"
+          (click)="dismiss.emit()"
+        >
+          Cerrar
+        </button>
+      </div>
+    }
+
+    @case ('error') {
+      <p class="modal__result modal__result--error" data-testid="support-result-error">
+        No se pudo enviar. Revisa tu conexión e inténtalo de nuevo; tu registro no se perdió, queda
+        guardado en el teléfono.
+      </p>
+      <div class="modal__actions">
+        <button type="button" class="modal__btn modal__btn--ghost" (click)="dismiss.emit()">
+          Cerrar
+        </button>
+        <button
+          #primaryButton
+          type="button"
+          class="modal__btn modal__btn--primary"
+          data-testid="support-retry"
+          (click)="accept.emit()"
+        >
+          Reintentar
+        </button>
+      </div>
+    }
+
+    @default {
+      <p class="modal__explain">
+        Se envía el registro de tu actividad en la app para que soporte pueda revisar tu caso. No
+        incluye datos personales.
+      </p>
+      @if (cooldownMinutes > 0) {
+        <p class="modal__result" data-testid="support-cooldown">
+          Ya enviaste hace poco. Puedes volver a enviar en {{ cooldownMinutes }} min.
+        </p>
+      }
+      <div class="modal__actions">
+        <button type="button" class="modal__btn modal__btn--ghost" (click)="dismiss.emit()">
+          Cancelar
+        </button>
+        <button
+          #primaryButton
+          type="button"
+          class="modal__btn modal__btn--primary"
+          [disabled]="cooldownMinutes > 0"
+          data-testid="support-send"
+          (click)="accept.emit()"
+        >
+          Enviar
+        </button>
+      </div>
+    }
+  }
+</div>

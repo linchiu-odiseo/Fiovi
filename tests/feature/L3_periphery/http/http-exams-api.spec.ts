@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { HttpExamsApi } from '../../../../src/L3_periphery/http/http-exams-api';
 import { SlugStore } from '../../../../src/L3_periphery/http/slug-store';
+import { AuditLogStore } from '../../../../src/L3_periphery/telemetry/audit-log-store.service';
 import { Exam } from '../../../../src/L1_domain/entities/exam';
 import { ServerTime } from '../../../../src/L1_domain/value-objects/server-time';
 import { InvalidExamError } from '../../../../src/L1_domain/errors/invalid-exam.error';
@@ -312,4 +313,107 @@ describe('HttpExamsApi', () => {
   // Los tests de `enviar()` viven en su propio archivo
   // `http-exams-api-enviar.spec.ts`. Acá solo cubrimos
   // GET /t/{slug}/student/exam-sessions.
+
+  // Sub-bloque G (design.md § Revision Log 2026-09-04 iteration 3): CLK se
+  // emite piggybacking en `dto.serverTime` de `getTodaysExams`, a lo sumo
+  // 1 vez cada 4h por instancia de app, y solo si el offset (srv - t) cambió
+  // más de 500ms vs el último offset emitido. Se usa un provider mock de
+  // `AuditLogStore` (en vez del real, respaldado por IndexedDB) para poder
+  // aserverar directamente sobre las llamadas a `append`.
+  describe('getTodaysExams — CLK clock calibration', () => {
+    const BASE_MS = new Date('2026-06-11T10:00:00.000Z').getTime();
+    const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
+
+    let appendSpy: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      appendSpy = vi.fn();
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          provideHttpClient(),
+          provideHttpClientTesting(),
+          HttpExamsApi,
+          SlugStore,
+          { provide: AuditLogStore, useValue: { append: appendSpy } },
+        ],
+      });
+      httpMock = TestBed.inject(HttpTestingController);
+      adapter = TestBed.inject(HttpExamsApi);
+      TestBed.inject(SlugStore).set(TEST_SLUG);
+    });
+
+    afterEach(() => {
+      httpMock.verify();
+      vi.useRealTimers();
+      TestBed.resetTestingModule();
+    });
+
+    function flushServerTime(serverTimeMs: number): void {
+      const req = httpMock.expectOne(EXAMS_URL);
+      req.flush({ serverTime: new Date(serverTimeMs).toISOString(), exams: [] });
+    }
+
+    it('primer poll del día emite CLK', async () => {
+      vi.setSystemTime(BASE_MS);
+      const pending = adapter.getTodaysExams();
+      flushServerTime(BASE_MS + 2000);
+      await pending;
+
+      expect(appendSpy).toHaveBeenCalledTimes(1);
+      const emitted = appendSpy.mock.calls[0][0];
+      expect(emitted.e).toBe('CLK');
+      expect(emitted.t).toBe(BASE_MS);
+      expect(emitted.srv).toBe(BASE_MS + 2000);
+    });
+
+    it('segundo poll dentro de las 4h NO emite CLK', async () => {
+      vi.setSystemTime(BASE_MS);
+      const first = adapter.getTodaysExams();
+      flushServerTime(BASE_MS + 2000);
+      await first;
+
+      vi.setSystemTime(BASE_MS + 60 * 60 * 1000); // +1h
+      const second = adapter.getTodaysExams();
+      flushServerTime(BASE_MS + 60 * 60 * 1000 + 2000);
+      await second;
+
+      expect(appendSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('poll después de 4h SIN drift no emite un nuevo CLK', async () => {
+      vi.setSystemTime(BASE_MS);
+      const first = adapter.getTodaysExams();
+      flushServerTime(BASE_MS + 2000); // offset = +2000ms
+      await first;
+
+      const laterNow = BASE_MS + FOUR_HOURS_MS + 60_000; // +4h1min
+      vi.setSystemTime(laterNow);
+      const second = adapter.getTodaysExams();
+      flushServerTime(laterNow + 2000); // mismo offset (+2000ms)
+      await second;
+
+      expect(appendSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('poll después de 4h CON drift > 500ms emite un nuevo CLK', async () => {
+      vi.setSystemTime(BASE_MS);
+      const first = adapter.getTodaysExams();
+      flushServerTime(BASE_MS + 2000); // offset = +2000ms
+      await first;
+
+      const laterNow = BASE_MS + FOUR_HOURS_MS; // +4h exacto
+      vi.setSystemTime(laterNow);
+      const second = adapter.getTodaysExams();
+      flushServerTime(laterNow + 3000); // offset = +3000ms → drift de 1000ms > 500ms
+      await second;
+
+      expect(appendSpy).toHaveBeenCalledTimes(2);
+      const secondEmitted = appendSpy.mock.calls[1][0];
+      expect(secondEmitted.e).toBe('CLK');
+      expect(secondEmitted.t).toBe(laterNow);
+      expect(secondEmitted.srv).toBe(laterNow + 3000);
+    });
+  });
 });

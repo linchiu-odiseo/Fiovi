@@ -4,13 +4,25 @@ import { GetIdentityUseCase } from '../../../L2_application/use-cases/get-identi
 import { GetProfileUseCase } from '../../../L2_application/use-cases/get-profile.use-case';
 import { LogoutUseCase } from '../../../L2_application/use-cases/logout.use-case';
 import { PwaUpdateService } from '../../../L3_periphery/pwa/pwa-update.service';
+import { AuditLogSerializer } from '../../../L3_periphery/telemetry/audit-log-serializer';
+import { AuditLogUploadScheduler } from '../../../L3_periphery/telemetry/audit-log-upload-scheduler.service';
 import { environment } from '../../../environments/environment';
 import { StudentProfile } from '../../../L1_domain/value-objects/student-profile';
 import { TutorProfile } from '../../../L1_domain/value-objects/tutor-profile';
 import { Role } from '../../../L1_domain/entities/identity';
 import { AboutModalComponent } from '../../components/about-modal/about-modal.component';
+import {
+  SupportLogsModalComponent,
+  type SupportModalState,
+} from '../../components/support-logs-modal/support-logs-modal.component';
 import { UpdateConfirmModalComponent } from '../../components/update-confirm-modal/update-confirm-modal.component';
 import { VersionFooterComponent } from '../../components/version-footer/version-footer.component';
+
+// Espera mínima entre envíos a soporte. El back ya tiene su propio límite
+// por usuario; esto es para que el alumno no dispare diez envíos seguidos
+// creyendo que "no pasó nada" cuando en realidad ya se mandó.
+const SUPPORT_COOLDOWN_MS = 10 * 60 * 1000;
+const SUPPORT_LAST_SENT_KEY = 'fiovi-support-last-sent-at';
 
 // Estados de la fila "Actualizaciones":
 //   idle       — sin acción reciente. Muestra la versión actual como hint.
@@ -31,7 +43,12 @@ type UpdateRowStatus = 'idle' | 'checking' | 'up-to-date' | 'applying';
   selector: 'app-profile-page',
   templateUrl: './profile.page.html',
   styleUrl: './profile.page.scss',
-  imports: [VersionFooterComponent, UpdateConfirmModalComponent, AboutModalComponent],
+  imports: [
+    VersionFooterComponent,
+    UpdateConfirmModalComponent,
+    AboutModalComponent,
+    SupportLogsModalComponent,
+  ],
 })
 export class ProfilePage {
   private readonly router = inject(Router);
@@ -39,12 +56,25 @@ export class ProfilePage {
   private readonly getIdentity = inject(GetIdentityUseCase);
   private readonly getProfile = inject(GetProfileUseCase);
   private readonly logout = inject(LogoutUseCase);
+  private readonly auditLogSerializer = inject(AuditLogSerializer);
+  private readonly uploadScheduler = inject(AuditLogUploadScheduler);
   protected readonly pwa = inject(PwaUpdateService);
 
   protected readonly appVersion = environment.appVersion;
   protected readonly updateStatus = signal<UpdateRowStatus>('idle');
   protected readonly showUpdateModal = signal(false);
   protected readonly showAboutModal = signal(false);
+  protected readonly showSupportModal = signal(false);
+  protected readonly supportState = signal<SupportModalState>('confirm');
+  protected readonly supportCooldownMinutes = signal(0);
+
+  // "Descargar logs" baja el archivo crudo al dispositivo: es una herramienta
+  // de diagnóstico, no algo para el alumno. Se gatea contra `production` y no
+  // contra `devTools` a propósito — `production` lo fija el generador por
+  // archivo de salida, mientras que `devTools` sale del `.env` que vive en la
+  // VM de producción y desde el repo no hay forma de verificar su valor. Si
+  // ese archivo tuviera el flag mal, el botón se publicaría a los alumnos.
+  protected readonly showDownloadLogs = !environment.production;
 
   // Datos del usuario. `email` viene siempre de la identity (garantizado por
   // authGuard). `role`, `firstName`, `lastName`, `code` vienen del perfil
@@ -171,6 +201,63 @@ export class ProfilePage {
     this.showAboutModal.set(true);
   }
 
+  // Salida manual para cuando el alumno reclama y sus logs de las últimas
+  // horas todavía no salieron por el ciclo normal.
+  protected onSoporteClick(): void {
+    this.supportState.set('confirm');
+    this.supportCooldownMinutes.set(remainingCooldownMinutes());
+    this.showSupportModal.set(true);
+  }
+
+  protected onSupportModalDismiss(): void {
+    this.showSupportModal.set(false);
+  }
+
+  protected async onSupportModalConfirm(): Promise<void> {
+    if (this.supportState() !== 'error' && remainingCooldownMinutes() > 0) return;
+    this.supportState.set('sending');
+
+    // `flushNow` sella lo pendiente en este momento y drena la cola: sin el
+    // sellado no se irían justamente las últimas horas, que son las que el
+    // alumno viene a reclamar.
+    //
+    // Se mira el resultado y no basta con que no haya excepción: la subida es
+    // best-effort y no lanza nunca, así que un `await` a secas siempre
+    // parecería exitoso. El alumno vino porque algo no le funcionaba —
+    // decirle "enviado" sin saberlo sería dejarlo peor que antes.
+    const outcome = await this.uploadScheduler.flushNow();
+
+    switch (outcome.status) {
+      case 'ok':
+        // `ok` con sent 0 = la cola quedó vacía pero NO porque se entregara:
+        // el back rechazó el paquete y se descartó. Decirle "llegó a soporte"
+        // sería justo la mentira que veníamos a sacar.
+        if (outcome.sent === 0) {
+          this.supportState.set('error');
+          break;
+        }
+        writeSupportSentAt(Date.now());
+        this.supportState.set('ok');
+        break;
+      case 'empty':
+        // No se marca cooldown: no gastó ningún envío.
+        this.supportState.set('empty');
+        break;
+      default:
+        // `partial` (algo quedó sin confirmar) y `busy` (otra pestaña está
+        // subiendo). En ambos casos el paquete sigue guardado.
+        this.supportState.set('error');
+        break;
+    }
+  }
+
+  protected async onDescargarLogsClick(): Promise<void> {
+    // Audit-log Fase 0: descarga NDJSON del día actual. Siempre visible en la
+    // rama feat/audit-log-fase-0 (sin feature flag per design Decision 6).
+    // Cuando la rama se promueva a develop se evalúa si necesita gating.
+    await this.auditLogSerializer.downloadCurrentDay();
+  }
+
   protected onAboutModalDismiss(): void {
     this.showAboutModal.set(false);
   }
@@ -184,5 +271,33 @@ export class ProfilePage {
     } finally {
       this.isSigningOut.set(false);
     }
+  }
+}
+
+// El cooldown vive en localStorage y no en un signal: tiene que sobrevivir a
+// que el alumno salga de la pantalla y vuelva a entrar, que es exactamente lo
+// que haría alguien impaciente.
+function remainingCooldownMinutes(now: number = Date.now()): number {
+  try {
+    const raw = localStorage.getItem(SUPPORT_LAST_SENT_KEY);
+    if (raw === null) return 0;
+    const lastSent = Number(raw);
+    if (!Number.isFinite(lastSent)) return 0;
+    const elapsed = now - lastSent;
+    // Un valor futuro (reloj del dispositivo movido) no puede dejar el botón
+    // trabado para siempre.
+    if (elapsed < 0 || elapsed >= SUPPORT_COOLDOWN_MS) return 0;
+    return Math.ceil((SUPPORT_COOLDOWN_MS - elapsed) / 60_000);
+  } catch {
+    return 0;
+  }
+}
+
+function writeSupportSentAt(ms: number): void {
+  try {
+    localStorage.setItem(SUPPORT_LAST_SENT_KEY, String(ms));
+  } catch {
+    // Best-effort: sin localStorage no hay cooldown local, pero el límite
+    // por usuario del back sigue en pie.
   }
 }

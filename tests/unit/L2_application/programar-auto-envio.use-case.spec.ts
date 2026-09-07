@@ -130,6 +130,28 @@ describe('ProgramarAutoEnvioUseCase', () => {
       expect(enviar.calls[0].override?.getTime()).toBe(expectedClose);
     });
 
+    it('onFire callback se invoca ANTES de enviar.execute (para emitir AS en el audit-log)', async () => {
+      vi.useFakeTimers();
+      vi.spyOn(Math, 'random').mockReturnValue(0.5);
+      const exam = buildExam();
+      enviar.willResolve();
+      const order: string[] = [];
+      const onFire = vi.fn(() => order.push('onFire'));
+
+      // Wrap enviar.execute to log its call order relative to onFire.
+      const originalExecute = enviar.execute.bind(enviar);
+      enviar.execute = vi.fn(async (input) => {
+        order.push('execute');
+        return originalExecute(input);
+      }) as typeof enviar.execute;
+
+      useCase.execute({ exam, onFire });
+      await vi.advanceTimersByTimeAsync(63_000);
+
+      expect(onFire).toHaveBeenCalledTimes(1);
+      expect(order).toEqual(['onFire', 'execute']);
+    });
+
     it('cancel() antes del fire NO invoca enviar.execute', async () => {
       vi.useFakeTimers();
       vi.spyOn(Math, 'random').mockReturnValue(0.5);

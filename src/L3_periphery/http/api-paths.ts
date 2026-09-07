@@ -58,6 +58,9 @@ export const apiPath = {
   // envío desde otro device).
   studentMySubmission: (slug: string, sessionId: string): string =>
     `${tenantBase(slug)}/student/exam-sessions/${encodeURIComponent(sessionId)}/my-submission`,
+  // Fase 1 del audit-log (AuditLogUploadDispatcher): sube un slice batcheado
+  // gzip+base64. Ver design.md § Fase 1 Bridge.
+  auditLogBatch: (slug: string): string => `${tenantBase(slug)}/student/telemetry/audit-log-batch`,
 
   // ---- Tutor (virtual exams) -------------------------------------------
 

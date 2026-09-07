@@ -23,6 +23,7 @@ import {
 } from '../../../../src/L2_application/use-cases/seleccionar-admission-area.use-case';
 import { AdmissionArea } from '../../../../src/L1_domain/value-objects/admission-area';
 import { CLOCK, MARKINGS_STORAGE } from '../../../../src/app.config';
+import { ExamActivity } from '../../../../src/L3_periphery/telemetry/exam-activity.service';
 import {
   DraftAutoSaveDispatcher,
   IDraftAutoSaveDispatcher,
@@ -865,6 +866,51 @@ describe('SimulacroPageViewModel', () => {
       expect(vm.lastAck()).toBe(ack);
       // El modal aparece tras auto-envío también; sin navegar hasta dismiss.
       expect(navigateSpy).not.toHaveBeenCalledWith(['/home']);
+      vm.stop();
+    });
+
+    it('view-model pasa callback onFire al use case (para emitir AS en audit-log)', async () => {
+      const exam = buildExam('exam-1', 'in_progress');
+      fakeGetTodaysExams.willResolve([exam]);
+      const vm = createVm();
+      await vm.start('exam-1');
+
+      expect(fakeProgramar.calls).toHaveLength(1);
+      expect(fakeProgramar.calls[0].onFire).toBeDefined();
+      expect(typeof fakeProgramar.calls[0].onFire).toBe('function');
+      vm.stop();
+    });
+
+    // La subida de logs se calla mientras el alumno rinde, para no competir
+    // con el auto-guardado del borrador por la red del dispositivo.
+    it('marca el examen en curso al arrancar y lo apaga en stop()', async () => {
+      const exam = buildExam('exam-1', 'in_progress');
+      fakeGetTodaysExams.willResolve([exam]);
+      const examActivity = TestBed.inject(ExamActivity);
+      const vm = createVm();
+
+      expect(examActivity.isActive()).toBe(false);
+      await vm.start('exam-1');
+      expect(examActivity.isActive()).toBe(true);
+
+      vm.stop();
+      expect(examActivity.isActive()).toBe(false);
+    });
+
+    // `submit()` no pasa por `stop()`: cancela los timers uno por uno. Sin
+    // apagar acá, la telemetría quedaría suprimida hasta destruir la página.
+    it('apaga el examen en curso también al enviar', async () => {
+      const exam = buildExam('exam-1', 'in_progress');
+      fakeGetTodaysExams.willResolve([exam]);
+      const examActivity = TestBed.inject(ExamActivity);
+      const vm = createVm();
+      await vm.start('exam-1');
+      expect(examActivity.isActive()).toBe(true);
+
+      fakeEnviar.willResolve({ status: 'queued', ack: null });
+      await vm.submit();
+
+      expect(examActivity.isActive()).toBe(false);
       vm.stop();
     });
 

@@ -87,6 +87,29 @@
         <span class="menu-item__label">Acerca de</span>
       </button>
     </li>
+
+    @if (showDownloadLogs) {
+      <li>
+        <button
+          type="button"
+          class="menu-item"
+          (click)="onDescargarLogsClick()"
+          data-testid="descargar-logs-link"
+        >
+          <span class="material-symbols-outlined menu-item__icon" aria-hidden="true">download</span>
+          <span class="menu-item__label">Descargar logs</span>
+        </button>
+      </li>
+    }
+
+    <li>
+      <button type="button" class="menu-item" (click)="onSoporteClick()" data-testid="soporte-link">
+        <span class="material-symbols-outlined menu-item__icon" aria-hidden="true"
+          >support_agent</span
+        >
+        <span class="menu-item__label">Soporte</span>
+      </button>
+    </li>
   </ul>
 
   <footer class="profile__footer">
@@ -117,5 +140,14 @@
 
   @if (showAboutModal()) {
     <app-about-modal [appVersion]="appVersion" (dismiss)="onAboutModalDismiss()" />
+  }
+
+  @if (showSupportModal()) {
+    <app-support-logs-modal
+      [cooldownMinutes]="supportCooldownMinutes()"
+      [state]="supportState()"
+      (dismiss)="onSupportModalDismiss()"
+      (accept)="onSupportModalConfirm()"
+    />
   }
 </main>

@@ -1,7 +1,18 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { timeout } from 'rxjs/operators';
+import { ENDPOINT_IDS } from '../telemetry/audit-log-dictionaries';
+import {
+  DRAFT_DELTA_TOKEN,
+  DRAFT_VERSION_TOKEN,
+  ENDPOINT_ID_TOKEN,
+  MARKS_COUNT_TOKEN,
+  SESSION_ID_TOKEN,
+} from '../telemetry/tokens';
+import { AlternativaCode } from '../telemetry/audit-log-event';
+import { AuditLogStore } from '../telemetry/audit-log-store.service';
+import { shortSessionId } from '../telemetry/day-key';
 import {
   DraftRequest,
   EnvioRequest,
@@ -134,10 +145,37 @@ const DRAFT_ERROR_MESSAGES: ReadonlySet<DraftErrorMessage> = new Set([
   'SESSION_NOT_ACTIVE',
 ]);
 
+// Sub-bloque G (design.md § Revision Log 2026-09-04 iteration 3): CLK se
+// recalcula a lo sumo 1 vez cada 4h por instancia de app, piggybacking en
+// `serverTime` de `getTodaysExams`. Un cambio de offset menor a 500ms se
+// considera ruido de red/latencia, no drift real de reloj.
+const CLOCK_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 horas
+const CLOCK_DRIFT_THRESHOLD_MS = 500; // ms
+
 @Injectable({ providedIn: 'root' })
 export class HttpExamsApi implements ExamsApi {
   private readonly http = inject(HttpClient);
   private readonly slugStore = inject(SlugStore);
+  private readonly auditLog = inject(AuditLogStore);
+
+  // Sub-bloque G: estado del último chequeo de calibración de reloj. Vive acá
+  // (instancia del adapter, singleton `providedIn: 'root'`) y NO en IDB —
+  // basta con "una vez por sesión de app", perderlo en un reload es aceptable
+  // (el próximo poll simplemente recalibra antes de lo estrictamente necesario).
+  private lastCalibrationCheckAt = 0;
+  private lastEmittedOffset: number | null = null;
+
+  // Sub-bloque C (design.md § Revision Log 2026-09-04): estado de audit-log
+  // vive acá — L3, no L1/L2 — porque HttpContext es Angular-specific y los
+  // use cases deben quedar framework-free. NO se lee `MarkingsStorage` de
+  // nuevo acá: `req.responses` (el string compacto que arma
+  // `GuardarDraftUseCase`) YA es la composición completa vigente para ese
+  // POST — reusarla evita un segundo read a IDB que podría desincronizarse
+  // del body que efectivamente se envía. `lastEmittedComposition` solo
+  // guarda las posiciones MARCADAS (letra !== '-'); ausencia de una pregunta
+  // en el mapa == sin marcar.
+  private readonly lastEmittedComposition = new Map<string, Map<number, AlternativaCode>>();
+  private readonly versionCounter = new Map<string, number>();
 
   // Los endpoints tenant-scoped (`/t/{slug}/...`) leen el slug del SlugStore
   // hidratado en APP_INITIALIZER. Si el slug es null, algún caller invocó
@@ -152,7 +190,9 @@ export class HttpExamsApi implements ExamsApi {
   async getTodaysExams(): Promise<ExamsListResult> {
     try {
       const dto = await firstValueFrom(
-        this.http.get<ExamsListResponseDto>(apiPath.studentExamSessions(this.requireSlug())),
+        this.http.get<ExamsListResponseDto>(apiPath.studentExamSessions(this.requireSlug()), {
+          context: new HttpContext().set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.studentExamSessions),
+        }),
       );
       // Pasa el DTO al dominio sin filtrar: los casos `in_progress` con
       // `started === null` (data rara que el back en teoría nunca emite)
@@ -160,9 +200,14 @@ export class HttpExamsApi implements ExamsApi {
       // como entrables con banner "tomando un café" + botón Enviar disabled,
       // exactamente como cuando `started` cae en el futuro. La puerta
       // sigue siendo `serverStatus`; la vigencia la decide `hasStartedBy(now)`.
+      const serverTime = new ServerTime(dto.serverTime);
+      // Sub-bloque G: piggyback de calibración de reloj sobre este poll.
+      // `AuditLogStore.append` es fire-and-forget (catch silencioso interno)
+      // — no hace falta envolver en try/catch acá.
+      this.maybeCalibrateClock(serverTime.toMillis());
       return {
         exams: dto.exams.map((e) => this.toExam(e)),
-        serverTime: new ServerTime(dto.serverTime),
+        serverTime,
       };
     } catch (err) {
       throw this.classifyListError(err);
@@ -186,6 +231,12 @@ export class HttpExamsApi implements ExamsApi {
             admission_area: req.admissionArea,
             responses: req.responses,
             client_finished_at: req.clientFinishedAt,
+          },
+          {
+            context: new HttpContext()
+              .set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.studentExamSubmit)
+              .set(MARKS_COUNT_TOKEN, countMarks(req.responses))
+              .set(SESSION_ID_TOKEN, shortSessionId(req.examId)),
           },
         ),
       );
@@ -212,6 +263,12 @@ export class HttpExamsApi implements ExamsApi {
             responses: req.responses,
             client_finished_at: req.clientFinishedAt,
           },
+          {
+            context: new HttpContext()
+              .set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.studentExamSubmitHomework)
+              .set(MARKS_COUNT_TOKEN, countMarks(req.responses))
+              .set(SESSION_ID_TOKEN, shortSessionId(req.examId)),
+          },
         ),
       );
       const ack = new SubmissionAck(dto.id, dto.submission_hash, new Date(dto.submitted_at));
@@ -229,19 +286,99 @@ export class HttpExamsApi implements ExamsApi {
   // `withCredentials` lo agrega el `credentials.interceptor` global — NO se
   // setea acá. Response: 204 No Content (void). Timeout: 10s.
   async guardarDraft(req: DraftRequest): Promise<void> {
+    // Composición vigente (de este mismo POST) + delta vs el último draft
+    // emitido con ÉXITO. `version` es tentativa: solo se persiste en
+    // `versionCounter` si el POST resuelve 204 — un fallo reintenta con el
+    // MISMO número de versión y el mismo baseline de delta (design.md D:
+    // "próximo intento reenvía el mismo delta, o uno más fresco si la
+    // composición cambió mientras tanto").
+    const composition = this.parseComposition(req.responses);
+    const delta = this.computeDraftDelta(this.lastEmittedComposition.get(req.examId), composition);
+    const version = (this.versionCounter.get(req.examId) ?? 0) + 1;
+
     try {
       await firstValueFrom(
         this.http
-          .post<void>(apiPath.studentExamDraft(this.requireSlug(), req.examId), {
-            code: req.code,
-            admission_area: req.admissionArea,
-            responses: req.responses,
-          })
+          .post<void>(
+            apiPath.studentExamDraft(this.requireSlug(), req.examId),
+            {
+              code: req.code,
+              admission_area: req.admissionArea,
+              responses: req.responses,
+            },
+            {
+              context: new HttpContext()
+                .set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.studentExamDraft)
+                .set(MARKS_COUNT_TOKEN, countMarksFromCompact(req.responses))
+                .set(SESSION_ID_TOKEN, shortSessionId(req.examId))
+                .set(DRAFT_VERSION_TOKEN, version)
+                .set(DRAFT_DELTA_TOKEN, delta),
+            },
+          )
           .pipe(timeout(10_000)),
       );
+      // Éxito: recién acá se "confirma" el baseline y la versión. Un fallo
+      // NO llega a este punto (el catch relanza antes).
+      this.lastEmittedComposition.set(req.examId, composition);
+      this.versionCounter.set(req.examId, version);
     } catch (err) {
       throw this.classifyDraftError(err);
     }
+  }
+
+  // Sub-bloque G: guard de intervalo (4h) + umbral de drift (500ms). `now` se
+  // lee UNA sola vez acá (no en el caller) para que el test pueda controlar
+  // ambos lados de la comparación vía `vi.setSystemTime`. `serverTime` YA
+  // viene en millis (`ServerTime.toMillis()`) — no el string ISO crudo del DTO.
+  private maybeCalibrateClock(serverTime: number): void {
+    const now = Date.now();
+    if (now - this.lastCalibrationCheckAt < CLOCK_CHECK_INTERVAL_MS) return;
+    this.lastCalibrationCheckAt = now;
+    const newOffset = serverTime - now;
+    if (
+      this.lastEmittedOffset === null ||
+      Math.abs(newOffset - this.lastEmittedOffset) > CLOCK_DRIFT_THRESHOLD_MS
+    ) {
+      this.auditLog.append({ t: now, e: 'CLK', srv: serverTime });
+      this.lastEmittedOffset = newOffset;
+    }
+  }
+
+  // Parsea el string compacto de `responses` a un mapa sparse de posiciones
+  // MARCADAS. Posición i (0-indexed) del string == pregunta i+1. '-' (sin
+  // marcar) se omite del mapa — solo viajan las letras A-E.
+  private parseComposition(compact: string): Map<number, AlternativaCode> {
+    const map = new Map<number, AlternativaCode>();
+    for (let i = 0; i < compact.length; i++) {
+      const letra = compact[i];
+      if (letra !== '-') {
+        map.set(i + 1, letra as AlternativaCode);
+      }
+    }
+    return map;
+  }
+
+  // Delta = preguntas ADDED/CHANGED (nueva letra, incluye el primer draft de
+  // la sesión completo porque `previous` es undefined → todo cuenta como
+  // "added") + preguntas CLEARED (estaban marcadas antes, ya no) como
+  // [pregunta, '0']. Preguntas sin cambio NO aparecen. Sin cambios de
+  // composición → array vacío (evento H real igual, con `v` incrementado).
+  private computeDraftDelta(
+    previous: Map<number, AlternativaCode> | undefined,
+    current: Map<number, AlternativaCode>,
+  ): readonly [number, AlternativaCode][] {
+    const questions = new Set<number>([...(previous?.keys() ?? []), ...current.keys()]);
+    const delta: [number, AlternativaCode][] = [];
+    for (const q of [...questions].sort((a, b) => a - b)) {
+      const prevLetra = previous?.get(q);
+      const currLetra = current.get(q);
+      if (currLetra !== undefined) {
+        if (currLetra !== prevLetra) delta.push([q, currLetra]);
+      } else if (prevLetra !== undefined) {
+        delta.push([q, '0']);
+      }
+    }
+    return delta;
   }
 
   // GET /t/{slug}/student/exam-sessions/{sessionId}/my-submission
@@ -250,7 +387,14 @@ export class HttpExamsApi implements ExamsApi {
     try {
       const dto = await firstValueFrom(
         this.http
-          .get<MySubmissionResponseDto>(apiPath.studentMySubmission(this.requireSlug(), sessionId))
+          .get<MySubmissionResponseDto>(
+            apiPath.studentMySubmission(this.requireSlug(), sessionId),
+            {
+              context: new HttpContext()
+                .set(ENDPOINT_ID_TOKEN, ENDPOINT_IDS.studentMySubmission)
+                .set(SESSION_ID_TOKEN, shortSessionId(sessionId)),
+            },
+          )
           .pipe(timeout(10_000)),
       );
       return this.toMySubmission(dto);
@@ -458,4 +602,21 @@ export class HttpExamsApi implements ExamsApi {
     }
     return new NetworkError();
   }
+}
+
+// Cuenta las respuestas del Record (submit/submit-homework). Todas las
+// entradas del Record ya vienen filtradas por el L2 (sin nulls) — el conteo
+// es el size del objeto.
+function countMarks(responses: Record<string, 'A' | 'B' | 'C' | 'D' | 'E'>): number {
+  return Object.keys(responses).length;
+}
+
+// Cuenta las respuestas del string compacto del draft. Cada '-' representa
+// una pregunta sin marcar; el resto son A-E. Ver DraftRequest.responses.
+function countMarksFromCompact(compact: string): number {
+  let n = 0;
+  for (const c of compact) {
+    if (c !== '-') n++;
+  }
+  return n;
 }

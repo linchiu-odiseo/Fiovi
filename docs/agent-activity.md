@@ -91,3 +91,15 @@ Auto-generado por `.claude/hooks/log-agent-usage.ps1` en cada PostToolUse del to
 | 2026-07-14 22:36:13 | Explore          | Map all Identity property consumers                              | opus-4-7 | 40,265       | --    | --       | $0.2069   |
 | 2026-08-17 09:45:21 | frontend-builder | Implement tarea modal UX changes                                 | opus-4-7 | 109,622      | --    | --       | $0.2501   |
 | 2026-08-17 10:16:06 | frontend-builder | Fix silent bug + add prevention guards                           | opus-4-7 | 107,988      | --    | --       | $0.2825   |
+| 2026-09-04 08:59:53 | general-purpose | Update SDD change artifacts for audit-log pivot | opus-4-7 | -- | -- | -- | -- |
+| 2026-09-04 09:09:43 | general-purpose | Execute Sub-bloque A ÔÇö Drop MK | opus-4-7 | -- | -- | -- | -- |
+| 2026-09-04 09:13:35 | general-purpose | Execute Sub-bloque C ÔÇö v+chg on draft H | opus-4-7 | -- | -- | -- | -- |
+| 2026-09-04 09:18:44 | general-purpose | Execute Sub-bloque D ÔÇö batch on serialize | opus-4-7 | -- | -- | -- | -- |
+| 2026-09-04 09:19:02 | general-purpose | Execute Sub-bloque E ÔÇö clearRange bridge | opus-4-7 | -- | -- | -- | -- |
+| 2026-09-04 09:24:18 | hexagonal-guard | Hexagonal-guard audit of changes | opus-4-7 | -- | -- | -- | -- |
+| 2026-09-04 09:24:33 | sdd-verify | SDD verify against specs and tasks | opus-4-7 | -- | -- | -- | -- |
+| 2026-09-04 09:31:01 | general-purpose | Fix W1 range boundary + W2 ghost-conditional | opus-4-7 | -- | -- | -- | -- |
+| 2026-09-04 10:24:29 | general-purpose | Refactor to senior format + SSO error dictionary | opus-4-7 | -- | -- | -- | -- |
+| 2026-09-04 11:00:39 | general-purpose | Execute Sub-bloque G ÔÇö CLK clock calibration | opus-4-7 | -- | -- | -- | -- |
+| 2026-09-04 11:05:51 | hexagonal-guard | Final hexagonal-guard audit | opus-4-7 | -- | -- | -- | -- |
+| 2026-09-04 11:06:04 | sdd-verify | Final SDD verify | opus-4-7 | -- | -- | -- | -- |

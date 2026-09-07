@@ -12,6 +12,9 @@ import {
 import { SeleccionarAdmissionAreaUseCase } from '../../L2_application/use-cases/seleccionar-admission-area.use-case';
 import { CLOCK, MARKINGS_STORAGE } from '../../app.config';
 import { DraftAutoSaveDispatcher } from '../../L3_periphery/envio/draft-auto-save-dispatcher.service';
+import { AuditLogStore } from '../../L3_periphery/telemetry/audit-log-store.service';
+import { ExamActivity } from '../../L3_periphery/telemetry/exam-activity.service';
+import { shortSessionId } from '../../L3_periphery/telemetry/day-key';
 import { Exam } from '../../L1_domain/entities/exam';
 import { Alternativa } from '../../L1_domain/value-objects/alternativa';
 import { AlternativaValue, AnswersMap } from '../../L1_domain/ports/markings-storage';
@@ -102,6 +105,8 @@ export class SimulacroPageViewModel {
   // environment.draftEnabled===true, o NoopDraftAutoSaveDispatcher si está
   // apagado. El view-model llama métodos sin condicional (design.md D7).
   private readonly draftDispatcher = inject(DraftAutoSaveDispatcher);
+  private readonly auditLog = inject(AuditLogStore);
+  private readonly examActivity = inject(ExamActivity);
 
   readonly exam = signal<Exam | null>(null);
   readonly marcaciones = signal<AnswersMap>({});
@@ -437,6 +442,12 @@ export class SimulacroPageViewModel {
 
     this.sessionId = encontrado.id;
     this.exam.set(encontrado);
+    // Audit-log: emitir SS (session start) al abrir la sesión. Fire-and-forget.
+    this.auditLog.append({
+      t: Date.now(),
+      e: 'SS',
+      s: shortSessionId(this.sessionId),
+    });
     // Modo "tarea": si ya hay un myStartedAt sellado en visitas previas,
     // lo restauramos y seguimos el flujo normal. Si no lo hay, esta es la
     // primera vez que el alumno abre la tarea (o volvió sin confirmar):
@@ -453,6 +464,9 @@ export class SimulacroPageViewModel {
       }
     }
     await this.loadMarcaciones(encontrado);
+    // Marca el examen como en curso: mientras dure, la subida de logs se
+    // calla para no competir con el auto-guardado del borrador.
+    this.examActivity.markStarted();
     this.startCountdownTicker();
     // Auto-envío queda pendiente si el alumno debe elegir área primero
     // (EXAMEN con subset restrictivo). `seleccionarArea()` lo agenda al
@@ -483,6 +497,9 @@ export class SimulacroPageViewModel {
     this.sealHomeworkStartedAt(exam.id);
     this.awaitingHomeworkStart.set(false);
     await this.loadMarcaciones(exam);
+    // Marca el examen como en curso: mientras dure, la subida de logs se
+    // calla para no competir con el auto-guardado del borrador.
+    this.examActivity.markStarted();
     this.startCountdownTicker();
     // Mismo guard que en start(): sin área elegida no se agenda auto-envío.
     if (!this.needsAreaSelection()) {
@@ -534,6 +551,7 @@ export class SimulacroPageViewModel {
 
   stop(): void {
     this.stopped = true;
+    this.examActivity.markEnded();
     // Cancela el debounce del dispatcher para prevenir timer leak (design.md R1).
     // Si el alumno navega fuera de /simulacro sin enviar, no queremos que el
     // debounce dispare un POST espurio desde /home.
@@ -760,6 +778,10 @@ export class SimulacroPageViewModel {
     this.draftDispatcher.cancelarDraftsPendientes(this.sessionId);
     this.cancelAutoEnvio();
     this.cancelTareaAutoEnvio();
+    // `submit()` NO pasa por `stop()` — cancela los timers uno por uno — así
+    // que el examen hay que darlo por terminado también acá. Si no, la
+    // subida de logs seguiría suprimida hasta que se destruya la página.
+    this.examActivity.markEnded();
     this.isSubmitting.set(true);
     this.submissionState.set('sending');
 
@@ -823,6 +845,9 @@ export class SimulacroPageViewModel {
         this.tareaAutoEnvioTimer = null;
         if (this.stopped) return;
         if (this.isSubmitting()) return;
+        // Audit-log: marcar que este submit es auto (timer disparó) para
+        // distinguirlo del submit manual en reclamos post-facto.
+        this.emitAutoSubmit();
         // submit() se encarga del router por modo, del stateo de submissionState,
         // del cancel del draft dispatcher, etc.
         void this.submit();
@@ -834,6 +859,8 @@ export class SimulacroPageViewModel {
     // a EnviarSimulacroUseCase con clientFinishedAtOverride para lock exact.
     this.autoEnvioHandle = this.programarAutoEnvio.execute({
       exam,
+      // Emitir AS justo antes del POST del auto-envío (hook onFire del use case).
+      onFire: () => this.emitAutoSubmit(),
       onResult: (result) => {
         // El timer ya disparó: el handle representa un cancelable agotado.
         // Lo soltamos para que `maybeRedirectIfExpired` no quede bloqueado
@@ -859,6 +886,19 @@ export class SimulacroPageViewModel {
         if (this.stopped) return;
         this.handleSubmissionError(err);
       },
+    });
+  }
+
+  // Audit-log: emitir evento AS (auto-submit fired). Se invoca desde:
+  //   - Modo tarea: setTimeout callback ANTES de llamar `submit()`.
+  //   - Modo examen: pasado como `onFire` al use case; el use case lo llama
+  //     ANTES del POST a `enviar-simulacro`.
+  // Fire-and-forget (store cachea excepciones).
+  private emitAutoSubmit(): void {
+    this.auditLog.append({
+      t: Date.now(),
+      e: 'AS',
+      s: shortSessionId(this.sessionId),
     });
   }
 
