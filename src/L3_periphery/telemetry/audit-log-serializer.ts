@@ -5,8 +5,12 @@ import type { AuditLogEvent } from './audit-log-event';
 
 // AuditLogSerializer -- serializa el batch del dia actual a NDJSON y dispara
 // la descarga en el navegador. Consumido por el item "Descargar logs" del
-// menu de /profile (Fase 0) y por el futuro AuditLogUploadDispatcher (Fase 1)
-// via serializeSlice.
+// menu de /profile.
+//
+// El armado del payload que se SUBE no vive aca: lo hace el dispatcher al
+// sellar cada paquete, porque el batchId tiene que quedar pegado al paquete
+// sellado y no regenerarse en cada intento. Lo que comparten es
+// `serializeBatchedNdjson`, que es una funcion pura.
 //
 // Formato flat (serializeToNdjson): una linea JSON por evento, terminada en
 // newline. Sin JSON array wrapping (spec REQ-AL-05). Se mantiene exportado
@@ -41,24 +45,6 @@ export class AuditLogSerializer {
     const ndjson = serializeBatchedNdjson(batch);
     const filename = `fiovi-audit-${todayLocalKey()}.ndjson`;
     triggerDownload(ndjson, filename);
-  }
-
-  async serializeSlice(
-    sinceMs: number,
-    untilMs: number,
-  ): Promise<{ payload: string; batchId: string; eventCount: number; bytesRaw: number }> {
-    const batchId = generateBatchId();
-    // `eventsInRange` y no `currentDayBatch`: la subida tiene que poder mirar
-    // más atrás del día actual. Es exactamente el caso del alumno que cerró
-    // la app a las 6pm y la abre a la mañana siguiente — lo de ayer todavía
-    // está en el store y tiene que salir.
-    const sliced = await this.store.eventsInRange(sinceMs, untilMs);
-    if (sliced.length === 0) {
-      return { payload: '', batchId, eventCount: 0, bytesRaw: 0 };
-    }
-    const payload = serializeBatchedNdjson(sliced);
-    const bytesRaw = new Blob([payload]).size;
-    return { payload, batchId, eventCount: sliced.length, bytesRaw };
   }
 }
 
@@ -236,12 +222,6 @@ function withoutFields(ev: AuditLogEvent, excluded: readonly string[]): Record<s
     rest[key] = record[key];
   }
   return rest;
-}
-
-// --- batchId (Fase 1 bridge) ---
-
-function generateBatchId(): string {
-  return crypto.randomUUID();
 }
 
 function triggerDownload(content: string, filename: string): void {

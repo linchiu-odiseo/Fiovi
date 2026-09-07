@@ -1,8 +1,14 @@
-// Feature tests del AuditLogUploadDispatcher (Fase 1 del audit-log) — cubre
-// las tres ramas de uploadPending(): batch vacío (avanza cursor, sin POST),
-// caso feliz (sube gzip+base64, limpia el rango, avanza cursor), y fallo de
-// red (NO avanza el cursor ni limpia — el próximo intervalo reintenta la
-// misma ventana). Ver design.md § Fase 1 Bridge.
+// Feature tests del AuditLogUploadDispatcher — modelo de paquetes sellados.
+//
+// El flujo es sellar y después drenar: `sealPending` convierte los eventos
+// sueltos en paquetes con `batchId` definitivo (partiendo en varios si no
+// entran en el tope de tamaño), y `drainPending` los sube de a uno borrando
+// solo lo que el back confirmó.
+//
+// Lo que más importa acá: que un fallo transitorio NO pierda el paquete, que
+// un rechazo definitivo (4xx) NO trabe la cola para siempre, y que el
+// `batchId` sea el mismo entre reintentos — que es lo que hace que el dedup
+// del back sirva de algo.
 
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -10,224 +16,294 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { AuditLogUploadDispatcherService } from '../../../../src/L3_periphery/telemetry/audit-log-upload-dispatcher.service';
-import { AuditLogSerializer } from '../../../../src/L3_periphery/telemetry/audit-log-serializer';
 import { AuditLogStore } from '../../../../src/L3_periphery/telemetry/audit-log-store.service';
 import { SlugStore } from '../../../../src/L3_periphery/http/slug-store';
 import { startOfTodayLocalMs } from '../../../../src/L3_periphery/telemetry/day-key';
 
-const CURSOR_KEY = 'fiovi-audit-log-last-upload-ms';
-const SLICE: { payload: string; batchId: string; eventCount: number; bytesRaw: number } = {
-  payload: '{"e":"AO","t0":1000,"x":[{"dt":0,"cold":1}]}\n',
-  batchId: 'batch-1',
-  eventCount: 1,
-  bytesRaw: 45,
-};
+const DB_NAME = 'fiovi-audit-log';
+const STORES = ['events', 'meta', 'packages'] as const;
+const URL = 'https://api.yangpimpollo.com/t/vonex/student/telemetry/audit-log-batch';
+const TODAY = startOfTodayLocalMs() + 60_000;
 
-describe('AuditLogUploadDispatcherService.uploadPending', () => {
+function wipeDb(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const openReq = indexedDB.open(DB_NAME);
+    openReq.onupgradeneeded = () => {
+      const db = openReq.result;
+      for (const s of STORES) {
+        if (!db.objectStoreNames.contains(s)) {
+          if (s === 'events') db.createObjectStore(s, { autoIncrement: true });
+          else if (s === 'packages') db.createObjectStore(s, { keyPath: 'batchId' });
+          else db.createObjectStore(s);
+        }
+      }
+    };
+    openReq.onsuccess = () => {
+      const db = openReq.result;
+      const available = STORES.filter((s) => db.objectStoreNames.contains(s));
+      if (available.length === 0) {
+        db.close();
+        resolve();
+        return;
+      }
+      const tx = db.transaction(available, 'readwrite');
+      for (const s of available) tx.objectStore(s).clear();
+      tx.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      tx.onerror = () => {
+        db.close();
+        reject(tx.error);
+      };
+    };
+    openReq.onerror = () => reject(openReq.error);
+  });
+}
+
+async function flushMicrotasks(): Promise<void> {
+  await new Promise((r) => setTimeout(r, 40));
+}
+
+describe('AuditLogUploadDispatcherService', () => {
   let httpMock: HttpTestingController;
   let dispatcher: AuditLogUploadDispatcherService;
-  let serializeSliceSpy: ReturnType<typeof vi.spyOn>;
-  let clearRangeSpy: ReturnType<typeof vi.spyOn>;
+  let store: AuditLogStore;
 
-  beforeEach(() => {
-    localStorage.clear();
+  beforeEach(async () => {
+    await wipeDb();
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
         AuditLogUploadDispatcherService,
-        AuditLogSerializer,
         AuditLogStore,
         SlugStore,
       ],
     });
 
     TestBed.inject(SlugStore).set('vonex');
-    // Cursor lo bastante viejo como para superar MIN_WINDOW_MS sin esperar.
-    localStorage.setItem(CURSOR_KEY, String(Date.now() - 60_000));
-
-    serializeSliceSpy = vi.spyOn(TestBed.inject(AuditLogSerializer), 'serializeSlice');
-    clearRangeSpy = vi.spyOn(TestBed.inject(AuditLogStore), 'clearRange').mockResolvedValue();
-
     httpMock = TestBed.inject(HttpTestingController);
+    store = TestBed.inject(AuditLogStore);
     dispatcher = TestBed.inject(AuditLogUploadDispatcherService);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     httpMock.verify();
-    localStorage.clear();
     TestBed.resetTestingModule();
     vi.restoreAllMocks();
+    await wipeDb();
   });
 
-  it('does nothing (no POST, cursor untouched) if the window is under MIN_WINDOW_MS', async () => {
-    localStorage.setItem(CURSOR_KEY, String(Date.now() - 5_000));
+  async function seedEvents(count: number): Promise<void> {
+    for (let i = 0; i < count; i++) {
+      store.append({ t: TODAY + i, e: 'VC', v: i % 2 === 0 ? 1 : 0 });
+    }
+    await flushMicrotasks();
+  }
+
+  it('sin eventos no hace ningún POST', async () => {
     await dispatcher.uploadPending();
-    httpMock.expectNone(() => true);
+    httpMock.expectNone(URL);
   });
 
-  it('does nothing if there is no active tenant slug', async () => {
+  it('sin slug activo no sube, pero el paquete queda sellado esperando', async () => {
+    // `clear()` y no `set('')`: SlugStore ignora los valores falsy.
     TestBed.inject(SlugStore).clear();
-    await dispatcher.uploadPending();
-    httpMock.expectNone(() => true);
-    expect(serializeSliceSpy).not.toHaveBeenCalled();
-  });
-
-  it('empty batch: advances the cursor without POSTing', async () => {
-    serializeSliceSpy.mockResolvedValue({ payload: '', batchId: 'b', eventCount: 0, bytesRaw: 0 });
-    const before = Date.now();
+    await seedEvents(2);
 
     await dispatcher.uploadPending();
 
-    httpMock.expectNone(() => true);
-    expect(clearRangeSpy).not.toHaveBeenCalled();
-    const cursor = Number(localStorage.getItem(CURSOR_KEY));
-    expect(cursor).toBeGreaterThanOrEqual(before);
+    httpMock.expectNone(URL);
+    expect(await store.pendingPackages()).toHaveLength(1);
   });
 
-  it('happy path: POSTs gzip+base64 payload and clears the uploaded range', async () => {
-    serializeSliceSpy.mockResolvedValue(SLICE);
-    const before = Date.now();
+  it('caso feliz: sella, sube en base64 gzip y borra el paquete', async () => {
+    await seedEvents(3);
 
-    const pending = dispatcher.uploadPending();
-    // gzip via CompressionStream corre en microtasks/macrotasks reales antes
-    // de llegar al http.post — dejamos que la cola drene (mismo patrón de
-    // flushMicrotasks que el resto de la suite de telemetry) antes de
-    // esperar la request en el backend de testing.
-    await new Promise((r) => setTimeout(r, 30));
-    const req = await httpMock.expectOne(
-      (r) => r.method === 'POST' && r.url.endsWith('/student/telemetry/audit-log-batch'),
+    const promise = dispatcher.uploadPending();
+    await flushMicrotasks();
+
+    const req = httpMock.expectOne(URL);
+    expect(req.request.body.enc).toBe('gzip');
+    expect(req.request.body.eventCount).toBe(3);
+    expect(typeof req.request.body.batchId).toBe('string');
+    // El payload es base64 de gzip, no el NDJSON en claro.
+    expect(req.request.body.payload).not.toContain('"e"');
+    req.flush(null, { status: 202, statusText: 'Accepted' });
+    await promise;
+
+    expect(await store.pendingPackages()).toHaveLength(0);
+    // Los eventos ya se habían borrado al sellar, dentro de la misma tx.
+    expect(await store.eventsInRange(0, Number.MAX_SAFE_INTEGER)).toHaveLength(0);
+  });
+
+  it('el sellado borra los eventos aunque la subida falle — no se suben dos veces', async () => {
+    await seedEvents(2);
+
+    const promise = dispatcher.uploadPending();
+    await flushMicrotasks();
+    httpMock.expectOne(URL).error(new ProgressEvent('error'));
+    await promise;
+
+    expect(await store.eventsInRange(0, Number.MAX_SAFE_INTEGER)).toHaveLength(0);
+    expect(await store.pendingPackages()).toHaveLength(1);
+  });
+
+  it('fallo de red: conserva el paquete para reintentarlo', async () => {
+    await seedEvents(2);
+
+    const first = dispatcher.uploadPending();
+    await flushMicrotasks();
+    httpMock.expectOne(URL).error(new ProgressEvent('error'));
+    await first;
+
+    const pending = await store.pendingPackages();
+    expect(pending).toHaveLength(1);
+
+    // Segundo intento: mismo paquete, mismo batchId.
+    const second = dispatcher.uploadPending();
+    await flushMicrotasks();
+    const retry = httpMock.expectOne(URL);
+    expect(retry.request.body.batchId).toBe(pending[0].batchId);
+    retry.flush(null, { status: 202, statusText: 'Accepted' });
+    await second;
+
+    expect(await store.pendingPackages()).toHaveLength(0);
+  });
+
+  it('5xx también conserva el paquete', async () => {
+    await seedEvents(1);
+
+    const promise = dispatcher.uploadPending();
+    await flushMicrotasks();
+    httpMock.expectOne(URL).flush(null, { status: 503, statusText: 'Service Unavailable' });
+    await promise;
+
+    expect(await store.pendingPackages()).toHaveLength(1);
+  });
+
+  it('429 conserva el paquete — es esperar, no un rechazo', async () => {
+    await seedEvents(1);
+
+    const promise = dispatcher.uploadPending();
+    await flushMicrotasks();
+    httpMock.expectOne(URL).flush(null, { status: 429, statusText: 'Too Many Requests' });
+    await promise;
+
+    expect(await store.pendingPackages()).toHaveLength(1);
+  });
+
+  it('4xx definitivo descarta el paquete — si no, traba la cola para siempre', async () => {
+    await seedEvents(1);
+
+    const promise = dispatcher.uploadPending();
+    await flushMicrotasks();
+    // 404 TELEMETRY_STUDENT_NOT_LINKED: reintentarlo no lo va a vincular.
+    httpMock
+      .expectOne(URL)
+      .flush({ code: 'TELEMETRY_STUDENT_NOT_LINKED' }, { status: 404, statusText: 'Not Found' });
+    await promise;
+
+    expect(await store.pendingPackages()).toHaveLength(0);
+  });
+
+  it('un fallo transitorio corta el drenaje — no machaca al back con el resto', async () => {
+    // Dos paquetes sellados a mano, para controlar el orden.
+    await store.sealPackage(
+      { batchId: 'pkg-1', payload: 'AAAA', enc: 'gzip', eventCount: 1, sealedAt: 1000 },
+      [],
     );
-    expect(req.request.body.batchId).toBe(SLICE.batchId);
-    expect(req.request.body.eventCount).toBe(SLICE.eventCount);
-    expect(typeof req.request.body.appVersion).toBe('string');
-
-    // El payload viaja gzip+base64 — round-trip real con DecompressionStream
-    // (misma API browser que usa el dispatcher) para confirmar que no es un
-    // mock, es compresión de verdad.
-    const decompressed = await gunzipFromBase64(req.request.body.payload as string);
-    expect(decompressed).toBe(SLICE.payload);
-
-    req.flush(null, { status: 204, statusText: 'No Content' });
-    await pending;
-
-    expect(clearRangeSpy).toHaveBeenCalledTimes(1);
-    const cursor = Number(localStorage.getItem(CURSOR_KEY));
-    expect(cursor).toBeGreaterThanOrEqual(before);
-  });
-
-  it('network error: does NOT clear the range and does NOT advance the cursor (retries the same window)', async () => {
-    serializeSliceSpy.mockResolvedValue(SLICE);
-    const cursorBefore = Date.now() - 60_000;
-    localStorage.setItem(CURSOR_KEY, String(cursorBefore));
-
-    const pending = dispatcher.uploadPending();
-    // gzip via CompressionStream corre en microtasks/macrotasks reales antes
-    // de llegar al http.post — dejamos que la cola drene (mismo patrón de
-    // flushMicrotasks que el resto de la suite de telemetry) antes de
-    // esperar la request en el backend de testing.
-    await new Promise((r) => setTimeout(r, 30));
-    const req = await httpMock.expectOne(
-      (r) => r.method === 'POST' && r.url.endsWith('/student/telemetry/audit-log-batch'),
+    await store.sealPackage(
+      { batchId: 'pkg-2', payload: 'BBBB', enc: 'gzip', eventCount: 1, sealedAt: 2000 },
+      [],
     );
-    req.flush('boom', { status: 500, statusText: 'Internal Server Error' });
-    await pending;
 
-    expect(clearRangeSpy).not.toHaveBeenCalled();
-    expect(Number(localStorage.getItem(CURSOR_KEY))).toBe(cursorBefore);
+    const promise = dispatcher.uploadPending();
+    await flushMicrotasks();
+    const req = httpMock.expectOne(URL);
+    expect(req.request.body.batchId).toBe('pkg-1'); // el más viejo primero
+    req.error(new ProgressEvent('error'));
+    await promise;
+
+    httpMock.expectNone(URL); // pkg-2 ni se intentó
+    expect(await store.pendingPackages()).toHaveLength(2);
   });
 
-  it('missing/garbage cursor defaults to start of today local', async () => {
-    localStorage.removeItem(CURSOR_KEY);
-    serializeSliceSpy.mockResolvedValue({ payload: '', batchId: 'b', eventCount: 0, bytesRaw: 0 });
+  it('sin CompressionStream manda el NDJSON crudo con enc:none', async () => {
+    const original = globalThis.CompressionStream;
+    // @ts-expect-error — simula Safari < 16.4, que no lo implementa.
+    delete globalThis.CompressionStream;
+    try {
+      await seedEvents(1);
 
-    await dispatcher.uploadPending();
+      const promise = dispatcher.uploadPending();
+      await flushMicrotasks();
+      const req = httpMock.expectOne(URL);
+      expect(req.request.body.enc).toBe('none');
+      // Sin comprimir, el base64 decodifica al NDJSON legible.
+      expect(atob(req.request.body.payload)).toContain('"e"');
+      req.flush(null, { status: 202, statusText: 'Accepted' });
+      await promise;
 
-    const [sinceMs] = serializeSliceSpy.mock.calls[0] as [number, number];
-    expect(sinceMs).toBe(startOfTodayLocalMs());
+      expect(await store.pendingPackages()).toHaveLength(0);
+    } finally {
+      globalThis.CompressionStream = original;
+    }
   });
 
-  it('cursor in the future (clock skew / corrupt value) falls back to start of today local', async () => {
-    localStorage.setItem(CURSOR_KEY, String(Date.now() + 3_600_000));
-    serializeSliceSpy.mockResolvedValue({ payload: '', batchId: 'b', eventCount: 0, bytesRaw: 0 });
+  it('parte en varios paquetes cuando no entra en el tope de tamaño', async () => {
+    // Eventos con un campo grande e irrepetible para que el gzip no los
+    // colapse y el lote supere los 48KB.
+    for (let i = 0; i < 40; i++) {
+      store.append({
+        t: TODAY + i,
+        e: 'H',
+        m: 2,
+        u: 1,
+        st: 200,
+        dur: i,
+        s: `${i}-${randomBlob()}`,
+      } as never);
+    }
+    await flushMicrotasks();
 
-    await dispatcher.uploadPending();
+    await dispatcher.sealPending();
 
-    const [sinceMs] = serializeSliceSpy.mock.calls[0] as [number, number];
-    expect(sinceMs).toBe(startOfTodayLocalMs());
+    const packages = await store.pendingPackages();
+    expect(packages.length).toBeGreaterThan(1);
+    for (const pkg of packages) {
+      expect(pkg.payload.length).toBeLessThanOrEqual(48 * 1024);
+    }
+    // Ningún evento se perdió en el reparto.
+    const total = packages.reduce((sum, p) => sum + p.eventCount, 0);
+    expect(total).toBe(40);
   });
 
   describe('con Web Locks API disponible', () => {
-    let originalLocks: unknown;
-
-    beforeEach(() => {
-      originalLocks = (navigator as unknown as { locks?: unknown }).locks;
-    });
-
-    afterEach(() => {
-      Object.defineProperty(navigator, 'locks', {
-        value: originalLocks,
-        configurable: true,
-        writable: true,
+    it('otra pestaña con el lock tomado: no sella ni sube', async () => {
+      await seedEvents(2);
+      const sealSpy = vi.spyOn(dispatcher, 'sealPending');
+      vi.stubGlobal('navigator', {
+        ...navigator,
+        locks: { request: vi.fn().mockResolvedValue(undefined) },
       });
-    });
-
-    it('otra pestaña/tick con el lock tomado: no llama serializeSlice ni hace POST', async () => {
-      const request = vi.fn(
-        async (_name: string, _opts: { ifAvailable: boolean }, cb: (lock: null) => unknown) =>
-          cb(null),
-      );
-      Object.defineProperty(navigator, 'locks', {
-        value: { request },
-        configurable: true,
-        writable: true,
-      });
-      serializeSliceSpy.mockResolvedValue(SLICE);
 
       await dispatcher.uploadPending();
 
-      expect(request).toHaveBeenCalledWith(
-        'fiovi-audit-log-upload',
-        { ifAvailable: true },
-        expect.any(Function),
-      );
-      expect(serializeSliceSpy).not.toHaveBeenCalled();
-      httpMock.expectNone(() => true);
-    });
-
-    it('lock disponible: procede con el upload normal', async () => {
-      const request = vi.fn(
-        async (
-          _name: string,
-          _opts: { ifAvailable: boolean },
-          cb: (lock: object) => Promise<unknown>,
-        ) => cb({}),
-      );
-      Object.defineProperty(navigator, 'locks', {
-        value: { request },
-        configurable: true,
-        writable: true,
-      });
-      serializeSliceSpy.mockResolvedValue({ payload: '', batchId: 'b', eventCount: 0, bytesRaw: 0 });
-
-      await dispatcher.uploadPending();
-
-      expect(serializeSliceSpy).toHaveBeenCalled();
+      expect(sealSpy).not.toHaveBeenCalled();
+      httpMock.expectNone(URL);
+      vi.unstubAllGlobals();
     });
   });
 });
 
-// Inversa de bytesToBase64+gzip del dispatcher, con las mismas APIs browser
-// (atob + DecompressionStream) — nada de Buffer/zlib de Node.
-async function gunzipFromBase64(base64: string): Promise<string> {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-
-  const ds = new DecompressionStream('gzip');
-  const writer = ds.writable.getWriter();
-  void writer.write(bytes);
-  void writer.close();
-  const buf = await new Response(ds.readable).arrayBuffer();
-  return new TextDecoder().decode(buf);
+// Texto pseudoaleatorio de ~2KB: incompresible en la práctica, para forzar
+// que el lote supere el tope sin depender del ratio de gzip.
+function randomBlob(): string {
+  let out = '';
+  for (let i = 0; i < 2048; i++) {
+    out += String.fromCharCode(33 + Math.floor(Math.random() * 90));
+  }
+  return out;
 }

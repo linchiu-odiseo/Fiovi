@@ -200,46 +200,4 @@ describe('AuditLogStore', () => {
       expect(all.map((e) => e.t)).toEqual([TODAY_AM]);
     });
   });
-
-  // clearRange borra solo el rango [sinceMs, untilMs) — es lo que confirma
-  // una subida exitosa, y por eso no puede llevarse nada de afuera.
-  // Se aseveran con readAll y no con currentDayBatch: acá interesa el rango,
-  // no el día.
-  describe('clearRange', () => {
-    it('deletes only events within [sinceMs, untilMs)', async () => {
-      const store = TestBed.inject(AuditLogStore);
-      store.append({ t: TODAY_AM + 1000, e: 'AO', cold: 1 });
-      store.append({ t: TODAY_AM + 5000, e: 'VC', v: 1 });
-      store.append({ t: TODAY_AM + 9000, e: 'VC', v: 0 });
-      await flushMicrotasks();
-
-      await store.clearRange(TODAY_AM + 4000, TODAY_AM + 9000);
-
-      const all = await readAll(store);
-      expect(all.map((e) => e.t)).toEqual([TODAY_AM + 1000, TODAY_AM + 9000]);
-    });
-
-    it('is a no-op when no events fall inside the range', async () => {
-      const store = TestBed.inject(AuditLogStore);
-      store.append({ t: TODAY_AM + 1000, e: 'AO', cold: 1 });
-      await flushMicrotasks();
-
-      await store.clearRange(TODAY_AM + 50000, TODAY_AM + 60000);
-
-      const all = await readAll(store);
-      expect(all).toHaveLength(1);
-    });
-
-    it('excludes the event exactly at untilMs (half-open range)', async () => {
-      const store = TestBed.inject(AuditLogStore);
-      store.append({ t: TODAY_AM + 4000, e: 'VC', v: 1 });
-      store.append({ t: TODAY_AM + 10000, e: 'AO', cold: 0 });
-      await flushMicrotasks();
-
-      await store.clearRange(TODAY_AM + 4000, TODAY_AM + 10000);
-
-      const all = await readAll(store);
-      expect(all.map((e) => e.t)).toEqual([TODAY_AM + 10000]);
-    });
-  });
 });

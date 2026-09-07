@@ -25,10 +25,27 @@ import { startOfTodayLocalMs, todayLocalKey } from './day-key';
 // La telemetría es best-effort por diseño (design Decision 8).
 
 const DB_NAME = 'fiovi-audit-log';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_EVENTS = 'events';
 const STORE_META = 'meta';
+const STORE_PACKAGES = 'packages';
 const META_DAY_KEY = 'dayKey';
+
+// Un paquete sellado: el payload ya serializado y (normalmente) comprimido,
+// listo para subir, con su `batchId` definitivo.
+//
+// El id se asigna al SELLAR, no al intentar subir. Antes se generaba uno
+// nuevo en cada intento, así que un reintento mandaba los mismos eventos con
+// otro id y el dedup del back — que es por batchId — no servía de nada: un
+// POST que llegaba pero cuya respuesta se perdía terminaba en dos filas.
+export interface AuditLogPackage {
+  readonly batchId: string;
+  /** base64 de gzip, o del NDJSON crudo cuando `enc` es 'none'. */
+  readonly payload: string;
+  readonly enc: 'gzip' | 'none';
+  readonly eventCount: number;
+  readonly sealedAt: number;
+}
 
 // Techo de retención local. Un evento que no se pudo subir en una semana ya
 // no le sirve a nadie: los reclamos que esto respalda aparecen el mismo día
@@ -81,20 +98,103 @@ export class AuditLogStore {
     return this.readEvents((ev) => ev.t >= sinceMs && ev.t < untilMs);
   }
 
-  // Borra los eventos más viejos que MAX_AGE_DAYS. Público para que un test
-  // pueda dispararlo sin depender del cambio de día; en runtime lo invoca
-  // `doAppend` cuando detecta que rotó el day-key.
-  async pruneExpired(now: number = Date.now()): Promise<void> {
-    await this.deleteEvents((ev) => ev.t < now - MAX_AGE_MS);
+  // Eventos pendientes de sellar, con su clave primaria de IDB.
+  //
+  // La clave importa: al sellar borramos exactamente estos registros por id,
+  // no un rango de tiempo. Un evento que aterrice mientras se serializa o se
+  // sube simplemente no entra en este paquete y queda para el siguiente — con
+  // borrado por rango, en cambio, se lo llevaba puesto sin haberlo subido.
+  async pendingEvents(): Promise<{ key: IDBValidKey; event: AuditLogEvent }[]> {
+    try {
+      const db = await this.db();
+      return await new Promise<{ key: IDBValidKey; event: AuditLogEvent }[]>((resolve, reject) => {
+        const tx = db.transaction(STORE_EVENTS, 'readonly');
+        const req = tx.objectStore(STORE_EVENTS).openCursor();
+        const out: { key: IDBValidKey; event: AuditLogEvent }[] = [];
+        req.onsuccess = () => {
+          const cursor = req.result;
+          if (!cursor) {
+            resolve(out);
+            return;
+          }
+          out.push({ key: cursor.primaryKey, event: cursor.value as AuditLogEvent });
+          cursor.continue();
+        };
+        req.onerror = () => reject(req.error ?? new Error('IDB cursor error'));
+      });
+    } catch {
+      return [];
+    }
   }
 
-  // Puente a Fase 1 (Sub-bloque E, design.md Revision Log 2026-09-04):
-  // borra solo los eventos cuyo `t` cae en [sinceMs, untilMs) -- half-open,
-  // simetrico con AuditLogSerializer.serializeSlice. Usado por el futuro
-  // AuditLogUploadDispatcher tras confirmar 2xx de un slice subido, sin
-  // afectar eventos fuera de esa ventana (a diferencia de clearDay).
-  async clearRange(sinceMs: number, untilMs: number): Promise<void> {
-    await this.deleteEvents((ev) => ev.t >= sinceMs && ev.t < untilMs);
+  // Sella un paquete: guarda el payload listo para subir y borra en el MISMO
+  // tick de IDB los eventos que lo componen. Una sola transacción sobre los
+  // dos object stores, así que o queda todo o no queda nada — nunca un
+  // paquete sin sus eventos borrados (duplicaría) ni eventos borrados sin
+  // paquete (los perdería).
+  //
+  // La compresión NO puede ir acá adentro: una transacción de IDB se cierra
+  // sola en cuanto el microtask queue se vacía sin pedidos pendientes, y
+  // `CompressionStream` es asíncrono. Por eso el caller comprime antes y esta
+  // función solo escribe.
+  async sealPackage(pkg: AuditLogPackage, eventKeys: readonly IDBValidKey[]): Promise<void> {
+    const db = await this.db();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction([STORE_EVENTS, STORE_PACKAGES], 'readwrite');
+      tx.objectStore(STORE_PACKAGES).put(pkg);
+      const events = tx.objectStore(STORE_EVENTS);
+      for (const key of eventKeys) events.delete(key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error ?? new Error('IDB seal error'));
+      tx.onabort = () => reject(tx.error ?? new Error('IDB tx aborted'));
+    });
+  }
+
+  // Paquetes sellados esperando subida, del más viejo al más nuevo.
+  async pendingPackages(): Promise<AuditLogPackage[]> {
+    try {
+      const db = await this.db();
+      const all = await new Promise<AuditLogPackage[]>((resolve, reject) => {
+        const tx = db.transaction(STORE_PACKAGES, 'readonly');
+        const req = tx.objectStore(STORE_PACKAGES).getAll();
+        req.onsuccess = () => resolve((req.result ?? []) as AuditLogPackage[]);
+        req.onerror = () => reject(req.error ?? new Error('IDB getAll error'));
+      });
+      return all.sort((a, b) => a.sealedAt - b.sealedAt);
+    } catch {
+      return [];
+    }
+  }
+
+  // Se invoca tras un 2xx, o cuando el back rechaza el paquete de forma
+  // definitiva (un 4xx que ningún reintento va a arreglar).
+  async deletePackage(batchId: string): Promise<void> {
+    try {
+      const db = await this.db();
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE_PACKAGES, 'readwrite');
+        tx.objectStore(STORE_PACKAGES).delete(batchId);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error ?? new Error('IDB delete package error'));
+        tx.onabort = () => reject(tx.error ?? new Error('IDB tx aborted'));
+      });
+    } catch {
+      // Silencioso -- no propagamos errores de IDB.
+    }
+  }
+
+  // Borra eventos y paquetes más viejos que MAX_AGE_DAYS. Público para que un
+  // test pueda dispararlo sin depender del cambio de día; en runtime lo invoca
+  // `doAppend` cuando detecta que rotó el day-key.
+  async pruneExpired(now: number = Date.now()): Promise<void> {
+    const cutoff = now - MAX_AGE_MS;
+    await this.deleteEvents((ev) => ev.t < cutoff);
+    // Los paquetes también caducan: si no, un alumno que nunca logra subir
+    // (sin conexión crónica, alumno no vinculado en el back) los acumularía
+    // para siempre aunque sus eventos originales ya se hayan podado.
+    for (const pkg of await this.pendingPackages()) {
+      if (pkg.sealedAt < cutoff) await this.deletePackage(pkg.batchId);
+    }
   }
 
   // --- privados ---
@@ -181,6 +281,11 @@ export class AuditLogStore {
         }
         if (!db.objectStoreNames.contains(STORE_META)) {
           db.createObjectStore(STORE_META);
+        }
+        // v2. `keyPath: 'batchId'` para poder borrar el paquete por su id
+        // cuando el back lo confirma, sin tener que buscarlo antes.
+        if (!db.objectStoreNames.contains(STORE_PACKAGES)) {
+          db.createObjectStore(STORE_PACKAGES, { keyPath: 'batchId' });
         }
       };
       req.onsuccess = () => resolve(req.result);
