@@ -19,10 +19,17 @@ import { AuditLogUploadDispatcherService } from '../../../../src/L3_periphery/te
 import { AuditLogStore } from '../../../../src/L3_periphery/telemetry/audit-log-store.service';
 import { SlugStore } from '../../../../src/L3_periphery/http/slug-store';
 import { startOfTodayLocalMs } from '../../../../src/L3_periphery/telemetry/day-key';
+import { environment } from '../../../../src/environments/environment';
 
 const DB_NAME = 'fiovi-audit-log';
 const STORES = ['events', 'meta', 'packages'] as const;
-const URL = 'https://api.yangpimpollo.com/t/vonex/student/telemetry/audit-log-batch';
+// El path se arma desde `environment` — igual que en http-exams-api.spec.ts.
+// Hardcodearlo ataba el spec al `.env` de una máquina en particular: pasaba
+// en local (donde API_BASE_URL apunta al back real) y fallaba en CI, que
+// siembra `API_BASE_URL=http://localhost:2001`. El `expectOne` no matcheaba,
+// la request quedaba abierta, y el `httpMock.verify()` del afterEach tumbaba
+// además el resto del archivo con "test module already instantiated".
+const URL = `${environment.apiBaseUrl}/t/vonex/student/telemetry/audit-log-batch`;
 const TODAY = startOfTodayLocalMs() + 60_000;
 
 function wipeDb(): Promise<void> {
