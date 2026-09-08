@@ -15,7 +15,7 @@ import {
   MARKS_COUNT_TOKEN,
   SESSION_ID_TOKEN,
 } from './tokens';
-import type { HEvent, NWEvent } from './audit-log-event';
+import type { AlternativaCode, HEvent, NWEvent } from './audit-log-event';
 
 // audit-log.interceptor -- emite evento H por cada request HTTP.
 //
@@ -39,68 +39,77 @@ interface ErrorBody {
   code?: unknown;
 }
 
+// Lo que el interceptor lee del HttpContext una sola vez, al entrar. Se pasa
+// entero a los builders en vez de reenviar cinco parametros sueltos: las dos
+// ramas (respuesta y error) arman el mismo evento salvo por el status y el
+// codigo, y tener el armado en un solo lugar evita que se desincronicen
+// cuando se agregue un campo nuevo.
+interface RequestContext {
+  readonly endpointId: number;
+  readonly marksCount: number | undefined;
+  readonly sessionId: string | undefined;
+  readonly draftVersion: number | undefined;
+  readonly draftDelta: readonly [number, AlternativaCode][] | undefined;
+  readonly methodId: number;
+}
+
 export const auditLogInterceptor: HttpInterceptorFn = (req, next) => {
   const store = inject(AuditLogStore);
   const start = Date.now();
-  const endpointId = req.context.get(ENDPOINT_ID_TOKEN);
-  const marksCount = req.context.get(MARKS_COUNT_TOKEN);
-  const sessionId = req.context.get(SESSION_ID_TOKEN);
-  const draftVersion = req.context.get(DRAFT_VERSION_TOKEN);
-  const draftDelta = req.context.get(DRAFT_DELTA_TOKEN);
-  const methodId = lookupMethod(req.method);
+  const ctx: RequestContext = {
+    endpointId: req.context.get(ENDPOINT_ID_TOKEN),
+    marksCount: req.context.get(MARKS_COUNT_TOKEN),
+    sessionId: req.context.get(SESSION_ID_TOKEN),
+    draftVersion: req.context.get(DRAFT_VERSION_TOKEN),
+    draftDelta: req.context.get(DRAFT_DELTA_TOKEN),
+    methodId: lookupMethod(req.method),
+  };
 
   return next(req).pipe(
     tap((event) => {
       if (event.type !== HttpEventType.Response) return;
       const response = event as HttpResponse<unknown>;
-      const h: HEvent = {
-        t: Date.now(),
-        e: 'H',
-        m: methodId,
-        u: endpointId,
-        st: response.status,
-        dur: Date.now() - start,
-        ...(marksCount !== undefined ? { d: marksCount } : {}),
-        ...(sessionId !== undefined ? { s: sessionId } : {}),
-        ...(draftVersion !== undefined ? { v: draftVersion } : {}),
-        ...(draftDelta !== undefined ? { chg: draftDelta } : {}),
-      };
-      store.append(h);
+      store.append(buildHEvent(ctx, response.status, start));
     }),
     catchError((err: unknown) => {
       if (err instanceof HttpErrorResponse) {
-        const codeId = extractCodeId(err.error);
-        const h: HEvent = {
-          t: Date.now(),
-          e: 'H',
-          m: methodId,
-          u: endpointId,
-          st: err.status,
-          dur: Date.now() - start,
-          ...(codeId !== 0 ? { c: codeId } : {}),
-          ...(marksCount !== undefined ? { d: marksCount } : {}),
-          ...(sessionId !== undefined ? { s: sessionId } : {}),
-          ...(draftVersion !== undefined ? { v: draftVersion } : {}),
-          ...(draftDelta !== undefined ? { chg: draftDelta } : {}),
-        };
-        store.append(h);
+        store.append(buildHEvent(ctx, err.status, start, extractCodeId(err.error)));
 
         if (err.status === 0) {
           // NetworkError -- la request nunca llego al back. Se emite un NW
           // adicional para simplificar deteccion server-side.
-          const nw: NWEvent = {
-            t: Date.now(),
-            e: 'NW',
-            u: endpointId,
-            ...(sessionId !== undefined ? { s: sessionId } : {}),
-          };
-          store.append(nw);
+          store.append(buildNWEvent(ctx));
         }
       }
       return throwError(() => err);
     }),
   );
 };
+
+function buildHEvent(ctx: RequestContext, status: number, start: number, codeId = 0): HEvent {
+  return {
+    t: Date.now(),
+    e: 'H',
+    m: ctx.methodId,
+    u: ctx.endpointId,
+    st: status,
+    dur: Date.now() - start,
+    ...(codeId !== 0 ? { c: codeId } : {}),
+    ...(ctx.marksCount !== undefined ? { d: ctx.marksCount } : {}),
+    ...(ctx.sessionId !== undefined ? { s: ctx.sessionId } : {}),
+    ...(ctx.draftVersion !== undefined ? { v: ctx.draftVersion } : {}),
+    ...(ctx.draftDelta !== undefined ? { chg: ctx.draftDelta } : {}),
+  };
+}
+
+function buildNWEvent(ctx: RequestContext): NWEvent {
+  return {
+    t: Date.now(),
+    e: 'NW',
+    u: ctx.endpointId,
+    ...(ctx.sessionId !== undefined ? { s: ctx.sessionId } : {}),
+  };
+}
 
 function extractCodeId(body: unknown): number {
   if (body === null || typeof body !== 'object') return 0;

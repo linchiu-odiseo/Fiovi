@@ -308,14 +308,18 @@ function textToBase64(text: string): string {
 }
 
 // Chunking manual para no pegarle un array gigante a
-// String.fromCharCode(...bytes) (límite práctico de argumentos por call
+// String.fromCodePoint(...bytes) (límite práctico de argumentos por call
 // stack) — el payload es de pocos KB, pero es gratis hacerlo robusto.
+//
+// `fromCodePoint` y no `fromCharCode`: para los valores 0..255 de un
+// Uint8Array las dos producen exactamente el mismo string (ambas quedan en
+// el BMP, sin pares subrogados), así que el base64 resultante es idéntico.
 function bytesToBase64(bytes: Uint8Array): string {
   const CHUNK_SIZE = 8192;
   let binary = '';
   for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
     const chunk = bytes.subarray(i, i + CHUNK_SIZE);
-    binary += String.fromCharCode(...chunk);
+    binary += String.fromCodePoint(...chunk);
   }
   return btoa(binary);
 }
