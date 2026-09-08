@@ -8,9 +8,9 @@
 
 **Fiovi** es una PWA Angular para móviles que sirve como **cartilla virtual de marcaciones** para simulacros (exámenes de práctica). El alumno marca las alternativas A–E por pregunta en pantalla; el enunciado viene impreso en una hoja física que entrega el profesor. Backend: **learnex** (NestJS + Postgres, multi-tenant) en Docker. Auth via cookies HttpOnly + `withCredentials: true`.
 
-**Estado actual (2026-07-08): Fase 3 completada + admission-area cerrado. Sin change activo.**
+**Estado actual (2026-09-08): audit-log Fases 0 y 1 archivadas. Sin change activo.**
 
-Changes archivados a la fecha (en `openspec/changes/archive/`):
+Changes archivados a la fecha (en `openspec/changes/archive/`). **La lista de abajo está incompleta** — se quedó en julio mientras el archivo siguió creciendo; para el inventario real, mirar el directorio:
 
 - `2026-06-11-add-auth-login` — Fase 1: login funcional + redirect a `/home` protegido por guard.
 - `2026-06-12-cartilla-fase-2` — Fase 2: cartilla completa con grilla A–E offline-first, queue IDB, server-time-sync (sobre API-FAKE). 400/400 tests.
@@ -21,6 +21,8 @@ Changes archivados a la fecha (en `openspec/changes/archive/`):
 - `2026-06-17-fase-3-exam-submit-learnex` — Fase 3 submit de marcaciones contra learnex (cierra la migración API-FAKE → learnex).
 - `2026-06-19-draft-auto-save` — auto-save de borrador (`submit-progress-snapshot`).
 - `2026-07-08-add-admission-area` — VO AdmissionArea + picker UI + integración con envío/draft.
+- …(8 changes de julio y agosto sin listar acá: SSO, captcha de login, slug dinámico, restyle tutor, `programar-apertura`, etc.)
+- `2026-09-08-add-audit-log-local-capture` — audit-log Fase 0 (captura local en IDB + descarga NDJSON) y Fase 1 (subida a learnex en paquetes sellados con gzip y dedup por `batchId`). Capacidad nueva `audit-log-capture` en `openspec/specs/`. Par backend: learnex#1089 y #1110.
 
 **Próximos changes candidatos:** dashboard tutor real (aulas, activación de examen), resultados post-envío, historial del alumno, anti-fraude hardening. Antes de empezar cualquiera: ver workflow SDD en [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
@@ -113,7 +115,7 @@ Cada fase tiene su skill (`sdd-<fase>`). Un change vive en `openspec/changes/<na
 
 **Gate bloqueante:** durante `sdd-verify` corre el subagente `hexagonal-guard`. Si reporta violaciones duras, el change NO se puede archivar. Ver [`CONTRIBUTING.md`](./CONTRIBUTING.md#regla-3--usar-los-3-subagentes-del-proyecto-hexagonal-guard-es-bloqueante).
 
-Hoy no hay change activo (último archivado: `2026-06-19-draft-auto-save`).
+Hoy no hay change activo (último archivado: `2026-09-08-add-audit-log-local-capture`).
 
 ## Información del entorno dev
 
