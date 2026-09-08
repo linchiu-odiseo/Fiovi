@@ -232,7 +232,7 @@ function triggerDownload(content: string, filename: string): void {
   anchor.download = filename;
   document.body.appendChild(anchor);
   anchor.click();
-  document.body.removeChild(anchor);
+  anchor.remove();
   // Revoke async para dar tiempo a que el navegador procese el click.
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

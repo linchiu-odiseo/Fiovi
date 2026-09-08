@@ -270,7 +270,7 @@ export class AuditLogStore {
   private async db(): Promise<IDBDatabase> {
     if (this.dbPromise) return this.dbPromise;
     if (typeof indexedDB === 'undefined') {
-      throw new Error('IndexedDB no está disponible');
+      throw new TypeError('IndexedDB no está disponible');
     }
     this.dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
       const req = indexedDB.open(DB_NAME, DB_VERSION);

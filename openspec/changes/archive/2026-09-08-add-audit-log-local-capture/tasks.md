@@ -277,10 +277,12 @@ Hecha con el navegador sobre la app real, no solo con tests:
 
 ### Pendiente
 
-- [ ] H.35 El envío AUTOMÁTICO no se verificó en vivo: depende de
-      `AUDIT_LOG_UPLOAD_ENABLED`, que gatea el arranque del scheduler. La
-      cañería está probada (Soporte usa el mismo `uploadPending`); falta ver
-      el gatillo — reloj de 5h, jitter, re-sorteo y supresión en examen.
-      Cubierto por 13 tests unitarios.
-- [ ] H.36 Load test acotado del endpoint antes de prender el flag en prod.
+- [ ] H.35 El envío AUTOMÁTICO no se verificó en vivo. La cañería está probada
+      (Soporte usa el mismo `uploadPending`); falta ver el gatillo — reloj de
+      5h, jitter, re-sorteo y supresión en examen. Cubierto por 13 tests
+      unitarios. `AUDIT_LOG_UPLOAD_ENABLED` se eliminó: sólo gateaba este
+      arranque, no el camino manual de Soporte, así que apagaba la mitad de lo
+      que decía apagar. El scheduler arranca siempre y el rollout lo gobierna
+      la promoción de ramas.
+- [ ] H.36 Load test acotado del endpoint antes de promover a `main`.
 - [ ] H.37 Confirmar que "Descargar logs" no aparece en un build de producción.

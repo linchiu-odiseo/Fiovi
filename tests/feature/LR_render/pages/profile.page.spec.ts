@@ -6,10 +6,11 @@
 // "Descargar logs" —que baja el archivo crudo— no llegue nunca a producción.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { TestBed } from '@angular/core/testing';
+import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Component } from '@angular/core';
 import { ProfilePage } from '../../../../src/LR_render/pages/profile/profile.page';
+import { Identity, type Role } from '../../../../src/L1_domain/entities/identity';
 import { GetIdentityUseCase } from '../../../../src/L2_application/use-cases/get-identity.use-case';
 import { GetProfileUseCase } from '../../../../src/L2_application/use-cases/get-profile.use-case';
 import { LogoutUseCase } from '../../../../src/L2_application/use-cases/logout.use-case';
@@ -233,5 +234,39 @@ describe('ProfilePage — Soporte', () => {
     // sale del .env de la VM de prod, que desde el repo no se puede verificar.
     const page = createPage() as unknown as { showDownloadLogs: boolean };
     expect(page.showDownloadLogs).toBe(!environment.production);
+  });
+
+  // El botón sube a `/t/{slug}/student/telemetry/audit-log-batch`, y learnex
+  // responde 404 a quien no sea alumno vinculado. Mostrárselo al tutor sería
+  // ofrecerle una acción que sólo puede terminar en el error del modal.
+  describe('visibilidad por rol', () => {
+    async function renderAs(role: Role): Promise<ComponentFixture<ProfilePage>> {
+      TestBed.overrideProvider(GetIdentityUseCase, {
+        useValue: {
+          execute: vi
+            .fn()
+            .mockResolvedValue(
+              new Identity('u-1', 't-1', 'slug-de-test', 'alumno@test.pe', null, [], role, 0),
+            ),
+        },
+      });
+      const fixture = TestBed.createComponent(ProfilePage);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      return fixture;
+    }
+
+    function soporteLink(fixture: ComponentFixture<ProfilePage>): Element | null {
+      return fixture.nativeElement.querySelector('[data-testid="soporte-link"]');
+    }
+
+    it('el alumno ve "Soporte"', async () => {
+      expect(soporteLink(await renderAs('student'))).not.toBeNull();
+    });
+
+    it('el tutor no ve "Soporte"', async () => {
+      expect(soporteLink(await renderAs('tutor'))).toBeNull();
+    });
   });
 });

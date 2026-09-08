@@ -94,7 +94,7 @@ describe('AuditLogSerializer.downloadCurrentDay', () => {
   let createUrlSpy: ReturnType<typeof vi.spyOn>;
   let createElementSpy: ReturnType<typeof vi.spyOn>;
   let appendChildSpy: ReturnType<typeof vi.spyOn>;
-  let removeChildSpy: ReturnType<typeof vi.spyOn>;
+  let anchorRemoveSpy: ReturnType<typeof vi.fn>;
   let fakeAnchor: HTMLAnchorElement;
 
   beforeEach(async () => {
@@ -104,17 +104,18 @@ describe('AuditLogSerializer.downloadCurrentDay', () => {
       /* noop */
     });
     anchorClickSpy = vi.fn();
+    anchorRemoveSpy = vi.fn();
     fakeAnchor = {
       href: '',
       download: '',
       click: anchorClickSpy,
+      remove: anchorRemoveSpy,
     } as unknown as HTMLAnchorElement;
     createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
       if (tag === 'a') return fakeAnchor;
       return {} as HTMLElement;
     });
     appendChildSpy = vi.spyOn(document.body, 'appendChild').mockImplementation((n: Node) => n);
-    removeChildSpy = vi.spyOn(document.body, 'removeChild').mockImplementation((n: Node) => n);
     createUrlSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock-url');
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {
       /* noop */
@@ -153,7 +154,9 @@ describe('AuditLogSerializer.downloadCurrentDay', () => {
     expect(fakeAnchor.href).toBe('blob:mock-url');
     expect(anchorClickSpy).toHaveBeenCalledTimes(1);
     expect(appendChildSpy).toHaveBeenCalled();
-    expect(removeChildSpy).toHaveBeenCalled();
+    // El anchor se desmonta con `anchor.remove()` (no `body.removeChild`):
+    // no queda basura en el DOM tras la descarga.
+    expect(anchorRemoveSpy).toHaveBeenCalledTimes(1);
   });
 });
 
