@@ -102,14 +102,25 @@
       </li>
     }
 
-    <li>
-      <button type="button" class="menu-item" (click)="onSoporteClick()" data-testid="soporte-link">
-        <span class="material-symbols-outlined menu-item__icon" aria-hidden="true"
-          >support_agent</span
+    <!-- Sólo alumno: el endpoint que alimenta este botón es
+         `/t/{slug}/student/telemetry/audit-log-batch` y learnex responde 404 a
+         quien no sea alumno vinculado. Un tutor apretándolo sólo consigue el
+         estado de error del modal, siempre. -->
+    @if (role() === 'student') {
+      <li>
+        <button
+          type="button"
+          class="menu-item"
+          (click)="onSoporteClick()"
+          data-testid="soporte-link"
         >
-        <span class="menu-item__label">Soporte</span>
-      </button>
-    </li>
+          <span class="material-symbols-outlined menu-item__icon" aria-hidden="true"
+            >support_agent</span
+          >
+          <span class="menu-item__label">Soporte</span>
+        </button>
+      </li>
+    }
   </ul>
 
   <footer class="profile__footer">

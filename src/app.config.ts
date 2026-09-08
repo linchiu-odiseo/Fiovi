@@ -527,14 +527,16 @@ export const appConfig: ApplicationConfig = {
     // un flush al ocultarse la app; se calla mientras hay un examen en curso.
     // Ver audit-log-upload-scheduler.service.ts.
     //
-    // Apagado por defecto (AUDIT_LOG_UPLOAD_ENABLED=false) hasta que learnex
-    // tenga desplegado POST /t/{slug}/student/telemetry/audit-log-batch. Con
-    // el flag en false no se instancia timer ni tráfico — mismo criterio que
-    // DraftAutoSaveDispatcher.
+    // Sin flag de entorno a propósito. El que existía sólo apagaba ESTE
+    // arranque: el botón "Soporte" de /profile llama `flushNow()` directo
+    // sobre el scheduler, así que con el flag en false la app POSTeaba igual
+    // por el camino manual y lo único muerto era el ciclo periódico. Un flag
+    // que apaga la mitad de lo que dice apagar miente más de lo que protege.
+    // El rollout lo gobierna el pipeline de ramas: esto llega a prod cuando
+    // se promueve, y para entonces learnex ya tiene desplegado
+    // POST /t/{slug}/student/telemetry/audit-log-batch (odiseo-peru/learnex#1089).
     provideAppInitializer(() => {
-      if (environment.auditLogUploadEnabled) {
-        inject(AuditLogUploadScheduler).start();
-      }
+      inject(AuditLogUploadScheduler).start();
     }),
   ],
 };
