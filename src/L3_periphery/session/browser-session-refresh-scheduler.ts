@@ -1,5 +1,7 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { SessionRefreshScheduler } from '../../L1_domain/ports/session-refresh-scheduler';
+import { Clock } from '../../L1_domain/ports/clock';
+import { CLOCK } from '../../app.config';
 
 /**
  * Ventana antes de `expiresAt` para disparar el refresh proactivo. 60s cubre
@@ -30,6 +32,7 @@ const REFRESH_LEAD_TIME_MS = 60_000;
  */
 @Injectable({ providedIn: 'root' })
 export class BrowserSessionRefreshScheduler implements SessionRefreshScheduler {
+  private readonly clock = inject<Clock>(CLOCK);
   private timerHandle: ReturnType<typeof setTimeout> | null = null;
   private handler: (() => Promise<void>) | null = null;
 
@@ -44,7 +47,10 @@ export class BrowserSessionRefreshScheduler implements SessionRefreshScheduler {
     // Esto sucede al arrancar la app con una identity persistida cuya cookie
     // estuvo hibernando (device dormido); queremos refresh inmediato pero no
     // sincrono, para no cargar al bootstrap.
-    const delayMs = Math.max(0, expiresAt - Date.now() - REFRESH_LEAD_TIME_MS);
+    // Usa el Clock server-anchored (no el reloj crudo del sistema) — un
+    // reloj local desviado no debe producir un delayMs artificial de 0 ni
+    // uno inflado.
+    const delayMs = Math.max(0, expiresAt - this.clock.now().getTime() - REFRESH_LEAD_TIME_MS);
     this.timerHandle = setTimeout(() => {
       this.timerHandle = null;
       void this.trigger();
