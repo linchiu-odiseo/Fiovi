@@ -190,7 +190,17 @@ export const appConfig: ApplicationConfig = {
         getProfile: GetProfileUseCase,
         pwaCookieMode: PwaCookieModeStore,
         refreshScheduler: SessionRefreshScheduler,
-      ) => new LoginUseCase(repo, storage, slugCache, getProfile, pwaCookieMode, refreshScheduler),
+        clock: Clock,
+      ) =>
+        new LoginUseCase(
+          repo,
+          storage,
+          slugCache,
+          getProfile,
+          pwaCookieMode,
+          refreshScheduler,
+          clock,
+        ),
       deps: [
         AUTH_REPOSITORY,
         IDENTITY_STORAGE,
@@ -198,6 +208,7 @@ export const appConfig: ApplicationConfig = {
         GetProfileUseCase,
         PWA_COOKIE_MODE_STORE,
         SESSION_REFRESH_SCHEDULER,
+        CLOCK,
       ],
     },
     {
@@ -209,6 +220,7 @@ export const appConfig: ApplicationConfig = {
         getProfile: GetProfileUseCase,
         pwaCookieMode: PwaCookieModeStore,
         refreshScheduler: SessionRefreshScheduler,
+        clock: Clock,
       ) =>
         new SelectTenantUseCase(
           repo,
@@ -217,6 +229,7 @@ export const appConfig: ApplicationConfig = {
           getProfile,
           pwaCookieMode,
           refreshScheduler,
+          clock,
         ),
       deps: [
         AUTH_REPOSITORY,
@@ -225,6 +238,7 @@ export const appConfig: ApplicationConfig = {
         GetProfileUseCase,
         PWA_COOKIE_MODE_STORE,
         SESSION_REFRESH_SCHEDULER,
+        CLOCK,
       ],
     },
     {
@@ -264,8 +278,9 @@ export const appConfig: ApplicationConfig = {
     },
     {
       provide: GetIdentityUseCase,
-      useFactory: (storage: IdentityStorage) => new GetIdentityUseCase(storage, () => Date.now()),
-      deps: [IDENTITY_STORAGE],
+      useFactory: (storage: IdentityStorage, clock: Clock) =>
+        new GetIdentityUseCase(storage, clock),
+      deps: [IDENTITY_STORAGE, CLOCK],
     },
     {
       provide: RefreshIdentityUseCase,
@@ -275,13 +290,15 @@ export const appConfig: ApplicationConfig = {
         slugCache: TenantSlugCache,
         logout: LogoutUseCase,
         refreshScheduler: SessionRefreshScheduler,
-      ) => new RefreshIdentityUseCase(repo, storage, slugCache, logout, refreshScheduler),
+        clock: Clock,
+      ) => new RefreshIdentityUseCase(repo, storage, slugCache, logout, refreshScheduler, clock),
       deps: [
         AUTH_REPOSITORY,
         IDENTITY_STORAGE,
         TENANT_SLUG_CACHE,
         LogoutUseCase,
         SESSION_REFRESH_SCHEDULER,
+        CLOCK,
       ],
     },
     {
@@ -292,13 +309,16 @@ export const appConfig: ApplicationConfig = {
         slugCache: TenantSlugCache,
         getProfile: GetProfileUseCase,
         refreshScheduler: SessionRefreshScheduler,
-      ) => new InitializeSessionUseCase(repo, storage, slugCache, getProfile, refreshScheduler),
+        clock: Clock,
+      ) =>
+        new InitializeSessionUseCase(repo, storage, slugCache, getProfile, refreshScheduler, clock),
       deps: [
         AUTH_REPOSITORY,
         IDENTITY_STORAGE,
         TENANT_SLUG_CACHE,
         GetProfileUseCase,
         SESSION_REFRESH_SCHEDULER,
+        CLOCK,
       ],
     },
     {
