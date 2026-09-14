@@ -5,7 +5,7 @@
       <ol class="steps">
         <li>
           <span class="material-symbols-outlined steps__icon" aria-hidden="true">ios_share</span>
-          <span>Toca el botón <strong>Compartir</strong> en la barra de abajo</span>
+          <span>Toca el botón <strong>Compartir</strong></span>
         </li>
         <li>
           <span class="material-symbols-outlined steps__icon" aria-hidden="true">add_box</span>
@@ -17,22 +17,27 @@
         </li>
       </ol>
       <p class="modal__hint">
-        Asegúrate de tener Fiovi abierta en Safari — otros navegadores del iPhone no permiten
-        instalar.
+        Si ya la instalaste, ábrela desde el ícono en tu pantalla de inicio.
       </p>
     }
-    @case ('iosOtherBrowser') {
-      <h2 id="install-modal-title" class="modal__title">Abre Fiovi en Safari</h2>
-      <p class="modal__explain">
-        Los otros navegadores del iPhone no permiten instalar apps en la pantalla de inicio. Copia
-        el enlace y ábrelo en Safari para instalar Fiovi.
+    @case ('androidInstructions') {
+      <h2 id="install-modal-title" class="modal__title">Instala Fiovi en tu Android</h2>
+      <ol class="steps">
+        <li>
+          <span class="material-symbols-outlined steps__icon" aria-hidden="true">more_vert</span>
+          <span>Toca el menú <strong>⋮</strong> de Chrome, arriba a la derecha</span>
+        </li>
+        <li>
+          <span class="material-symbols-outlined steps__icon" aria-hidden="true">install_mobile</span>
+          <span
+            >Toca <strong>Instalar aplicación</strong>. Si en su lugar dice
+            <strong>Abrir aplicación</strong>, ya la tienes instalada — tócalo y listo.</span
+          >
+        </li>
+      </ol>
+      <p class="modal__hint">
+        Si ya la instalaste, ábrela desde el ícono en tu pantalla de inicio.
       </p>
-      <div class="url-box">
-        <code class="url-box__url">{{ currentUrl }}</code>
-        <button type="button" class="url-box__btn" (click)="onCopyUrl()">
-          {{ copied() ? 'Copiado ✓' : 'Copiar' }}
-        </button>
-      </div>
     }
     @case ('webviewFallback') {
       <h2 id="install-modal-title" class="modal__title">Abre en tu navegador</h2>

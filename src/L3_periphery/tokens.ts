@@ -2,7 +2,6 @@ import { InjectionToken } from '@angular/core';
 import { CaptchaProvider } from '../L1_domain/ports/captcha-provider';
 import { IdentityStorage } from '../L1_domain/ports/identity-storage';
 import { InstallEnvironmentProbe } from '../L1_domain/ports/install-environment-probe';
-import { InstallPromptStore } from '../L1_domain/ports/install-prompt-store';
 import { NativeInstallPrompt } from '../L1_domain/ports/native-install-prompt';
 import { ProfileStorage } from '../L1_domain/ports/profile-storage';
 import { OutboxStoragePort } from '../L1_domain/ports/outbox-storage.port';
@@ -60,14 +59,12 @@ export const SESSION_REFRESH_SCHEDULER = new InjectionToken<SessionRefreshSchedu
   'SessionRefreshScheduler',
 );
 
-// Tokens del card "Instala Fiovi como app" del /home. Los tres colaboran para
+// Tokens del card "Instala Fiovi como app" del /home. Ambos colaboran para
 // que el `DecideInstallCardStateUseCase` (L2) decida qué modalidad mostrar:
 //   - `INSTALL_ENV_PROBE`: capabilities del entorno (standalone, mobile, platform).
-//   - `INSTALL_PROMPT_STORE`: persistencia (visitCount, dismissedAt, installed).
 //   - `NATIVE_INSTALL_PROMPT`: wrapper del evento `beforeinstallprompt` de Chromium.
 // Bindings concretos y wiring del use case en `app.config.ts`.
 export const INSTALL_ENV_PROBE = new InjectionToken<InstallEnvironmentProbe>(
   'InstallEnvironmentProbe',
 );
-export const INSTALL_PROMPT_STORE = new InjectionToken<InstallPromptStore>('InstallPromptStore');
 export const NATIVE_INSTALL_PROMPT = new InjectionToken<NativeInstallPrompt>('NativeInstallPrompt');

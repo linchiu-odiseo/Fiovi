@@ -11,7 +11,6 @@ import { PwaUpdateService } from '../../../../../src/L3_periphery/pwa/pwa-update
 import { PendingUpdate } from '../../../../../src/L3_periphery/pwa/pwa-update.types';
 import { environment } from '../../../../../src/environments/environment';
 import { CLOCK, MARKINGS_STORAGE } from '../../../../../src/app.config';
-import { INSTALL_PROMPT_STORE } from '../../../../../src/L3_periphery/tokens';
 import { BeforeInstallPromptAdapter } from '../../../../../src/L3_periphery/pwa/before-install-prompt.adapter';
 import { DecideInstallCardStateUseCase } from '../../../../../src/L2_application/use-cases/decide-install-card-state.use-case';
 import { Identity, Role } from '../../../../../src/L1_domain/entities/identity';
@@ -290,13 +289,6 @@ describe('HomePage', () => {
             isAvailable: () => false,
             trigger: async () => 'unavailable' as const,
             start: () => undefined,
-          },
-        },
-        {
-          provide: INSTALL_PROMPT_STORE,
-          useValue: {
-            isMarkedInstalled: () => false,
-            markInstalled: () => undefined,
           },
         },
       ],

@@ -1,8 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { BeforeInstallPromptAdapter } from '../../../../src/L3_periphery/pwa/before-install-prompt.adapter';
-import { INSTALL_PROMPT_STORE } from '../../../../src/L3_periphery/tokens';
-import { FakeInstallPromptStore } from '../../../unit/fixtures/install-prompt-store.fake';
 
 // Helper para simular el evento `beforeinstallprompt` con el shape que
 // espera el adapter (prompt() + userChoice).
@@ -18,12 +16,10 @@ function makeBeforeInstallEvent(outcome: 'accepted' | 'dismissed'): Event {
 
 describe('BeforeInstallPromptAdapter', () => {
   let adapter: BeforeInstallPromptAdapter;
-  let store: FakeInstallPromptStore;
 
   beforeEach(() => {
-    store = new FakeInstallPromptStore();
     TestBed.configureTestingModule({
-      providers: [BeforeInstallPromptAdapter, { provide: INSTALL_PROMPT_STORE, useValue: store }],
+      providers: [BeforeInstallPromptAdapter],
     });
     adapter = TestBed.inject(BeforeInstallPromptAdapter);
   });
@@ -74,15 +70,20 @@ describe('BeforeInstallPromptAdapter', () => {
     expect(adapter.available()).toBe(false);
   });
 
-  it('evento `appinstalled` marca el flag permanent en el store', () => {
+  it('evento `appinstalled` limpia el latch: available flippa a false y trigger() queda unavailable', async () => {
     adapter.start();
     // Primero captamos un beforeinstallprompt para tener el latch.
     window.dispatchEvent(makeBeforeInstallEvent('accepted'));
     expect(adapter.available()).toBe(true);
-    // Ahora disparamos appinstalled — flag permanente + limpieza del latch.
+    // El evento `appinstalled` puede llegar sin que el user haya usado
+    // nuestro botón (instaló desde el menú del browser) — el evento
+    // `beforeinstallprompt` ya es stale de cualquier forma.
     window.dispatchEvent(new Event('appinstalled'));
-    expect(store.isMarkedInstalled()).toBe(true);
     expect(adapter.available()).toBe(false);
+    // Prueba de que `deferredPrompt` quedó en null: un trigger() posterior
+    // no puede lanzar el diálogo sobre un evento consumido.
+    const outcome = await adapter.trigger();
+    expect(outcome).toBe('unavailable');
   });
 
   it('trigger() maneja rejection de prompt() sin propagar y devuelve unavailable', async () => {

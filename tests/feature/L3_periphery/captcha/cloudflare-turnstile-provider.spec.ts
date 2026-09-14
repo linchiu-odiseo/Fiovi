@@ -23,10 +23,12 @@ import { environment } from '../../../../src/environments/environment';
 interface MutableEnv {
   captchaProvider: string;
   captchaSiteKey: string;
+  devTools: boolean;
 }
 const originalEnv = {
   captchaProvider: environment.captchaProvider,
   captchaSiteKey: environment.captchaSiteKey,
+  devTools: environment.devTools,
 };
 
 // Restaura `window.turnstile` y quita cualquier <script> insertado entre tests.
@@ -51,6 +53,10 @@ describe('CloudflareTurnstileProvider', () => {
   beforeEach(() => {
     (environment as MutableEnv).captchaProvider = 'turnstile';
     (environment as MutableEnv).captchaSiteKey = 'test-site-key';
+    // `isEnabled()` corta en seco si `devTools` esta activo
+    // (cloudflare-turnstile-provider.ts:38). Sin fijarlo aca, la suite hereda
+    // el DEV_TOOLS del `.env` de cada maquina y da rojo solo en algunas.
+    (environment as MutableEnv).devTools = false;
     cleanupDom();
     provider = new CloudflareTurnstileProvider();
   });
@@ -59,6 +65,7 @@ describe('CloudflareTurnstileProvider', () => {
     cleanupDom();
     (environment as MutableEnv).captchaProvider = originalEnv.captchaProvider;
     (environment as MutableEnv).captchaSiteKey = originalEnv.captchaSiteKey;
+    (environment as MutableEnv).devTools = originalEnv.devTools;
   });
 
   describe('isEnabled', () => {
