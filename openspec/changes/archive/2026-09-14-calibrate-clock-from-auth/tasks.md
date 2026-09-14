@@ -206,12 +206,11 @@ Compiler-driven: every factory touched in Phase 4 now requires a `Clock` argumen
 - [x] 8.4 `npm run format:check` clean (or only the known pre-existing CRLF-illusion noise — see
   `docs/` guidance on `core.autocrlf`; verify via `git diff --shortstat` on any files this change
   did not touch before assuming a warning is pre-existing).
-- [ ] 8.5 **`hexagonal-guard` subagent** (blocking gate per `CONTRIBUTING.md` rule #3) — run
-  during `sdd-verify`, not by `sdd-apply`. Expect no findings: `AuthSession` is a plain L1 VO
-  with zero behavior (same shape as `SelectionChallenge`); no new mapper duplicates an existing
-  DTO↔entity shape; `BrowserSessionRefreshScheduler`'s new `CLOCK` import from `app.config.ts`
-  mirrors an already-accepted `LR_render` pattern (see design.md D4) — confirm the guard does
-  not flag it as a new violation class.
+- [x] 8.5 **`hexagonal-guard` subagent** (blocking gate per `CONTRIBUTING.md` rule #3) — run
+  during `sdd-verify`, not by `sdd-apply`. DONE: Hexagonal-guard approved with no critical violations.
+  `AuthSession` is a plain L1 VO (same shape as `SelectionChallenge`); no new mapper violations;
+  `BrowserSessionRefreshScheduler`'s `CLOCK` import from `app.config.ts` matches the
+  pre-existing accepted pattern (`envio-retry-dispatcher.service.ts` + `CONNECTIVITY`).
 
 ## PR
 
@@ -219,3 +218,4 @@ Compiler-driven: every factory touched in Phase 4 now requires a `Clock` argumen
   ~16 files sits at the edge of the 400-line review budget — if the actual diff comes in over
   400, split by layer (L1+L3 adapter+fixture in PR #1, L2 use cases+scheduler+wiring in PR #2)
   rather than force a same-PR squeeze; confirm with `git diff --stat` before opening.
+  **Note: PR will be opened by orchestrator after archive is complete.**

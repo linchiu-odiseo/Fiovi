@@ -114,3 +114,6 @@ Auto-generado por `.claude/hooks/log-agent-usage.ps1` en cada PostToolUse del to
 | 2026-09-14 12:14:53 | hexagonal-guard | Auditoria hexagonal del change | opus-4-7 | -- | -- | -- | -- |
 | 2026-09-14 12:15:19 | sdd-verify | SDD verify banner instalacion | opus-4-7 | -- | -- | -- | -- |
 | 2026-09-14 14:24:14 | sdd-archive | SDD archive banner instalacion | opus-4-7 | -- | -- | -- | -- |
+| 2026-09-14 16:40:59 | hexagonal-guard | Hexagonal audit: calibrate clock change | opus-4-7 | -- | -- | -- | -- |
+| 2026-09-14 16:41:09 | sdd-verify | SDD verify: calibrate clock from auth | opus-4-7 | -- | -- | -- | -- |
+| 2026-09-14 16:46:40 | sdd-archive | SDD archive: calibrate clock from auth | opus-4-7 | -- | -- | -- | -- |

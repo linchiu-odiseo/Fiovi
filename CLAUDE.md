@@ -8,7 +8,7 @@
 
 **Fiovi** es una PWA Angular para móviles que sirve como **cartilla virtual de marcaciones** para simulacros (exámenes de práctica). El alumno marca las alternativas A–E por pregunta en pantalla; el enunciado viene impreso en una hoja física que entrega el profesor. Backend: **learnex** (NestJS + Postgres, multi-tenant) en Docker. Auth via cookies HttpOnly + `withCredentials: true`.
 
-**Estado actual (2026-09-08): audit-log Fases 0 y 1 archivadas. Sin change activo.**
+**Estado actual (2026-09-14): calibrate-clock-from-auth archivado. Sin change activo.**
 
 Changes archivados a la fecha (en `openspec/changes/archive/`). **La lista de abajo está incompleta** — se quedó en julio mientras el archivo siguió creciendo; para el inventario real, mirar el directorio:
 
@@ -23,6 +23,7 @@ Changes archivados a la fecha (en `openspec/changes/archive/`). **La lista de ab
 - `2026-07-08-add-admission-area` — VO AdmissionArea + picker UI + integración con envío/draft.
 - …(8 changes de julio y agosto sin listar acá: SSO, captcha de login, slug dinámico, restyle tutor, `programar-apertura`, etc.)
 - `2026-09-08-add-audit-log-local-capture` — audit-log Fase 0 (captura local en IDB + descarga NDJSON) y Fase 1 (subida a learnex en paquetes sellados con gzip y dedup por `batchId`). Capacidad nueva `audit-log-capture` en `openspec/specs/`. Par backend: learnex#1089 y #1110.
+- `2026-09-14-calibrate-clock-from-auth` — Fix para reloj local desviado en login/session-expiry: `AuthSession` VO + calibración de `Clock` desde `serverTime` en auth responses; `GetIdentityUseCase` y `BrowserSessionRefreshScheduler` ahora usan `Clock` port. Par learnex: PR agregando `serverTime` a `/auth/login`, `/auth/select-tenant`, `/auth/refresh`, `/auth/me`.
 
 **Próximos changes candidatos:** dashboard tutor real (aulas, activación de examen), resultados post-envío, historial del alumno, anti-fraude hardening. Antes de empezar cualquiera: ver workflow SDD en [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
@@ -115,7 +116,7 @@ Cada fase tiene su skill (`sdd-<fase>`). Un change vive en `openspec/changes/<na
 
 **Gate bloqueante:** durante `sdd-verify` corre el subagente `hexagonal-guard`. Si reporta violaciones duras, el change NO se puede archivar. Ver [`CONTRIBUTING.md`](./CONTRIBUTING.md#regla-3--usar-los-3-subagentes-del-proyecto-hexagonal-guard-es-bloqueante).
 
-Hoy no hay change activo (último archivado: `2026-09-08-add-audit-log-local-capture`).
+Hoy no hay change activo (último archivado: `2026-09-14-calibrate-clock-from-auth`).
 
 ## Información del entorno dev
 
