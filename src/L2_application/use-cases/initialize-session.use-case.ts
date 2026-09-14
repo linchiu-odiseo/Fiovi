@@ -1,4 +1,5 @@
 import { AuthRepository } from '../../L1_domain/ports/auth-repository';
+import { Clock } from '../../L1_domain/ports/clock';
 import { IdentityStorage } from '../../L1_domain/ports/identity-storage';
 import { SessionRefreshScheduler } from '../../L1_domain/ports/session-refresh-scheduler';
 import { TenantSlugCache } from '../../L1_domain/ports/tenant-slug-cache';
@@ -32,6 +33,7 @@ export class InitializeSessionUseCase {
     private readonly slugCache: TenantSlugCache,
     private readonly getProfile: GetProfileUseCase,
     private readonly refreshScheduler: SessionRefreshScheduler,
+    private readonly clock: Clock,
   ) {}
 
   async execute(): Promise<Identity | null> {
@@ -46,7 +48,8 @@ export class InitializeSessionUseCase {
     }
 
     try {
-      const identity = await this.authRepo.me();
+      const { identity, serverTime } = await this.authRepo.me();
+      if (serverTime) this.clock.setServerTime(serverTime);
       await this.identityStorage.write(identity);
       this.slugCache.set(identity.tenantSlug);
       // Al arrancar la app con sesion viva, agenda el proximo refresh proactivo.

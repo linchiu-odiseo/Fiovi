@@ -1,4 +1,5 @@
 import { AuthRepository } from '../../L1_domain/ports/auth-repository';
+import { Clock } from '../../L1_domain/ports/clock';
 import { IdentityStorage } from '../../L1_domain/ports/identity-storage';
 import { SessionRefreshScheduler } from '../../L1_domain/ports/session-refresh-scheduler';
 import { TenantSlugCache } from '../../L1_domain/ports/tenant-slug-cache';
@@ -26,11 +27,13 @@ export class RefreshIdentityUseCase {
     private readonly slugCache: TenantSlugCache,
     private readonly logout: LogoutUseCase,
     private readonly refreshScheduler: SessionRefreshScheduler,
+    private readonly clock: Clock,
   ) {}
 
   async execute(): Promise<Identity> {
     try {
-      const identity = await this.authRepo.refresh();
+      const { identity, serverTime } = await this.authRepo.refresh();
+      if (serverTime) this.clock.setServerTime(serverTime);
       await this.identityStorage.write(identity);
       this.slugCache.set(identity.tenantSlug);
       this.refreshScheduler.schedule(identity.expiresAt);

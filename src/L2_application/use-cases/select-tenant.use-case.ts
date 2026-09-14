@@ -1,4 +1,5 @@
 import { AuthRepository } from '../../L1_domain/ports/auth-repository';
+import { Clock } from '../../L1_domain/ports/clock';
 import { IdentityStorage } from '../../L1_domain/ports/identity-storage';
 import { PwaCookieModeStore } from '../../L1_domain/ports/pwa-cookie-mode-store';
 import { SessionRefreshScheduler } from '../../L1_domain/ports/session-refresh-scheduler';
@@ -29,10 +30,12 @@ export class SelectTenantUseCase {
     private readonly getProfile: GetProfileUseCase,
     private readonly pwaCookieMode: PwaCookieModeStore,
     private readonly refreshScheduler: SessionRefreshScheduler,
+    private readonly clock: Clock,
   ) {}
 
   async execute(input: { selectionToken: string; slug: string }): Promise<Identity> {
-    const identity = await this.authRepo.selectTenant(input);
+    const { identity, serverTime } = await this.authRepo.selectTenant(input);
+    if (serverTime) this.clock.setServerTime(serverTime);
     await this.identityStorage.write(identity);
     this.slugCache.set(identity.tenantSlug);
     // Backend acaba de setear cookies pwa (interceptor mandó el header en
