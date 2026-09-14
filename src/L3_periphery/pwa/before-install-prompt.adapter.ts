@@ -1,11 +1,9 @@
-import { Injectable, Signal, inject, signal } from '@angular/core';
+import { Injectable, Signal, signal } from '@angular/core';
 
-import { InstallPromptStore } from '../../L1_domain/ports/install-prompt-store';
 import {
   NativeInstallOutcome,
   NativeInstallPrompt,
 } from '../../L1_domain/ports/native-install-prompt';
-import { INSTALL_PROMPT_STORE } from '../tokens';
 
 // Shape del evento `beforeinstallprompt` de Chromium. No hay tipo estándar
 // en lib.dom.d.ts porque el spec sigue "informal". Declaramos lo mínimo
@@ -29,12 +27,13 @@ type BeforeInstallPromptEventLike = Event & {
 //
 // Sobre `appinstalled`: se dispara UNA vez cuando el user instala por
 // cualquier vía (nuestro botón o el menú del navegador). Al recibirlo
-// marcamos el flag permanent en el store → el use case cae en el
-// early-return `isMarkedInstalled()` y el card no vuelve a aparecer.
+// limpiamos el latch del evento nativo — es de un solo uso y ya quedó
+// stale — y reseteamos `available` para que el view-model deje de
+// ofrecer el diálogo nativo. No hay persistencia de "ya instalado": el
+// card sigue tentando en la próxima visita por browser (ver
+// `DecideInstallCardStateUseCase`).
 @Injectable({ providedIn: 'root' })
 export class BeforeInstallPromptAdapter implements NativeInstallPrompt {
-  private readonly store = inject<InstallPromptStore>(INSTALL_PROMPT_STORE);
-
   private readonly availableSignal = signal(false);
 
   // Signal público read-only para consumidores LR. NO forma parte de la
@@ -51,7 +50,6 @@ export class BeforeInstallPromptAdapter implements NativeInstallPrompt {
   };
 
   private readonly onAppInstalled = (): void => {
-    this.store.markInstalled();
     this.deferredPrompt = null;
     this.availableSignal.set(false);
   };

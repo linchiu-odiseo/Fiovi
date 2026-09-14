@@ -18,7 +18,6 @@ import { AuthRepository } from './L1_domain/ports/auth-repository';
 import { Clock } from './L1_domain/ports/clock';
 import { Connectivity } from './L1_domain/ports/connectivity';
 import { InstallEnvironmentProbe } from './L1_domain/ports/install-environment-probe';
-import { InstallPromptStore } from './L1_domain/ports/install-prompt-store';
 import { MarkingsStorage } from './L1_domain/ports/markings-storage';
 import { ExamsApi } from './L1_domain/ports/exams-api';
 import { IdentityStorage } from './L1_domain/ports/identity-storage';
@@ -77,14 +76,12 @@ import { AuditLogUploadScheduler } from './L3_periphery/telemetry/audit-log-uplo
 import { BeforeInstallPromptAdapter } from './L3_periphery/pwa/before-install-prompt.adapter';
 import { BrowserInstallEnvironmentProbe } from './L3_periphery/pwa/browser-install-environment-probe';
 import { PwaUpdateService } from './L3_periphery/pwa/pwa-update.service';
-import { LocalStorageInstallPromptStore } from './L3_periphery/storage/local-storage-install-prompt-store';
 import { SlugStore } from './L3_periphery/http/slug-store';
 import { SsoCallbackBootstrap } from './L3_periphery/http/sso-callback-bootstrap';
 import {
   CAPTCHA_PROVIDER,
   IDENTITY_STORAGE,
   INSTALL_ENV_PROBE,
-  INSTALL_PROMPT_STORE,
   NATIVE_INSTALL_PROMPT,
   PROFILE_STORAGE,
   OUTBOX_STORAGE,
@@ -151,7 +148,6 @@ export const appConfig: ApplicationConfig = {
     { provide: PWA_COOKIE_MODE_STORE, useExisting: LocalStoragePwaCookieModeStore },
     { provide: SESSION_REFRESH_SCHEDULER, useExisting: BrowserSessionRefreshScheduler },
     { provide: INSTALL_ENV_PROBE, useExisting: BrowserInstallEnvironmentProbe },
-    { provide: INSTALL_PROMPT_STORE, useExisting: LocalStorageInstallPromptStore },
     { provide: NATIVE_INSTALL_PROMPT, useExisting: BeforeInstallPromptAdapter },
     { provide: TENANT_SLUG_CACHE, useExisting: SlugStore },
     { provide: PROFILE_STORAGE, useExisting: IndexedDbProfileStorage },
@@ -377,12 +373,9 @@ export const appConfig: ApplicationConfig = {
     },
     {
       provide: DecideInstallCardStateUseCase,
-      useFactory: (
-        probe: InstallEnvironmentProbe,
-        store: InstallPromptStore,
-        native: NativeInstallPrompt,
-      ) => new DecideInstallCardStateUseCase(probe, store, native),
-      deps: [INSTALL_ENV_PROBE, INSTALL_PROMPT_STORE, NATIVE_INSTALL_PROMPT],
+      useFactory: (probe: InstallEnvironmentProbe, native: NativeInstallPrompt) =>
+        new DecideInstallCardStateUseCase(probe, native),
+      deps: [INSTALL_ENV_PROBE, NATIVE_INSTALL_PROMPT],
     },
     // Use-cases del tutor: fábricas puras que inyectan el puerto via TUTOR_EXAMS_API.
     // PR1 los registra aquí pero ninguna VM los inyecta todavía (compila, runtime-inert).
