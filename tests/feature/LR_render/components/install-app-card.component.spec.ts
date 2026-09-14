@@ -9,7 +9,6 @@ import {
   NativeInstallPrompt,
 } from '../../../../src/L1_domain/ports/native-install-prompt';
 import { FakeInstallEnvironmentProbe } from '../../../unit/fixtures/install-environment-probe.fake';
-import { FakeInstallPromptStore } from '../../../unit/fixtures/install-prompt-store.fake';
 
 // Fake del adapter Chromium con Signal real (imprescindible: el componente
 // consume `available` como Signal para reactividad).
@@ -41,7 +40,6 @@ class FakeBeforeInstallPromptAdapter implements NativeInstallPrompt {
 describe('InstallAppCardComponent', () => {
   let fixture: ComponentFixture<InstallAppCardComponent>;
   let probe: FakeInstallEnvironmentProbe;
-  let store: FakeInstallPromptStore;
   let native: FakeBeforeInstallPromptAdapter;
 
   const mount = (): void => {
@@ -51,7 +49,6 @@ describe('InstallAppCardComponent', () => {
 
   beforeEach(() => {
     probe = new FakeInstallEnvironmentProbe();
-    store = new FakeInstallPromptStore();
     native = new FakeBeforeInstallPromptAdapter();
 
     TestBed.configureTestingModule({
@@ -60,7 +57,7 @@ describe('InstallAppCardComponent', () => {
         { provide: BeforeInstallPromptAdapter, useValue: native },
         {
           provide: DecideInstallCardStateUseCase,
-          useValue: new DecideInstallCardStateUseCase(probe, store, native),
+          useValue: new DecideInstallCardStateUseCase(probe, native),
         },
       ],
     });
@@ -106,22 +103,24 @@ describe('InstallAppCardComponent', () => {
     expect(fixture.nativeElement.querySelector('[data-testid="install-app-card"]')).toBeNull();
   });
 
-  it('NO renderiza el card si el store marca installed (flag permanente)', () => {
-    probe.configure({ platform: 'iosSafari' });
-    store.setInstalled(true);
-    mount();
-    expect(fixture.nativeElement.querySelector('[data-testid="install-app-card"]')).toBeNull();
-  });
-
-  it('el card reacciona cuando native.available flippa de false a true (Signal reactivo)', () => {
+  it('el card reacciona cuando native.available flippa de false a true (Signal reactivo)', async () => {
     probe.configure({ platform: 'androidChromium' });
     native.setAvailable(false);
     mount();
-    expect(fixture.nativeElement.querySelector('[data-testid="install-app-card"]')).toBeNull();
+    const card = fixture.nativeElement.querySelector(
+      '[data-testid="install-app-card"]',
+    ) as HTMLElement;
+    expect(card).not.toBeNull();
+    // Sin evento nativo: el tap abre instrucciones, no dispara el diálogo real.
+    card.click();
+    await fixture.whenStable();
+    expect(native.triggerCalls).toBe(0);
     // El evento nativo finalmente llega — computed re-ejecuta.
     native.setAvailable(true);
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('[data-testid="install-app-card"]')).not.toBeNull();
+    card.click();
+    await fixture.whenStable();
+    expect(native.triggerCalls).toBe(1);
   });
 
   it('click en androidChromium dispara native.trigger()', async () => {
@@ -135,8 +134,23 @@ describe('InstallAppCardComponent', () => {
     card.click();
     await fixture.whenStable();
     expect(native.triggerCalls).toBe(1);
-    // Sin snooze: el store NO se marca dismissed nunca.
-    expect(store.markInstalledCalls).toBe(0);
+    // El card sigue visible/tappable tras el trigger: no hay persistencia
+    // que lo oculte para siempre tras aceptar la instalación.
+    expect(fixture.nativeElement.querySelector('[data-testid="install-app-card"]')).not.toBeNull();
+  });
+
+  it('click en androidChromium sin prompt nativo abre el modal con instrucciones Android', async () => {
+    probe.configure({ platform: 'androidChromium' });
+    native.setAvailable(false);
+    mount();
+    const card = fixture.nativeElement.querySelector(
+      '[data-testid="install-app-card"]',
+    ) as HTMLElement;
+    card.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const modalTitle = document.querySelector('.modal__title');
+    expect(modalTitle?.textContent).toContain('Instala Fiovi en tu Android');
   });
 
   it('click en iosSafari abre el modal con instrucciones', async () => {

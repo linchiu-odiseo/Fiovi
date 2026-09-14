@@ -21,10 +21,10 @@ export type InstallAppCardVariant = 'student' | 'tutor';
 // border, strip lateral) pero con strip primary — se lee como "un item más"
 // del listado, tentando al user a instalar sin bloquear ningún flujo.
 //
-// Filosofía "tentando siempre": el card queda visible mientras el user no
-// haya instalado. No hay X para cerrar, no hay snooze temporal. Los únicos
-// oculta-para-siempre son: standalone (ya abrió instalada), flag installed
-// prendido (via evento `appinstalled`), o desktop. Ver
+// Filosofía "tentando siempre": el card queda visible en todo browser
+// mobile, sin importar si el user ya instaló Fiovi antes. No hay X para
+// cerrar, no hay snooze temporal. Los únicos oculta-para-siempre son:
+// standalone (ya abrió instalada) o desktop. Ver
 // `DecideInstallCardStateUseCase` para las reglas.
 @Component({
   selector: 'app-install-app-card',
@@ -68,17 +68,17 @@ export class InstallAppCardComponent {
       case 'nativePrompt':
         await this.native.trigger();
         // Cualquier outcome (accepted/dismissed/unavailable) re-evalúa:
-        //   - accepted → el evento `appinstalled` marcará el flag permanente
-        //     via el adapter → próxima re-eval devuelve hidden.
+        //   - accepted → `appinstalled` resetea el signal nativo; el card
+        //     sigue visible (no hay persistencia que lo oculte).
         //   - dismissed → available flippa a false → próxima re-eval devuelve
-        //     hidden hasta que Chromium re-emita `beforeinstallprompt` (lo
-        //     hará por engagement heuristics).
+        //     androidInstructions hasta que Chromium re-emita
+        //     `beforeinstallprompt` (lo hará por engagement heuristics).
         //   - unavailable → race raro; el card sigue apareciendo cuando
         //     available vuelva a true.
         this.revision.update((n) => n + 1);
         break;
       case 'iosInstructions':
-      case 'iosOtherBrowser':
+      case 'androidInstructions':
       case 'webviewFallback':
         this.modalMode.set(state.kind);
         break;

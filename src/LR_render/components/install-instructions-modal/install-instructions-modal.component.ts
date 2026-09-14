@@ -14,12 +14,12 @@ import {
 // Modo del modal — matchea 1:1 los kinds no-nativos de `InstallCardState`.
 // `nativePrompt` no usa este modal (dispara el diálogo del browser).
 // `hidden` tampoco (el modal no se abre).
-export type InstallInstructionsMode = 'iosInstructions' | 'iosOtherBrowser' | 'webviewFallback';
+export type InstallInstructionsMode = 'iosInstructions' | 'androidInstructions' | 'webviewFallback';
 
 // Modal con instrucciones para instalar Fiovi cuando el flow 1-tap nativo
-// no está disponible: iOS Safari (Compartir → Añadir a pantalla), iOS
-// no-Safari (redirigir a Safari), o browser embebido en apps (redirigir
-// al navegador principal).
+// no está disponible: iOS (Compartir → Añadir a pantalla, cualquier
+// browser), Android sin `beforeinstallprompt` capturado (menú ⋮ → Instalar
+// aplicación), o browser embebido en apps (redirigir al navegador principal).
 //
 // Usa `<dialog>` nativo: el browser maneja gratis el backdrop, focus trap,
 // tecla Escape y aria-modal. El evento `close` del dialog dispara al
