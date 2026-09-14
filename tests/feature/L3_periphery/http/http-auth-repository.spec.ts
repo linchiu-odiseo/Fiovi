@@ -8,7 +8,7 @@
 //
 // Usamos `HttpTestingController` para responder cada request sin red real.
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -163,8 +163,9 @@ describe('HttpAuthRepository', () => {
       req.flush(STUDENT_LOGIN_RESPONSE);
 
       const outcome = await pending;
-      expect(outcome).toBeInstanceOf(Identity);
-      const identity = outcome as Identity;
+      if ('selectionToken' in outcome) throw new Error('expected AuthSession branch');
+      const { identity, serverTime } = outcome;
+      expect(identity).toBeInstanceOf(Identity);
       expect(identity.id).toBe('766aac21-71f9-4f48-a14a-5c2bcebc7d0b');
       expect(identity.tenantSlug).toBe(TEST_SLUG);
       expect(identity.email).toBe('79507732@vonex.edu.pe');
@@ -172,6 +173,7 @@ describe('HttpAuthRepository', () => {
       expect(identity.tenantId).toBe('5fff5eec-34dc-40a2-b15e-10e503e7c2dc');
       expect(identity.role()).toBe('student');
       expect(identity.expiresAt).toBe(1781458612856);
+      expect(serverTime).toBeNull();
     });
 
     it('mapea 200 tutor a Identity con codigo: null y roles: ["tutor"]', async () => {
@@ -180,11 +182,48 @@ describe('HttpAuthRepository', () => {
       req.flush(TUTOR_LOGIN_RESPONSE);
 
       const outcome = await pending;
-      expect(outcome).toBeInstanceOf(Identity);
-      const identity = outcome as Identity;
+      if ('selectionToken' in outcome) throw new Error('expected AuthSession branch');
+      const { identity } = outcome;
+      expect(identity).toBeInstanceOf(Identity);
       expect(identity.codigo).toBeNull();
       expect(identity.role()).toBe('tutor');
       expect(identity.tenantSlug).toBe(TEST_SLUG);
+    });
+
+    it('mapea serverTime presente y valido a AuthSession.serverTime calibrable', async () => {
+      const pending = repo.login(credentials);
+      const req = httpMock.expectOne(LOGIN_URL);
+      req.flush({ ...STUDENT_LOGIN_RESPONSE, serverTime: '2026-09-14T15:07:11.123Z' });
+
+      const outcome = await pending;
+      if ('selectionToken' in outcome) throw new Error('expected AuthSession branch');
+      expect(outcome.serverTime).not.toBeNull();
+      expect(outcome.serverTime?.toMillis()).toBe(new Date('2026-09-14T15:07:11.123Z').getTime());
+    });
+
+    it('serverTime ausente en el body no falla el login y deja serverTime en null', async () => {
+      const pending = repo.login(credentials);
+      const req = httpMock.expectOne(LOGIN_URL);
+      req.flush(STUDENT_LOGIN_RESPONSE);
+
+      const outcome = await pending;
+      if ('selectionToken' in outcome) throw new Error('expected AuthSession branch');
+      expect(outcome.serverTime).toBeNull();
+      expect(outcome.identity).toBeInstanceOf(Identity);
+    });
+
+    it('serverTime invalido no falla el login, logea console.warn y deja serverTime en null', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const pending = repo.login(credentials);
+      const req = httpMock.expectOne(LOGIN_URL);
+      req.flush({ ...STUDENT_LOGIN_RESPONSE, serverTime: 'not-a-date' });
+
+      const outcome = await pending;
+      if ('selectionToken' in outcome) throw new Error('expected AuthSession branch');
+      expect(outcome.serverTime).toBeNull();
+      expect(outcome.identity).toBeInstanceOf(Identity);
+      expect(warnSpy).toHaveBeenCalled();
+      warnSpy.mockRestore();
     });
 
     it('mapea 401 con code TENANT_AUTH_INVALID_CREDENTIALS a InvalidCredentialsError', async () => {
@@ -283,8 +322,9 @@ describe('HttpAuthRepository', () => {
           dashboardKind: 'student',
         },
       });
-      const identity = await pending;
-      expect((identity as { dashboardKind: string }).dashboardKind).toBe('student');
+      const outcome = await pending;
+      if ('selectionToken' in outcome) throw new Error('expected AuthSession branch');
+      expect(outcome.identity.dashboardKind).toBe('student');
     });
 
     it('incluye captchaToken en el body cuando viene en las credenciales', async () => {
@@ -337,9 +377,19 @@ describe('HttpAuthRepository', () => {
       expect(req.request.body).toEqual(input);
       req.flush(STUDENT_LOGIN_RESPONSE);
 
-      const identity = await pending;
+      const { identity } = await pending;
       expect(identity.tenantSlug).toBe(TEST_SLUG);
       expect(identity.role()).toBe('student');
+    });
+
+    it('mapea serverTime presente y valido a AuthSession.serverTime calibrable', async () => {
+      const pending = repo.selectTenant(input);
+      const req = httpMock.expectOne(SELECT_TENANT_URL);
+      req.flush({ ...STUDENT_LOGIN_RESPONSE, serverTime: '2026-09-14T15:07:11.123Z' });
+
+      const { serverTime } = await pending;
+      expect(serverTime).not.toBeNull();
+      expect(serverTime?.toMillis()).toBe(new Date('2026-09-14T15:07:11.123Z').getTime());
     });
 
     it('mapea 401 a SelectionInvalidError (token expiró o inválido)', async () => {
@@ -395,7 +445,7 @@ describe('HttpAuthRepository', () => {
       expect(req.request.method).toBe('GET');
       req.flush(STUDENT_TENANT_RESPONSE);
 
-      const identity = await pending;
+      const { identity } = await pending;
       expect(identity.tenantSlug).toBe(TEST_SLUG);
       expect(identity.email).toBe('79507732@vonex.edu.pe');
     });
@@ -427,9 +477,43 @@ describe('HttpAuthRepository', () => {
       expect(req.request.method).toBe('POST');
       req.flush(STUDENT_TENANT_RESPONSE);
 
-      const identity = await pending;
+      const { identity, serverTime } = await pending;
       expect(identity.id).toBe('766aac21-71f9-4f48-a14a-5c2bcebc7d0b');
       expect(identity.tenantSlug).toBe(TEST_SLUG);
+      expect(serverTime).toBeNull();
+    });
+
+    it('mapea serverTime presente y valido a AuthSession.serverTime calibrable', async () => {
+      const pending = repo.refresh();
+      const req = httpMock.expectOne(REFRESH_URL);
+      req.flush({ ...STUDENT_TENANT_RESPONSE, serverTime: '2026-09-14T15:07:11.123Z' });
+
+      const { serverTime } = await pending;
+      expect(serverTime).not.toBeNull();
+      expect(serverTime?.toMillis()).toBe(new Date('2026-09-14T15:07:11.123Z').getTime());
+    });
+
+    it('serverTime ausente en el body no falla el refresh y deja serverTime en null', async () => {
+      const pending = repo.refresh();
+      const req = httpMock.expectOne(REFRESH_URL);
+      req.flush(STUDENT_TENANT_RESPONSE);
+
+      const { serverTime, identity } = await pending;
+      expect(serverTime).toBeNull();
+      expect(identity).toBeInstanceOf(Identity);
+    });
+
+    it('serverTime invalido no falla el refresh, logea console.warn y deja serverTime en null', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const pending = repo.refresh();
+      const req = httpMock.expectOne(REFRESH_URL);
+      req.flush({ ...STUDENT_TENANT_RESPONSE, serverTime: 'not-a-date' });
+
+      const { serverTime, identity } = await pending;
+      expect(serverTime).toBeNull();
+      expect(identity).toBeInstanceOf(Identity);
+      expect(warnSpy).toHaveBeenCalled();
+      warnSpy.mockRestore();
     });
 
     it('mapea 401 con code TENANT_AUTH_REFRESH_TOKEN_EXPIRED a RefreshFailedError', async () => {

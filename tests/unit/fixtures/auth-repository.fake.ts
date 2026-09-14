@@ -4,27 +4,36 @@
 
 import { AuthRepository } from '../../../src/L1_domain/ports/auth-repository';
 import { Identity, Role } from '../../../src/L1_domain/entities/identity';
+import { AuthSession } from '../../../src/L1_domain/value-objects/auth-session';
 import { SelectionChallenge } from '../../../src/L1_domain/value-objects/selection-challenge';
+import { ServerTime } from '../../../src/L1_domain/value-objects/server-time';
 import { SsoProvider } from '../../../src/L1_domain/value-objects/sso-provider';
 import { StudentProfile } from '../../../src/L1_domain/value-objects/student-profile';
 import { TutorProfile } from '../../../src/L1_domain/value-objects/tutor-profile';
 
+// Helper para construir un `AuthSession` en los tests sin repetir el shape.
+// `serverTime` default a `null` — sin calibración, matchea el comportamiento
+// de hoy salvo que el test la pida explícita.
+export function authSession(identity: Identity, serverTime: ServerTime | null = null): AuthSession {
+  return { identity, serverTime };
+}
+
 export class FakeAuthRepository implements AuthRepository {
   private nextLogin:
-    | { kind: 'resolve'; outcome: Identity | SelectionChallenge }
+    | { kind: 'resolve'; outcome: AuthSession | SelectionChallenge }
     | { kind: 'reject'; error: Error }
     | null = null;
   private nextSelectTenant:
-    | { kind: 'resolve'; identity: Identity }
+    | { kind: 'resolve'; session: AuthSession }
     | { kind: 'reject'; error: Error }
     | null = null;
   private nextSsoProviders: SsoProvider[] = [];
   private nextMe:
-    | { kind: 'resolve'; identity: Identity }
+    | { kind: 'resolve'; session: AuthSession }
     | { kind: 'reject'; error: Error }
     | null = null;
   private nextRefresh:
-    | { kind: 'resolve'; identity: Identity }
+    | { kind: 'resolve'; session: AuthSession }
     | { kind: 'reject'; error: Error }
     | null = null;
   private logoutShouldFail = false;
@@ -43,7 +52,7 @@ export class FakeAuthRepository implements AuthRepository {
 
   // Configuración
 
-  willResolveLogin(outcome: Identity | SelectionChallenge): void {
+  willResolveLogin(outcome: AuthSession | SelectionChallenge): void {
     this.nextLogin = { kind: 'resolve', outcome };
   }
 
@@ -51,8 +60,8 @@ export class FakeAuthRepository implements AuthRepository {
     this.nextLogin = { kind: 'reject', error };
   }
 
-  willResolveSelectTenant(identity: Identity): void {
-    this.nextSelectTenant = { kind: 'resolve', identity };
+  willResolveSelectTenant(session: AuthSession): void {
+    this.nextSelectTenant = { kind: 'resolve', session };
   }
 
   willRejectSelectTenant(error: Error): void {
@@ -63,16 +72,16 @@ export class FakeAuthRepository implements AuthRepository {
     this.nextSsoProviders = providers;
   }
 
-  willResolveMe(identity: Identity): void {
-    this.nextMe = { kind: 'resolve', identity };
+  willResolveMe(session: AuthSession): void {
+    this.nextMe = { kind: 'resolve', session };
   }
 
   willRejectMe(error: Error): void {
     this.nextMe = { kind: 'reject', error };
   }
 
-  willResolveRefresh(identity: Identity): void {
-    this.nextRefresh = { kind: 'resolve', identity };
+  willResolveRefresh(session: AuthSession): void {
+    this.nextRefresh = { kind: 'resolve', session };
   }
 
   willRejectRefresh(error: Error): void {
@@ -127,7 +136,7 @@ export class FakeAuthRepository implements AuthRepository {
     email: string;
     password: string;
     captchaToken?: string;
-  }): Promise<Identity | SelectionChallenge> {
+  }): Promise<AuthSession | SelectionChallenge> {
     this.loginCalls.push(credentials);
     if (!this.nextLogin)
       throw new Error(
@@ -137,14 +146,14 @@ export class FakeAuthRepository implements AuthRepository {
     return this.nextLogin.outcome;
   }
 
-  async selectTenant(input: { selectionToken: string; slug: string }): Promise<Identity> {
+  async selectTenant(input: { selectionToken: string; slug: string }): Promise<AuthSession> {
     this.selectTenantCalls.push(input);
     if (!this.nextSelectTenant)
       throw new Error(
         'FakeAuthRepository: configurar willResolveSelectTenant/willRejectSelectTenant antes de selectTenant()',
       );
     if (this.nextSelectTenant.kind === 'reject') throw this.nextSelectTenant.error;
-    return this.nextSelectTenant.identity;
+    return this.nextSelectTenant.session;
   }
 
   async listSsoProviders(): Promise<SsoProvider[]> {
@@ -152,22 +161,22 @@ export class FakeAuthRepository implements AuthRepository {
     return this.nextSsoProviders;
   }
 
-  async me(): Promise<Identity> {
+  async me(): Promise<AuthSession> {
     this.meCalls++;
     if (!this.nextMe)
       throw new Error('FakeAuthRepository: configurar willResolveMe/willRejectMe antes de me()');
     if (this.nextMe.kind === 'reject') throw this.nextMe.error;
-    return this.nextMe.identity;
+    return this.nextMe.session;
   }
 
-  async refresh(): Promise<Identity> {
+  async refresh(): Promise<AuthSession> {
     this.refreshCalls++;
     if (!this.nextRefresh)
       throw new Error(
         'FakeAuthRepository: configurar willResolveRefresh/willRejectRefresh antes de refresh()',
       );
     if (this.nextRefresh.kind === 'reject') throw this.nextRefresh.error;
-    return this.nextRefresh.identity;
+    return this.nextRefresh.session;
   }
 
   async logout(): Promise<void> {
