@@ -113,3 +113,4 @@ Auto-generado por `.claude/hooks/log-agent-usage.ps1` en cada PostToolUse del to
 | 2026-09-14 12:02:54 | sdd-apply | SDD apply banner instalacion | opus-4-7 | -- | -- | -- | -- |
 | 2026-09-14 12:14:53 | hexagonal-guard | Auditoria hexagonal del change | opus-4-7 | -- | -- | -- | -- |
 | 2026-09-14 12:15:19 | sdd-verify | SDD verify banner instalacion | opus-4-7 | -- | -- | -- | -- |
+| 2026-09-14 14:24:14 | sdd-archive | SDD archive banner instalacion | opus-4-7 | -- | -- | -- | -- |
