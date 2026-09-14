@@ -103,3 +103,13 @@ Auto-generado por `.claude/hooks/log-agent-usage.ps1` en cada PostToolUse del to
 | 2026-09-04 11:00:39 | general-purpose  | Execute Sub-bloque G ÔÇö CLK clock calibration                   | opus-4-7 | --           | --    | --       | --        |
 | 2026-09-04 11:05:51 | hexagonal-guard  | Final hexagonal-guard audit                                      | opus-4-7 | --           | --    | --       | --        |
 | 2026-09-04 11:06:04 | sdd-verify       | Final SDD verify                                                 | opus-4-7 | --           | --    | --       | --        |
+| 2026-09-14 09:50:48 | general-purpose | Analizar banner install PWA | opus-4-7 | -- | -- | -- | -- |
+| 2026-09-14 10:51:17 | general-purpose | Analisis de impacto banner PWA | opus-4-7 | -- | -- | -- | -- |
+| 2026-09-14 10:59:04 | general-purpose | Verificacion tecnica profunda PWA | opus-4-7 | -- | -- | -- | -- |
+| 2026-09-14 11:22:35 | sdd-propose | SDD propose banner instalacion | opus-4-7 | -- | -- | -- | -- |
+| 2026-09-14 11:25:28 | sdd-spec | SDD spec banner instalacion | opus-4-7 | -- | -- | -- | -- |
+| 2026-09-14 11:25:57 | sdd-design | SDD design banner instalacion | opus-4-7 | -- | -- | -- | -- |
+| 2026-09-14 11:27:50 | sdd-tasks | SDD tasks banner instalacion | opus-4-7 | -- | -- | -- | -- |
+| 2026-09-14 12:02:54 | sdd-apply | SDD apply banner instalacion | opus-4-7 | -- | -- | -- | -- |
+| 2026-09-14 12:14:53 | hexagonal-guard | Auditoria hexagonal del change | opus-4-7 | -- | -- | -- | -- |
+| 2026-09-14 12:15:19 | sdd-verify | SDD verify banner instalacion | opus-4-7 | -- | -- | -- | -- |
