@@ -39,7 +39,7 @@ Credenciales seed dev:
 
 ### Response
 
-learnex setea cookies `Set-Cookie` con `HttpOnly; Secure; SameSite=Lax/None` (según env del back). El cliente NO las lee — el browser las gestiona. Tras `POST /auth/login` y `POST /auth/refresh`, el body trae además el shape `{user, expiresAt}` para que el cliente conozca la identity sin tocar la cookie.
+learnex setea cookies `Set-Cookie` con `HttpOnly; Secure; SameSite=Lax/None` (según env del back). El cliente NO las lee — el browser las gestiona. Tras `POST /auth/login` y `POST /auth/refresh`, el body trae además el shape `{user, expiresAt}` para que el cliente conozca la identity sin tocar la cookie. El body de auth también puede traer `serverTime` (ISO 8601) — ver nota debajo de cada response — para calibrar el `Clock` server-anchored del cliente; el campo es **opcional**, su ausencia no es un error.
 
 ## Auth endpoints (Fase 3 — learnex)
 
@@ -63,9 +63,12 @@ Response 200 (alumno):
     "roles": ["student"],
     "permissions": ["student:dashboard:view", "student:exams:view", "..."]
   },
-  "expiresAt": 1781458612856
+  "expiresAt": 1781458612856,
+  "serverTime": "2026-09-14T15:07:11.123Z"
 }
 ```
+
+> `serverTime` (ISO 8601) es **opcional** — el cliente lo usa para calibrar el `Clock` server-anchored (change `calibrate-clock-from-auth`). Ausente → sin calibración, comportamiento idéntico a hoy. Presente pero no parseable → el cliente lo ignora con un `console.warn`, sin fallar el login.
 
 > El campo `permissions[]` viaja en el body pero Fiovi lo ignora en el mapper (F5-03 — no se hornea en `Identity` ni en `localStorage`). La autorización efectiva es server-side (RLS + guards). No agregar consumo de `permissions` en cliente sin discutir alternativas primero.
 
@@ -84,7 +87,7 @@ Errores:
 
 Sin body. Cookie `learnex_tenant_refresh` viaja en el request automáticamente.
 
-Response 200: mismo shape que login (rota cookies + body con identity actualizada).
+Response 200: mismo shape que login (rota cookies + body con identity actualizada), incluyendo el mismo `serverTime` opcional.
 
 Errores:
 
@@ -100,7 +103,7 @@ Best-effort en el cliente: si falla por red o 5xx, `LogoutUseCase` igual contin�
 
 ### `GET /t/{slug}/auth/me` — protegido
 
-Sin body. Response 200: mismo shape que login (identity actualizada con `expiresAt` nuevo si la cookie todavía es válida).
+Sin body. Response 200: mismo shape que login (identity actualizada con `expiresAt` nuevo si la cookie todavía es válida), incluyendo el mismo `serverTime` opcional.
 
 Errores:
 

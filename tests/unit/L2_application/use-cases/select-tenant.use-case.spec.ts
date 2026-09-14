@@ -1,15 +1,17 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SelectTenantUseCase } from '../../../../src/L2_application/use-cases/select-tenant.use-case';
 import { Identity } from '../../../../src/L1_domain/entities/identity';
+import { ServerTime } from '../../../../src/L1_domain/value-objects/server-time';
 import { NetworkError } from '../../../../src/L1_domain/errors/network.error';
 import { SelectionInvalidError } from '../../../../src/L1_domain/errors/selection-invalid.error';
-import { FakeAuthRepository } from '../../fixtures/auth-repository.fake';
+import { FakeAuthRepository, authSession } from '../../fixtures/auth-repository.fake';
 import { FakeIdentityStorage } from '../../fixtures/identity-storage.fake';
 import { FakeProfileStorage } from '../../fixtures/profile-storage.fake';
 import { FakePwaCookieModeStore } from '../../fixtures/pwa-cookie-mode-store.fake';
 import { FakeSessionRefreshScheduler } from '../../fixtures/session-refresh-scheduler.fake';
 import { FakeTenantSlugCache } from '../../fixtures/tenant-slug-cache.fake';
 import { GetProfileUseCase } from '../../../../src/L2_application/use-cases/get-profile.use-case';
+import { FakeClock } from '../fakes';
 
 const NOW = 1_700_000_000_000;
 
@@ -32,6 +34,7 @@ describe('SelectTenantUseCase', () => {
   let slugCache: FakeTenantSlugCache;
   let pwaCookieMode: FakePwaCookieModeStore;
   let refreshScheduler: FakeSessionRefreshScheduler;
+  let clock: FakeClock;
   let useCase: SelectTenantUseCase;
 
   const input = { selectionToken: 'jwt.token', slug: 'pitagoras' };
@@ -43,6 +46,7 @@ describe('SelectTenantUseCase', () => {
     slugCache = new FakeTenantSlugCache();
     pwaCookieMode = new FakePwaCookieModeStore();
     refreshScheduler = new FakeSessionRefreshScheduler();
+    clock = new FakeClock();
     const getProfile = new GetProfileUseCase(profileStorage, repo);
     useCase = new SelectTenantUseCase(
       repo,
@@ -51,12 +55,13 @@ describe('SelectTenantUseCase', () => {
       getProfile,
       pwaCookieMode,
       refreshScheduler,
+      clock,
     );
   });
 
   it('selección exitosa persiste identity, hidrata slugCache con el slug elegido y devuelve Identity', async () => {
     const identity = makeIdentity();
-    repo.willResolveSelectTenant(identity);
+    repo.willResolveSelectTenant(authSession(identity));
     repo.willRejectProfile(new Error('no profile needed'));
 
     const result = await useCase.execute(input);
@@ -65,6 +70,41 @@ describe('SelectTenantUseCase', () => {
     expect(await identityStorage.read()).toBe(identity);
     expect(slugCache.current()).toBe('pitagoras');
     expect(repo.getSelectTenantCalls()).toEqual([input]);
+  });
+
+  it('selección exitosa con serverTime calibra el Clock antes de agendar el refresh', async () => {
+    const identity = makeIdentity();
+    const serverTime = new ServerTime('2026-09-14T15:07:11.123Z');
+    repo.willResolveSelectTenant(authSession(identity, serverTime));
+    repo.willRejectProfile(new Error('no profile'));
+
+    const order: string[] = [];
+    const originalSetServerTime = clock.setServerTime.bind(clock);
+    clock.setServerTime = (st) => {
+      order.push('calibrate');
+      originalSetServerTime(st);
+    };
+    const originalSchedule = refreshScheduler.schedule.bind(refreshScheduler);
+    refreshScheduler.schedule = (expiresAt) => {
+      order.push('schedule');
+      originalSchedule(expiresAt);
+    };
+
+    await useCase.execute(input);
+
+    expect(clock.getSetServerTimeCalls()).toEqual([serverTime]);
+    expect(order).toEqual(['calibrate', 'schedule']);
+  });
+
+  it('selección exitosa sin serverTime NO calibra el Clock', async () => {
+    const identity = makeIdentity();
+    repo.willResolveSelectTenant(authSession(identity));
+    repo.willRejectProfile(new Error('no profile'));
+
+    await useCase.execute(input);
+
+    expect(clock.getSetServerTimeCalls()).toEqual([]);
+    expect(refreshScheduler.scheduleCalls).toEqual([identity.expiresAt]);
   });
 
   it('SelectionInvalidError propaga y NO toca storage ni slugCache', async () => {
@@ -82,7 +122,7 @@ describe('SelectTenantUseCase', () => {
 
   it('fire-and-forget: profile fetch fallido no bloquea', async () => {
     const identity = makeIdentity();
-    repo.willResolveSelectTenant(identity);
+    repo.willResolveSelectTenant(authSession(identity));
     repo.willRejectProfile(new NetworkError('profile fetch failed'));
 
     const result = await useCase.execute(input);
@@ -91,7 +131,7 @@ describe('SelectTenantUseCase', () => {
 
   describe('PWA cookie mode flag', () => {
     it('selección exitosa enciende el flag', async () => {
-      repo.willResolveSelectTenant(makeIdentity());
+      repo.willResolveSelectTenant(authSession(makeIdentity()));
       repo.willRejectProfile(new Error('no profile'));
       expect(pwaCookieMode.isEnabled()).toBe(false);
       await useCase.execute(input);

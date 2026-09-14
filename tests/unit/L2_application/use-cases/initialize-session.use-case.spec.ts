@@ -1,15 +1,17 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { InitializeSessionUseCase } from '../../../../src/L2_application/use-cases/initialize-session.use-case';
 import { Identity } from '../../../../src/L1_domain/entities/identity';
+import { ServerTime } from '../../../../src/L1_domain/value-objects/server-time';
 import { SessionExpiredError } from '../../../../src/L1_domain/errors/session-expired.error';
 import { NetworkError } from '../../../../src/L1_domain/errors/network.error';
 import { UnsupportedRoleError } from '../../../../src/L1_domain/errors/unsupported-role.error';
-import { FakeAuthRepository } from '../../fixtures/auth-repository.fake';
+import { FakeAuthRepository, authSession } from '../../fixtures/auth-repository.fake';
 import { FakeIdentityStorage } from '../../fixtures/identity-storage.fake';
 import { FakeProfileStorage } from '../../fixtures/profile-storage.fake';
 import { FakeSessionRefreshScheduler } from '../../fixtures/session-refresh-scheduler.fake';
 import { FakeTenantSlugCache } from '../../fixtures/tenant-slug-cache.fake';
 import { GetProfileUseCase } from '../../../../src/L2_application/use-cases/get-profile.use-case';
+import { FakeClock } from '../fakes';
 
 const NOW = 1_700_000_000_000;
 
@@ -35,6 +37,7 @@ describe('InitializeSessionUseCase', () => {
   let slugCache: FakeTenantSlugCache;
   let refreshScheduler: FakeSessionRefreshScheduler;
   let getProfile: GetProfileUseCase;
+  let clock: FakeClock;
   let useCase: InitializeSessionUseCase;
 
   beforeEach(() => {
@@ -44,12 +47,14 @@ describe('InitializeSessionUseCase', () => {
     slugCache = new FakeTenantSlugCache();
     refreshScheduler = new FakeSessionRefreshScheduler();
     getProfile = new GetProfileUseCase(profileStorage, repo);
+    clock = new FakeClock();
     useCase = new InitializeSessionUseCase(
       repo,
       identityStorage,
       slugCache,
       getProfile,
       refreshScheduler,
+      clock,
     );
   });
 
@@ -66,7 +71,7 @@ describe('InitializeSessionUseCase', () => {
     it('llama me() con el slug ya seteado, hidrata identity y devuelve Identity', async () => {
       slugCache.set('vonex');
       const identity = makeStudentIdentity();
-      repo.willResolveMe(identity);
+      repo.willResolveMe(authSession(identity));
       repo.willRejectProfile(new Error('no profile needed'));
       const result = await useCase.execute();
       expect(result).toBe(identity);
@@ -80,7 +85,7 @@ describe('InitializeSessionUseCase', () => {
       const stored = makeStudentIdentity();
       await identityStorage.write(stored);
       const fresh = makeStudentIdentity();
-      repo.willResolveMe(fresh);
+      repo.willResolveMe(authSession(fresh));
       repo.willRejectProfile(new Error('no profile needed'));
       const result = await useCase.execute();
       expect(result).toBe(fresh);
@@ -91,7 +96,7 @@ describe('InitializeSessionUseCase', () => {
       const stored = makeTutorIdentity();
       await identityStorage.write(stored);
       const fresh = makeTutorIdentity();
-      repo.willResolveMe(fresh);
+      repo.willResolveMe(authSession(fresh));
       repo.willRejectProfile(new Error('no profile needed'));
       const result = await useCase.execute();
       expect(result?.role()).toBe('tutor');
@@ -124,7 +129,7 @@ describe('InitializeSessionUseCase', () => {
     it('es silencioso (fire-and-forget)', async () => {
       slugCache.set('vonex');
       const identity = makeStudentIdentity();
-      repo.willResolveMe(identity);
+      repo.willResolveMe(authSession(identity));
       repo.willRejectProfile(new NetworkError('profile 503'));
       const result = await useCase.execute();
       expect(result).toBe(identity);
@@ -162,7 +167,7 @@ describe('InitializeSessionUseCase', () => {
     it('me() exitoso agenda el scheduler con el expiresAt de la identity fresh', async () => {
       slugCache.set('vonex');
       const identity = makeStudentIdentity();
-      repo.willResolveMe(identity);
+      repo.willResolveMe(authSession(identity));
       repo.willRejectProfile(new Error('no profile'));
       await useCase.execute();
       expect(refreshScheduler.scheduleCalls).toEqual([identity.expiresAt]);
@@ -185,6 +190,51 @@ describe('InitializeSessionUseCase', () => {
       repo.willRejectMe(new NetworkError());
       await expect(useCase.execute()).rejects.toBeInstanceOf(NetworkError);
       expect(refreshScheduler.scheduleCalls).toEqual([]);
+    });
+  });
+
+  describe('calibración del Clock', () => {
+    it('me() exitoso con serverTime calibra el Clock antes de agendar el refresh', async () => {
+      slugCache.set('vonex');
+      const identity = makeStudentIdentity();
+      const serverTime = new ServerTime('2026-09-14T15:07:11.123Z');
+      repo.willResolveMe(authSession(identity, serverTime));
+      repo.willRejectProfile(new Error('no profile'));
+
+      const order: string[] = [];
+      const originalSetServerTime = clock.setServerTime.bind(clock);
+      clock.setServerTime = (st) => {
+        order.push('calibrate');
+        originalSetServerTime(st);
+      };
+      const originalSchedule = refreshScheduler.schedule.bind(refreshScheduler);
+      refreshScheduler.schedule = (expiresAt) => {
+        order.push('schedule');
+        originalSchedule(expiresAt);
+      };
+
+      await useCase.execute();
+
+      expect(clock.getSetServerTimeCalls()).toEqual([serverTime]);
+      expect(order).toEqual(['calibrate', 'schedule']);
+    });
+
+    it('me() exitoso sin serverTime NO calibra el Clock', async () => {
+      slugCache.set('vonex');
+      const identity = makeStudentIdentity();
+      repo.willResolveMe(authSession(identity));
+      repo.willRejectProfile(new Error('no profile'));
+
+      await useCase.execute();
+
+      expect(clock.getSetServerTimeCalls()).toEqual([]);
+    });
+
+    it('me() con SessionExpiredError/UnsupportedRoleError/NetworkError NO calibra el Clock', async () => {
+      slugCache.set('vonex');
+      repo.willRejectMe(new SessionExpiredError());
+      await useCase.execute();
+      expect(clock.getSetServerTimeCalls()).toEqual([]);
     });
   });
 });

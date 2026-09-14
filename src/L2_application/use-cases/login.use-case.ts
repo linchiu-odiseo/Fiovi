@@ -1,4 +1,5 @@
 import { AuthRepository } from '../../L1_domain/ports/auth-repository';
+import { Clock } from '../../L1_domain/ports/clock';
 import { IdentityStorage } from '../../L1_domain/ports/identity-storage';
 import { PwaCookieModeStore } from '../../L1_domain/ports/pwa-cookie-mode-store';
 import { SessionRefreshScheduler } from '../../L1_domain/ports/session-refresh-scheduler';
@@ -32,6 +33,7 @@ export class LoginUseCase {
     private readonly getProfile: GetProfileUseCase,
     private readonly pwaCookieMode: PwaCookieModeStore,
     private readonly refreshScheduler: SessionRefreshScheduler,
+    private readonly clock: Clock,
   ) {}
 
   async execute(credentials: {
@@ -43,7 +45,8 @@ export class LoginUseCase {
     if ('selectionToken' in outcome) {
       return outcome;
     }
-    const identity = outcome;
+    const { identity, serverTime } = outcome;
+    if (serverTime) this.clock.setServerTime(serverTime);
     await this.identityStorage.write(identity);
     this.slugCache.set(identity.tenantSlug);
     // Backend seteó cookies `learnex_pwa_*` (el interceptor mandó

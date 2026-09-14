@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { RefreshIdentityUseCase } from '../../../../src/L2_application/use-cases/refresh-identity.use-case';
 import { Identity } from '../../../../src/L1_domain/entities/identity';
+import { ServerTime } from '../../../../src/L1_domain/value-objects/server-time';
 import { RefreshFailedError } from '../../../../src/L1_domain/errors/refresh-failed.error';
 import { NetworkError } from '../../../../src/L1_domain/errors/network.error';
-import { FakeAuthRepository } from '../../fixtures/auth-repository.fake';
+import { FakeAuthRepository, authSession } from '../../fixtures/auth-repository.fake';
 import { FakeIdentityStorage } from '../../fixtures/identity-storage.fake';
 import { FakeProfileStorage } from '../../fixtures/profile-storage.fake';
 import { FakeSessionRefreshScheduler } from '../../fixtures/session-refresh-scheduler.fake';
@@ -12,6 +13,7 @@ import { LogoutUseCase } from '../../../../src/L2_application/use-cases/logout.u
 import { RouterPort } from '../../../../src/L1_domain/ports/router-port';
 import { DraftDispatcher } from '../../../../src/L1_domain/ports/draft-dispatcher';
 import { GetProfileUseCase } from '../../../../src/L2_application/use-cases/get-profile.use-case';
+import { FakeClock } from '../fakes';
 
 const NOW = 1_700_000_000_000;
 
@@ -47,6 +49,7 @@ describe('RefreshIdentityUseCase', () => {
   let refreshScheduler: FakeSessionRefreshScheduler;
   let logout: LogoutUseCase;
   let logoutExecuteCalls: number;
+  let clock: FakeClock;
   let useCase: RefreshIdentityUseCase;
 
   beforeEach(() => {
@@ -55,6 +58,7 @@ describe('RefreshIdentityUseCase', () => {
     profileStorage = new FakeProfileStorage();
     slugCache = new FakeTenantSlugCache();
     refreshScheduler = new FakeSessionRefreshScheduler();
+    clock = new FakeClock();
     const _getProfile = new GetProfileUseCase(profileStorage, repo);
     logout = new LogoutUseCase(
       repo,
@@ -77,15 +81,56 @@ describe('RefreshIdentityUseCase', () => {
       slugCache,
       logout,
       refreshScheduler,
+      clock,
     );
   });
 
   it('refresh exitoso actualiza el storage con la nueva identity', async () => {
     const newIdentity = makeIdentity();
-    repo.willResolveRefresh(newIdentity);
+    repo.willResolveRefresh(authSession(newIdentity));
     const result = await useCase.execute();
     expect(result).toBe(newIdentity);
     expect(await identityStorage.read()).toBe(newIdentity);
+  });
+
+  it('refresh exitoso con serverTime calibra el Clock antes de re-agendar', async () => {
+    const newIdentity = makeIdentity();
+    const serverTime = new ServerTime('2026-09-14T15:07:11.123Z');
+    repo.willResolveRefresh(authSession(newIdentity, serverTime));
+
+    const order: string[] = [];
+    const originalSetServerTime = clock.setServerTime.bind(clock);
+    clock.setServerTime = (st) => {
+      order.push('calibrate');
+      originalSetServerTime(st);
+    };
+    const originalSchedule = refreshScheduler.schedule.bind(refreshScheduler);
+    refreshScheduler.schedule = (expiresAt) => {
+      order.push('schedule');
+      originalSchedule(expiresAt);
+    };
+
+    await useCase.execute();
+
+    expect(clock.getSetServerTimeCalls()).toEqual([serverTime]);
+    expect(order).toEqual(['calibrate', 'schedule']);
+    expect(await identityStorage.read()).toBe(newIdentity);
+  });
+
+  it('refresh exitoso sin serverTime NO calibra el Clock', async () => {
+    const newIdentity = makeIdentity();
+    repo.willResolveRefresh(authSession(newIdentity));
+
+    await useCase.execute();
+
+    expect(clock.getSetServerTimeCalls()).toEqual([]);
+    expect(refreshScheduler.scheduleCalls).toEqual([newIdentity.expiresAt]);
+  });
+
+  it('refresh fallido (RefreshFailedError) NO calibra el Clock', async () => {
+    repo.willRejectRefresh(new RefreshFailedError());
+    await expect(useCase.execute()).rejects.toThrow(RefreshFailedError);
+    expect(clock.getSetServerTimeCalls()).toEqual([]);
   });
 
   it('RefreshFailedError invoca logout.execute()', async () => {
@@ -108,7 +153,7 @@ describe('RefreshIdentityUseCase', () => {
 
   it('refresh exitoso re-agenda el scheduler con el nuevo expiresAt', async () => {
     const newIdentity = makeIdentity();
-    repo.willResolveRefresh(newIdentity);
+    repo.willResolveRefresh(authSession(newIdentity));
     await useCase.execute();
     expect(refreshScheduler.scheduleCalls).toEqual([newIdentity.expiresAt]);
   });

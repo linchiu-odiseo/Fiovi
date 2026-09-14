@@ -2,16 +2,18 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { LoginUseCase } from '../../../../src/L2_application/use-cases/login.use-case';
 import { Identity } from '../../../../src/L1_domain/entities/identity';
 import { SelectionChallenge } from '../../../../src/L1_domain/value-objects/selection-challenge';
+import { ServerTime } from '../../../../src/L1_domain/value-objects/server-time';
 import { InvalidCredentialsError } from '../../../../src/L1_domain/errors/invalid-credentials.error';
 import { RateLimitError } from '../../../../src/L1_domain/errors/rate-limit.error';
 import { NetworkError } from '../../../../src/L1_domain/errors/network.error';
-import { FakeAuthRepository } from '../../fixtures/auth-repository.fake';
+import { FakeAuthRepository, authSession } from '../../fixtures/auth-repository.fake';
 import { FakeIdentityStorage } from '../../fixtures/identity-storage.fake';
 import { FakeProfileStorage } from '../../fixtures/profile-storage.fake';
 import { FakePwaCookieModeStore } from '../../fixtures/pwa-cookie-mode-store.fake';
 import { FakeSessionRefreshScheduler } from '../../fixtures/session-refresh-scheduler.fake';
 import { FakeTenantSlugCache } from '../../fixtures/tenant-slug-cache.fake';
 import { GetProfileUseCase } from '../../../../src/L2_application/use-cases/get-profile.use-case';
+import { FakeClock } from '../fakes';
 
 const NOW = 1_700_000_000_000;
 
@@ -64,6 +66,7 @@ describe('LoginUseCase', () => {
   let pwaCookieMode: FakePwaCookieModeStore;
   let refreshScheduler: FakeSessionRefreshScheduler;
   let getProfile: GetProfileUseCase;
+  let clock: FakeClock;
   let useCase: LoginUseCase;
 
   const credentials = { email: '79507732@vonex.edu.pe', password: '79507732' };
@@ -76,6 +79,7 @@ describe('LoginUseCase', () => {
     pwaCookieMode = new FakePwaCookieModeStore();
     refreshScheduler = new FakeSessionRefreshScheduler();
     getProfile = new GetProfileUseCase(profileStorage, repo);
+    clock = new FakeClock();
     useCase = new LoginUseCase(
       repo,
       identityStorage,
@@ -83,12 +87,13 @@ describe('LoginUseCase', () => {
       getProfile,
       pwaCookieMode,
       refreshScheduler,
+      clock,
     );
   });
 
   it('login de alumno exitoso devuelve Identity con role student', async () => {
     const identity = makeStudentIdentity();
-    repo.willResolveLogin(identity);
+    repo.willResolveLogin(authSession(identity));
     repo.willRejectProfile(new Error('no profile needed in this test'));
     const result = await useCase.execute(credentials);
     expect(result).toBe(identity);
@@ -97,7 +102,7 @@ describe('LoginUseCase', () => {
 
   it('login exitoso persiste la Identity en storage', async () => {
     const identity = makeStudentIdentity();
-    repo.willResolveLogin(identity);
+    repo.willResolveLogin(authSession(identity));
     repo.willRejectProfile(new Error('no profile'));
     await useCase.execute(credentials);
     expect(await identityStorage.read()).toBe(identity);
@@ -105,7 +110,7 @@ describe('LoginUseCase', () => {
 
   it('login exitoso hidrata el SlugStore con el tenantSlug del Identity', async () => {
     const identity = makeStudentIdentity();
-    repo.willResolveLogin(identity);
+    repo.willResolveLogin(authSession(identity));
     repo.willRejectProfile(new Error('no profile'));
     expect(slugCache.current()).toBeNull();
     await useCase.execute(credentials);
@@ -123,7 +128,7 @@ describe('LoginUseCase', () => {
 
   it('login de tutor exitoso devuelve Identity con role tutor y codigo null', async () => {
     const identity = makeTutorIdentity();
-    repo.willResolveLogin(identity);
+    repo.willResolveLogin(authSession(identity));
     repo.willRejectProfile(new Error('no profile'));
     const result = await useCase.execute({ email: 'tutor1@vonex.pe', password: 'tutor123' });
     expect(asIdentity(result).role()).toBe('tutor');
@@ -150,7 +155,7 @@ describe('LoginUseCase', () => {
 
   it('profile fetch falla silenciosamente (fire-and-forget no bloquea)', async () => {
     const identity = makeStudentIdentity();
-    repo.willResolveLogin(identity);
+    repo.willResolveLogin(authSession(identity));
     repo.willRejectProfile(new NetworkError('profile fetch failed'));
     const result = await useCase.execute(credentials);
     expect(result).toBe(identity);
@@ -159,7 +164,7 @@ describe('LoginUseCase', () => {
   it('identity se escribe en storage antes de retornar', async () => {
     const written: Identity[] = [];
     const identity = makeStudentIdentity();
-    repo.willResolveLogin(identity);
+    repo.willResolveLogin(authSession(identity));
     repo.willRejectProfile(new Error('no profile'));
     const originalWrite = identityStorage.write.bind(identityStorage);
     identityStorage.write = async (_id: Identity) => {
@@ -173,7 +178,7 @@ describe('LoginUseCase', () => {
 
   it('propaga captchaToken al repositorio cuando viene en las credenciales', async () => {
     const identity = makeStudentIdentity();
-    repo.willResolveLogin(identity);
+    repo.willResolveLogin(authSession(identity));
     repo.willRejectProfile(new Error('no profile'));
     await useCase.execute({ ...credentials, captchaToken: 'turnstile-token-xyz' });
     expect(repo.getLoginCalls()).toEqual([{ ...credentials, captchaToken: 'turnstile-token-xyz' }]);
@@ -181,7 +186,7 @@ describe('LoginUseCase', () => {
 
   it('omite captchaToken cuando no viene (dev con captcha deshabilitado)', async () => {
     const identity = makeStudentIdentity();
-    repo.willResolveLogin(identity);
+    repo.willResolveLogin(authSession(identity));
     repo.willRejectProfile(new Error('no profile'));
     await useCase.execute(credentials);
     const [call] = repo.getLoginCalls();
@@ -191,7 +196,7 @@ describe('LoginUseCase', () => {
 
   it('fire-and-forget: execute devuelve identity sin esperar al profile fetch', async () => {
     const identity = makeStudentIdentity();
-    repo.willResolveLogin(identity);
+    repo.willResolveLogin(authSession(identity));
     repo.willResolveProfile({
       id: 'p1',
       code: '79507732',
@@ -208,7 +213,7 @@ describe('LoginUseCase', () => {
   describe('proactive refresh scheduler', () => {
     it('login exitoso (Identity) agenda el scheduler con el expiresAt de la identity', async () => {
       const identity = makeStudentIdentity();
-      repo.willResolveLogin(identity);
+      repo.willResolveLogin(authSession(identity));
       repo.willRejectProfile(new Error('no profile'));
       await useCase.execute(credentials);
       expect(refreshScheduler.scheduleCalls).toEqual([identity.expiresAt]);
@@ -229,10 +234,50 @@ describe('LoginUseCase', () => {
     });
   });
 
+  describe('calibración del Clock', () => {
+    it('login exitoso con serverTime calibra el Clock antes de agendar el refresh', async () => {
+      const identity = makeStudentIdentity();
+      const serverTime = new ServerTime('2026-09-14T15:07:11.123Z');
+      repo.willResolveLogin(authSession(identity, serverTime));
+      repo.willRejectProfile(new Error('no profile'));
+
+      const order: string[] = [];
+      const originalSetServerTime = clock.setServerTime.bind(clock);
+      clock.setServerTime = (st) => {
+        order.push('calibrate');
+        originalSetServerTime(st);
+      };
+      const originalSchedule = refreshScheduler.schedule.bind(refreshScheduler);
+      refreshScheduler.schedule = (expiresAt) => {
+        order.push('schedule');
+        originalSchedule(expiresAt);
+      };
+
+      await useCase.execute(credentials);
+
+      expect(clock.getSetServerTimeCalls()).toEqual([serverTime]);
+      expect(order).toEqual(['calibrate', 'schedule']);
+      expect(await identityStorage.read()).toBe(identity);
+    });
+
+    it('login exitoso sin serverTime NO calibra el Clock, resto del flow sin cambios', async () => {
+      const identity = makeStudentIdentity();
+      repo.willResolveLogin(authSession(identity));
+      repo.willRejectProfile(new Error('no profile'));
+
+      await useCase.execute(credentials);
+
+      expect(clock.getSetServerTimeCalls()).toEqual([]);
+      expect(await identityStorage.read()).toBe(identity);
+      expect(pwaCookieMode.isEnabled()).toBe(true);
+      expect(refreshScheduler.scheduleCalls).toEqual([identity.expiresAt]);
+    });
+  });
+
   describe('PWA cookie mode flag', () => {
     it('login exitoso (Identity) enciende el flag', async () => {
       const identity = makeStudentIdentity();
-      repo.willResolveLogin(identity);
+      repo.willResolveLogin(authSession(identity));
       repo.willRejectProfile(new Error('no profile'));
       expect(pwaCookieMode.isEnabled()).toBe(false);
       await useCase.execute(credentials);

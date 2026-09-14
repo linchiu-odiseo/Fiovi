@@ -5,7 +5,9 @@ import { AuthRepository } from '../../L1_domain/ports/auth-repository';
 import { ENDPOINT_IDS } from '../telemetry/audit-log-dictionaries';
 import { ENDPOINT_ID_TOKEN } from '../telemetry/tokens';
 import { Identity, Role } from '../../L1_domain/entities/identity';
+import { AuthSession } from '../../L1_domain/value-objects/auth-session';
 import { SelectionChallenge } from '../../L1_domain/value-objects/selection-challenge';
+import { ServerTime } from '../../L1_domain/value-objects/server-time';
 import { SsoProvider } from '../../L1_domain/value-objects/sso-provider';
 import { StudentProfile } from '../../L1_domain/value-objects/student-profile';
 import { TutorProfile } from '../../L1_domain/value-objects/tutor-profile';
@@ -53,6 +55,9 @@ interface PublicAuthResponseDto {
     dashboardKind?: string;
   };
   expiresAt: number;
+  // ISO 8601, opcional — ausente en backs que aún no lo desplegaron. Se usa
+  // para calibrar el Clock server-anchored (ver `parseServerTime`).
+  serverTime?: string;
 }
 
 // Shape del user en `TenantAuthResponse` (GET /t/{slug}/auth/me, POST /t/{slug}/auth/refresh):
@@ -68,6 +73,7 @@ interface TenantAuthResponseDto {
     dashboardKind?: string;
   };
   expiresAt: number;
+  serverTime?: string;
 }
 
 interface PublicAuthSelectionResponseDto {
@@ -135,7 +141,7 @@ export class HttpAuthRepository implements AuthRepository {
     email: string;
     password: string;
     captchaToken?: string;
-  }): Promise<Identity | SelectionChallenge> {
+  }): Promise<AuthSession | SelectionChallenge> {
     // Body construido explícito: solo incluye `captchaToken` cuando viene con
     // valor. Si estuviera siempre presente como `undefined`, algunos serializers
     // lo mandarían como `null` — el back rechazaría el zod. Además evita mandar
@@ -169,7 +175,7 @@ export class HttpAuthRepository implements AuthRepository {
     }
   }
 
-  async selectTenant(input: { selectionToken: string; slug: string }): Promise<Identity> {
+  async selectTenant(input: { selectionToken: string; slug: string }): Promise<AuthSession> {
     try {
       const dto = await firstValueFrom(
         this.http.post<PublicAuthResponseDto>(apiPath.selectTenant(), input, {
@@ -199,7 +205,7 @@ export class HttpAuthRepository implements AuthRepository {
     }
   }
 
-  async me(): Promise<Identity> {
+  async me(): Promise<AuthSession> {
     const slug = this.requireSlug();
     try {
       const dto = await firstValueFrom(
@@ -214,7 +220,7 @@ export class HttpAuthRepository implements AuthRepository {
     }
   }
 
-  async refresh(): Promise<Identity> {
+  async refresh(): Promise<AuthSession> {
     const slug = this.requireSlug();
     try {
       const dto = await firstValueFrom(
@@ -287,8 +293,8 @@ export class HttpAuthRepository implements AuthRepository {
 
   // --- mappers ---
 
-  private mapIdentityFromPublic(dto: PublicAuthResponseDto): Identity {
-    return this.buildIdentity({
+  private mapIdentityFromPublic(dto: PublicAuthResponseDto): AuthSession {
+    const identity = this.buildIdentity({
       id: dto.user.id,
       tenantId: dto.user.tenantId,
       tenantSlug: dto.user.slug,
@@ -298,10 +304,11 @@ export class HttpAuthRepository implements AuthRepository {
       dashboardKind: dto.user.dashboardKind,
       expiresAt: dto.expiresAt,
     });
+    return { identity, serverTime: this.parseServerTime(dto.serverTime) };
   }
 
-  private mapIdentityFromTenant(dto: TenantAuthResponseDto, slug: string): Identity {
-    return this.buildIdentity({
+  private mapIdentityFromTenant(dto: TenantAuthResponseDto, slug: string): AuthSession {
+    const identity = this.buildIdentity({
       id: dto.user.id,
       tenantId: dto.user.tenantId,
       tenantSlug: slug,
@@ -311,6 +318,20 @@ export class HttpAuthRepository implements AuthRepository {
       dashboardKind: dto.user.dashboardKind,
       expiresAt: dto.expiresAt,
     });
+    return { identity, serverTime: this.parseServerTime(dto.serverTime) };
+  }
+
+  // `serverTime` es opcional en la wire y puede venir malformado (bug del
+  // back, clock hiccup del server). Ninguno de los dos casos rompe el auth
+  // call — simplemente no hay calibración para esta respuesta.
+  private parseServerTime(raw: string | undefined): ServerTime | null {
+    if (!raw) return null;
+    try {
+      return new ServerTime(raw);
+    } catch {
+      console.warn('HttpAuthRepository: serverTime invalido en la respuesta, se ignora', raw);
+      return null;
+    }
   }
 
   private buildIdentity(fields: {

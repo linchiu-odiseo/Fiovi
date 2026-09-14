@@ -1,4 +1,5 @@
-import { Identity, Role } from '../entities/identity';
+import { Role } from '../entities/identity';
+import { AuthSession } from '../value-objects/auth-session';
 import { SelectionChallenge } from '../value-objects/selection-challenge';
 import { SsoProvider } from '../value-objects/sso-provider';
 import { StudentProfile } from '../value-objects/student-profile';
@@ -11,7 +12,7 @@ export interface AuthRepository {
   /**
    * POST /auth/login (global, sin slug en path).
    * Retorna:
-   *   - `Identity` cuando el email matchea 1 tenant (cookies HttpOnly ya seteadas).
+   *   - `AuthSession` cuando el email matchea 1 tenant (cookies HttpOnly ya seteadas).
    *   - `SelectionChallenge` cuando matchea >1 tenant (sin cookies; el flow
    *     se completa con `selectTenant()` tras elegir el slug).
    * El caller distingue con `'selectionToken' in outcome`.
@@ -25,13 +26,14 @@ export interface AuthRepository {
     email: string;
     password: string;
     captchaToken?: string;
-  }): Promise<Identity | SelectionChallenge>;
+  }): Promise<AuthSession | SelectionChallenge>;
 
   /**
    * POST /auth/select-tenant (global). Cierra el flow multi-tenant tras el
    * selector — vale tanto para password como para SSO Google.
+   * Retorna `AuthSession`.
    */
-  selectTenant(input: { selectionToken: string; slug: string }): Promise<Identity>;
+  selectTenant(input: { selectionToken: string; slug: string }): Promise<AuthSession>;
 
   /**
    * GET /auth/sso/providers — lista global de providers SSO habilitados.
@@ -39,8 +41,10 @@ export interface AuthRepository {
    */
   listSsoProviders(): Promise<SsoProvider[]>;
 
-  me(): Promise<Identity>;
-  refresh(): Promise<Identity>;
+  // Retorna `AuthSession`.
+  me(): Promise<AuthSession>;
+  // Retorna `AuthSession`.
+  refresh(): Promise<AuthSession>;
   logout(): Promise<void>;
   getProfile(role: Role): Promise<StudentProfile | TutorProfile>;
 }
