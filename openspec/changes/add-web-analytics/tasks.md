@@ -84,7 +84,7 @@ order inside one PR — only the PR boundary changes, not the task order.
 
 ## Phase 2: L3 — `GoogleAnalyticsService` — Work Unit 2
 
-- [ ] 2.1 **ADD (test-first)** `tests/feature/L3_periphery/analytics/google-analytics.service.spec.ts`
+- [x] 2.1 **ADD (test-first)** `tests/feature/L3_periphery/analytics/google-analytics.service.spec.ts`
   — per design.md Test plan #2, mocking pattern per `cloudflare-turnstile-provider.spec.ts:19-32`
   (mutate the imported `environment` object in `beforeEach`, reconstruct the service per test):
   empty `gaMeasurementId` ⇒ no `<script>`, no `window.gtag`, no `window.dataLayer` · empty ID ⇒
@@ -100,10 +100,10 @@ order inside one PR — only the PR boundary changes, not the task order.
   empty", "`page_view` carries route template and `display_mode`", "No GA activity while the
   student is in an exam", "A blocked, failed, or missing GA load is a silent no-op", "No
   student-identifying data ever reaches Google" (all listed scenarios).
-- [ ] 2.2 **ADD** `src/L3_periphery/analytics/gtag.d.ts` — `declare global { interface Window {
+- [x] 2.2 **ADD** `src/L3_periphery/analytics/gtag.d.ts` — `declare global { interface Window {
   dataLayer?: unknown[]; gtag?: (...a: unknown[]) => void } } export {}`, same shape as
   `captcha/turnstile.d.ts`.
-- [ ] 2.3 **ADD** `src/L3_periphery/analytics/google-analytics.service.ts` — make 2.1 pass:
+- [x] 2.3 **ADD** `src/L3_periphery/analytics/google-analytics.service.ts` — make 2.1 pass:
   `start()` (no-op when `environment.gaMeasurementId === ''`; defines `window.dataLayer`/
   `window.gtag` as a real `function` pushing `arguments`, not an arrow — see design.md D5; injects
   the `gtag/js` script tag once; `error` listener flips `enabled = false`), `isEnabled()`,
