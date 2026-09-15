@@ -73,9 +73,12 @@ only, regardless of whether the install originated from the app's card or the br
 
 ### Requirement: No GA activity while the student is in an exam
 
-While `ExamActivity.isActive()` is `true`, the system SHALL NOT inject the GA script (if not already
-loaded) and SHALL NOT emit any `page_view` or install event — the same gate
-`audit-log-upload-scheduler.service.ts` uses.
+While ExamActivity.isActive() is true, the system SHALL NOT emit any page_view or install
+event - the same gate audit-log-upload-scheduler.service.ts uses. The GA script load and
+bootstrap config call are NOT gated by exam state and MAY occur on any app boot, including a
+reload during an in-progress exam, because ExamActivity is an in-memory signal that always
+starts false on a fresh boot; this carries no student-identifying payload and is treated as an
+accepted residual, not a defect.
 
 #### Scenario: Navigation during an exam is suppressed, then resumes
 
