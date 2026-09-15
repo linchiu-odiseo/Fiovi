@@ -1,9 +1,10 @@
-import { Injectable, Signal, signal } from '@angular/core';
+import { Injectable, Signal, inject, signal } from '@angular/core';
 
 import {
   NativeInstallOutcome,
   NativeInstallPrompt,
 } from '../../L1_domain/ports/native-install-prompt';
+import { GoogleAnalyticsService } from '../analytics/google-analytics.service';
 
 // Shape del evento `beforeinstallprompt` de Chromium. No hay tipo estándar
 // en lib.dom.d.ts porque el spec sigue "informal". Declaramos lo mínimo
@@ -34,6 +35,7 @@ type BeforeInstallPromptEventLike = Event & {
 // `DecideInstallCardStateUseCase`).
 @Injectable({ providedIn: 'root' })
 export class BeforeInstallPromptAdapter implements NativeInstallPrompt {
+  private readonly analytics = inject(GoogleAnalyticsService);
   private readonly availableSignal = signal(false);
 
   // Signal público read-only para consumidores LR. NO forma parte de la
@@ -52,6 +54,10 @@ export class BeforeInstallPromptAdapter implements NativeInstallPrompt {
   private readonly onAppInstalled = (): void => {
     this.deferredPrompt = null;
     this.availableSignal.set(false);
+    // Único punto donde la instalación está CONFIRMADA (card o menú del
+    // browser). El outcome 'accepted' de `trigger()` solo dice que el user
+    // tocó Instalar, no que la instalación terminó.
+    this.analytics.trackPwaInstall();
   };
 
   start(): void {

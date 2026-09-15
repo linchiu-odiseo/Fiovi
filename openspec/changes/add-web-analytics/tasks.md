@@ -117,7 +117,7 @@ order inside one PR — only the PR boundary changes, not the task order.
 
 ## Phase 3: L3 — `AnalyticsRouteTracker` — Work Unit 3
 
-- [ ] 3.1 **ADD (test-first)** `tests/feature/L3_periphery/analytics/analytics-route-tracker.spec.ts`
+- [x] 3.1 **ADD (test-first)** `tests/feature/L3_periphery/analytics/analytics-route-tracker.spec.ts`
   — per design.md Test plan #3: GA disabled ⇒ `start()` does not subscribe to `router.events` ·
   `/student/home` ⇒ `/student/home` · **privacy**: `/student/simulacro/abc-123` ⇒
   `/student/simulacro/:id`, and the call argument does not contain the literal `abc-123` ·
@@ -125,7 +125,7 @@ order inside one PR — only the PR boundary changes, not the task order.
   resolves to `/student/home` after redirect · `start()` called twice ⇒ one subscription. Covers
   spec Requirement "`page_view` carries route template and `display_mode`, never a resolved URL" —
   scenario "ID-bearing route sends template and mode, not the ID".
-- [ ] 3.2 **ADD** `src/L3_periphery/analytics/analytics-route-tracker.ts` — make 3.1 pass:
+- [x] 3.2 **ADD** `src/L3_periphery/analytics/analytics-route-tracker.ts` — make 3.1 pass:
   `start()` idempotent, returns early when `!analytics.isEnabled()`; subscribes to
   `router.events` filtered to `NavigationEnd`; `routeTemplate()` walks
   `router.routerState.snapshot.root` via `firstChild`, collecting non-empty `routeConfig?.path`
@@ -134,20 +134,20 @@ order inside one PR — only the PR boundary changes, not the task order.
 
 ## Phase 4: L3 — PWA-install hook — Work Unit 3
 
-- [ ] 4.1 **MODIFY (test-first)**
+- [x] 4.1 **MODIFY (test-first)**
   `tests/feature/L3_periphery/pwa/before-install-prompt.adapter.spec.ts` (extend) — add: the
   `appinstalled` event ⇒ `GoogleAnalyticsService.trackPwaInstall()` called exactly once · a
   `trigger()` call resolving `'accepted'` alone (no `appinstalled`) does **not** call it. Keep
   every existing assertion unchanged. Covers spec Requirement "PWA install is reported once, only
   from `appinstalled`" — scenario "Install via browser menu still reports".
-- [ ] 4.2 **MODIFY** `src/L3_periphery/pwa/before-install-prompt.adapter.ts:52-55` — make 4.1
+- [x] 4.2 **MODIFY** `src/L3_periphery/pwa/before-install-prompt.adapter.ts:52-55` — make 4.1
   pass: inject `GoogleAnalyticsService` (concrete class, design.md D7) and call
   `analytics.trackPwaInstall()` inside the existing `onAppInstalled` handler, after its current
   logic. `trigger()`'s `'accepted'` branch (`:81`) is untouched.
 
 ## Phase 5: Wiring — Work Unit 3
 
-- [ ] 5.1 **MODIFY** `src/app.config.ts` — add one `provideAppInitializer` that calls
+- [x] 5.1 **MODIFY** `src/app.config.ts` — add one `provideAppInitializer` that calls
   `GoogleAnalyticsService.start()` then `AnalyticsRouteTracker.start()`, placed immediately before
   the existing `BeforeInstallPromptAdapter` initializer (`:527`) so `window.gtag` exists before
   the install listener registers (design.md File changes table).

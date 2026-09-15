@@ -51,6 +51,8 @@ import { GetMySubmissionUseCase } from './L2_application/use-cases/get-my-submis
 import { DecideInstallCardStateUseCase } from './L2_application/use-cases/decide-install-card-state.use-case';
 
 // L3 implementaciones de los puertos.
+import { AnalyticsRouteTracker } from './L3_periphery/analytics/analytics-route-tracker';
+import { GoogleAnalyticsService } from './L3_periphery/analytics/google-analytics.service';
 import { CloudflareTurnstileProvider } from './L3_periphery/captcha/cloudflare-turnstile-provider';
 import { HttpAuthRepository } from './L3_periphery/http/http-auth-repository';
 import { HttpExamsApi } from './L3_periphery/http/http-exams-api';
@@ -518,6 +520,19 @@ export const appConfig: ApplicationConfig = {
     // boot. En dev mode el servicio detecta isEnabled=false y no-op.
     provideAppInitializer(() => {
       inject(PwaUpdateService).start();
+    }),
+
+    // Google Analytics 4: bootstrap de `dataLayer`/`gtag` + inyección del
+    // script, y después el puente de navegaciones → `page_view`. Con
+    // `PUBLIC_GA_MEASUREMENT_ID` vacía las dos llamadas son no-op (ni script,
+    // ni globals, ni suscripción al Router).
+    //
+    // Va ANTES del initializer de `BeforeInstallPromptAdapter` porque ese
+    // registra el listener de `appinstalled`, que reporta a GA: cuando el
+    // listener queda armado, `gtag` ya existe.
+    provideAppInitializer(() => {
+      inject(GoogleAnalyticsService).start();
+      inject(AnalyticsRouteTracker).start();
     }),
 
     // BeforeInstallPromptAdapter: registra listeners globales
