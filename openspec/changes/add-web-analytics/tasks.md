@@ -76,7 +76,7 @@ order inside one PR — only the PR boundary changes, not the task order.
 - [x] 1.6 **MODIFY** `.env.example` — document `PUBLIC_GA_MEASUREMENT_ID` (optional, empty ⇒
   disabled), noting production uses `G-LV9RXZP838` and dev/staging needs its own GA4 data stream
   before being set non-empty.
-- [ ] 1.7 **Manual** — run `npm run dev`, `npm run build`, `npm test` in sequence (each triggers
+- [x] 1.7 **Manual** — run `npm run dev`, `npm run build`, `npm test` in sequence (each triggers
   `build-env.mjs` via `predev`/`prebuild`/`pretest`); inspect `src/index.html`'s CSP after each and
   confirm the GA hosts from 1.4 are still present and the API origin token is still correctly
   synced. This is the exact failure mode `build-env.mjs:173` had before this change — verify by
@@ -167,8 +167,8 @@ order inside one PR — only the PR boundary changes, not the task order.
 
 ## Phase 7: Final gates + Verify/Archive
 
-- [ ] 7.1 `npm test` green: baseline + the 4 new/extended spec files, no regressions.
-- [ ] 7.2 `npm run lint` clean.
+- [x] 7.1 `npm test` green: baseline + the 4 new/extended spec files, no regressions.
+- [x] 7.2 `npm run lint` clean.
 - [ ] 7.3 `npm run format:check` clean.
 - [ ] 7.4 **`hexagonal-guard` subagent** (blocking gate per CONTRIBUTING.md rule #3) — run during
   `sdd-verify`. Expect no findings: `src/L1_domain/` and `src/L2_application/` untouched
