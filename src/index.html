@@ -34,13 +34,39 @@
       script `scripts/build-env.mjs` con `API_BASE_URL` del `.env`. NO editar
       a mano: el próximo `npm run dev`/`build`/`test` lo va a reescribir.
 
+      INVARIANTE: el origin de la API tiene que ser SIEMPRE el primer host
+      después de `'self'` en `connect-src`. El sync reemplaza exactamente ese
+      token (`scripts/csp-sync.mjs`, `API_ORIGIN_RE`) y deja el resto de la
+      directiva intacto. Si alguien mete otro host antes, el build le
+      reescribe ESE host con el origin de la API.
+
+      Hosts de Google: sirven a Google Analytics 4 (measurement ID en
+      `PUBLIC_GA_MEASUREMENT_ID`). `googletagmanager.com` en `script-src` es
+      el único archivo externo que se carga; los de `connect-src` reciben los
+      hits de `collect`; los de `img-src` cubren el fallback de pixel cuando
+      `fetch`/`sendBeacon` no está disponible. Los hosts de "Advertising
+      Features" del doc de Google (`*.g.doubleclick.net`, `*.google.com`,
+      `*.google.<TLD>`, `pagead2.googlesyndication.com`) quedaron fuera a
+      propósito: Fiovi no linkea Google Ads y `*.google.com` vaciaría de
+      sentido esta política. Fuente:
+      developers.google.com/tag-platform/security/guides/csp
+
+      NUNCA agregar `'unsafe-inline'` a `script-src`. El snippet estándar de
+      GA es un `<script>` inline y pide justo eso; por eso el bootstrap de
+      `dataLayer`/`gtag` vive en TypeScript bundleado
+      (`src/L3_periphery/analytics/google-analytics.service.ts`), que corre
+      como código propio bajo `'self'`. Habilitar inline por un contador de
+      páginas dejaría correr CUALQUIER script inyectado en el documento —
+      exactamente el ataque contra el que existe este CSP. GA4 no necesita
+      `'unsafe-inline'`. Ver openspec/changes/add-web-analytics/design.md (D2).
+
       PROD: este meta CSP queda incluido en el bundle. Si el server que
       sirve la PWA en producción además inyecta un CSP via HTTP header, ese
       header gana — útil para directivas más estrictas que requieran nonce.
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; connect-src 'self' https://api.yangpimpollo.com; img-src 'self' data:; font-src 'self' data: https://fonts.gstatic.com; frame-src 'self' https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'"
+      content="default-src 'self'; script-src 'self' https://challenges.cloudflare.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; connect-src 'self' https://api.yangpimpollo.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com; img-src 'self' data: https://*.google-analytics.com https://www.googletagmanager.com; font-src 'self' data: https://fonts.gstatic.com; frame-src 'self' https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'"
     />
     <!--
       Tipografía del design system Native Excellence — se carga desde Google

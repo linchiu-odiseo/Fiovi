@@ -13,6 +13,14 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import {
+  CspSyncError,
+  REQUIRED_CSP_HOSTS,
+  findMissingHosts,
+  readCspContent,
+  syncApiOrigin,
+} from './csp-sync.mjs';
+
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..');
 const envPath = resolve(repoRoot, '.env');
@@ -100,6 +108,15 @@ const devTools = (env['DEV_TOOLS'] ?? '').toLowerCase() === 'true';
 const captchaProvider = env['CAPTCHA_PROVIDER'] ?? '';
 const captchaSiteKey = env['PUBLIC_CAPTCHA_SITE_KEY'] ?? '';
 
+// PUBLIC_GA_MEASUREMENT_ID: measurement ID de Google Analytics 4. Opcional y
+// vacía por default, igual que la site key del captcha: con la var vacía el
+// adapter L3 (`GoogleAnalyticsService`) no inyecta el script de Google, no
+// define `dataLayer`/`gtag` y todos sus entry points son no-op. El prefijo
+// `PUBLIC_` marca que es material público (viaja al bundle del cliente).
+// Dev/staging debe usar su propio data stream para no ensuciar la propiedad
+// de producción.
+const gaMeasurementId = env['PUBLIC_GA_MEASUREMENT_ID'] ?? '';
+
 const envDir = resolve(repoRoot, 'src/environments');
 mkdirSync(envDir, { recursive: true });
 
@@ -114,6 +131,7 @@ const apiBaseUrl = sq(env.API_BASE_URL);
 const appVersion = sq(appVersionValue);
 const captchaProviderLit = sq(captchaProvider);
 const captchaSiteKeyLit = sq(captchaSiteKey);
+const gaMeasurementIdLit = sq(gaMeasurementId);
 
 writeFileSync(
   resolve(envDir, 'environment.ts'),
@@ -125,6 +143,7 @@ writeFileSync(
     `  devTools: ${devTools},\n` +
     `  captchaProvider: ${captchaProviderLit},\n` +
     `  captchaSiteKey: ${captchaSiteKeyLit},\n` +
+    `  gaMeasurementId: ${gaMeasurementIdLit},\n` +
     `};\n`,
 );
 
@@ -138,6 +157,7 @@ writeFileSync(
     `  devTools: ${devTools},\n` +
     `  captchaProvider: ${captchaProviderLit},\n` +
     `  captchaSiteKey: ${captchaSiteKeyLit},\n` +
+    `  gaMeasurementId: ${gaMeasurementIdLit},\n` +
     `};\n`,
 );
 
@@ -155,6 +175,12 @@ console.log(`✓ Generated src/environments/environment{,.production}.ts from .e
 // el origin que aparece en `connect-src` para que el browser permita las
 // requests. Es idempotente: si el origin ya está sincronizado, no toca el
 // archivo (evita ruido en git status).
+//
+// La lógica de regex vive en `scripts/csp-sync.mjs` (pura, testeada en
+// `tests/unit/scripts/csp-sync.spec.ts`); acá queda solo la I/O y el fallo
+// ruidoso. El reemplazo toca EXACTAMENTE el primer host después de `'self'`:
+// la versión anterior se comía toda la cola de la directiva y borraba en
+// silencio cualquier otro host (los de GA4) en cada predev/prebuild/pretest.
 
 let apiOrigin;
 try {
@@ -167,24 +193,33 @@ try {
 const indexPath = resolve(repoRoot, 'src/index.html');
 const indexBefore = readFileSync(indexPath, 'utf8');
 
-// Regex sobre el atributo content del meta CSP. Capta cualquier sub-string
-// dentro de `connect-src 'self' <ORIGIN>;` o `connect-src 'self' <ORIGIN>"`
-// (último item de la lista de directivas) y lo reemplaza por apiOrigin.
-const cspConnectSrcRe = /(connect-src\s+'self'\s+)([^;"']+)/;
-const match = indexBefore.match(cspConnectSrcRe);
-if (!match) {
-  console.error(
-    "✘ No se encontró `connect-src 'self' <origin>` en src/index.html. " +
-      'Revisar el meta Content-Security-Policy.',
-  );
-  process.exit(1);
+let synced;
+try {
+  synced = syncApiOrigin(indexBefore, apiOrigin);
+} catch (err) {
+  if (err instanceof CspSyncError) {
+    console.error(`✘ ${err.message}.`);
+    process.exit(1);
+  }
+  throw err;
 }
 
-const currentOrigin = match[2].trim();
-if (currentOrigin === apiOrigin) {
-  console.log(`✓ CSP connect-src ya apunta a ${apiOrigin} (sin cambios)`);
+if (synced.changed) {
+  writeFileSync(indexPath, synced.html);
+  console.log(`✓ CSP connect-src actualizado: ${synced.previousOrigin} → ${apiOrigin}`);
 } else {
-  const indexAfter = indexBefore.replace(cspConnectSrcRe, `$1${apiOrigin}`);
-  writeFileSync(indexPath, indexAfter);
-  console.log(`✓ CSP connect-src actualizado: ${currentOrigin} → ${apiOrigin}`);
+  console.log(`✓ CSP connect-src ya apunta a ${apiOrigin} (sin cambios)`);
+}
+
+// Guard del fallo que este cambio existe para evitar: que el sync deje el CSP
+// sin los hosts de GA4. Se chequea contra el atributo `content` del meta, NO
+// contra el HTML entero: el comentario de arriba nombra esos hosts y un
+// `includes` sobre todo el archivo pasaría con la directiva vacía.
+const missingHosts = findMissingHosts(readCspContent(synced.html), REQUIRED_CSP_HOSTS);
+if (missingHosts.length) {
+  console.error(
+    `✘ Faltan hosts requeridos en el CSP de src/index.html: ${missingHosts.join(', ')}.`,
+  );
+  console.error('  Revisar el meta Content-Security-Policy y scripts/csp-sync.mjs.');
+  process.exit(1);
 }
