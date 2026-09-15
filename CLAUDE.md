@@ -8,7 +8,7 @@
 
 **Fiovi** es una PWA Angular para móviles que sirve como **cartilla virtual de marcaciones** para simulacros (exámenes de práctica). El alumno marca las alternativas A–E por pregunta en pantalla; el enunciado viene impreso en una hoja física que entrega el profesor. Backend: **learnex** (NestJS + Postgres, multi-tenant) en Docker. Auth via cookies HttpOnly + `withCredentials: true`.
 
-**Estado actual (2026-09-14): calibrate-clock-from-auth archivado. Sin change activo.**
+**Estado actual (2026-09-15): add-web-analytics archivado. Sin change activo.**
 
 Changes archivados a la fecha (en `openspec/changes/archive/`). **La lista de abajo está incompleta** — se quedó en julio mientras el archivo siguió creciendo; para el inventario real, mirar el directorio:
 
@@ -24,6 +24,7 @@ Changes archivados a la fecha (en `openspec/changes/archive/`). **La lista de ab
 - …(8 changes de julio y agosto sin listar acá: SSO, captcha de login, slug dinámico, restyle tutor, `programar-apertura`, etc.)
 - `2026-09-08-add-audit-log-local-capture` — audit-log Fase 0 (captura local en IDB + descarga NDJSON) y Fase 1 (subida a learnex en paquetes sellados con gzip y dedup por `batchId`). Capacidad nueva `audit-log-capture` en `openspec/specs/`. Par backend: learnex#1089 y #1110.
 - `2026-09-14-calibrate-clock-from-auth` — Fix para reloj local desviado en login/session-expiry: `AuthSession` VO + calibración de `Clock` desde `serverTime` en auth responses; `GetIdentityUseCase` y `BrowserSessionRefreshScheduler` ahora usan `Clock` port. Par learnex: PR agregando `serverTime` a `/auth/login`, `/auth/select-tenant`, `/auth/refresh`, `/auth/me`.
+- `2026-09-15-add-web-analytics` — GA4 integración L3-only: medición de tráfico/dispositivos/instalaciones PWA via bundled TS (sin `unsafe-inline`), page-view por template no por URL, gate de examen sobre emisión, CSP-sync arreglado en `build-env.mjs`. Capacidad nueva `web-analytics` en `openspec/specs/`. Cero cambios learnex, cero cambios L1/L2.
 
 **Próximos changes candidatos:** dashboard tutor real (aulas, activación de examen), resultados post-envío, historial del alumno, anti-fraude hardening. Antes de empezar cualquiera: ver workflow SDD en [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
@@ -116,12 +117,12 @@ Cada fase tiene su skill (`sdd-<fase>`). Un change vive en `openspec/changes/<na
 
 **Gate bloqueante:** durante `sdd-verify` corre el subagente `hexagonal-guard`. Si reporta violaciones duras, el change NO se puede archivar. Ver [`CONTRIBUTING.md`](./CONTRIBUTING.md#regla-3--usar-los-3-subagentes-del-proyecto-hexagonal-guard-es-bloqueante).
 
-Hoy no hay change activo (último archivado: `2026-09-14-calibrate-clock-from-auth`).
+Hoy no hay change activo (último archivado: `2026-09-15-add-web-analytics`).
 
 ## Información del entorno dev
 
 - **learnex** (back real) corre en Docker en `http://localhost:2001`. Multi-tenant: el slug viaja en el path `/t/{slug}/...`. Slug actual de dev: `vonex` (definido en `.env`).
 - **API-FAKE retirado** (cambio `fase-3-login-learnex`). Si encontrás referencias a `localhost:2004/v3`, `API_KEY`, `X-API-Key`, `Authorization: Bearer`, `X-New-Bearer`, son legacy y deben migrarse.
 - **Credenciales de dev**: pedírselas al equipo. No van acá — este archivo se commitea, y las que había quedaron obsoletas sin que nadie se enterara hasta que fallaron en pleno debug.
-- **`.env`** tiene solo `API_BASE_URL` como requerido (más flags opcionales: `DRAFT_ENABLED`, `DEV_TOOLS`, `CAPTCHA_PROVIDER`, `PUBLIC_CAPTCHA_SITE_KEY`). Si falta el requerido, el dev server falla en el hook `predev` con mensaje claro. `TENANT_SLUG` quedó deprecado — el slug se descubre en runtime post-login (ver regla #6). `APP_VERSION` salió de `.env` y ahora vive en `package.json.version`: bumpear con `npm version patch|minor|major`.
+- **`.env`** tiene solo `API_BASE_URL` como requerido (más flags opcionales: `DRAFT_ENABLED`, `DEV_TOOLS`, `CAPTCHA_PROVIDER`, `PUBLIC_CAPTCHA_SITE_KEY`, `PUBLIC_GA_MEASUREMENT_ID` — vacío = analytics apagado). Si falta el requerido, el dev server falla en el hook `predev` con mensaje claro. `TENANT_SLUG` quedó deprecado — el slug se descubre en runtime post-login (ver regla #6). `APP_VERSION` salió de `.env` y ahora vive en `package.json.version`: bumpear con `npm version patch|minor|major`.
 - **Plataforma de dev**: Windows + PowerShell. Comandos POSIX vía Bash tool funcionan; usar `/` en paths.

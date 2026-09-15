@@ -389,3 +389,52 @@ and sdd-archive.
 "While ExamActivity.isActive() is true, the system SHALL NOT emit any page_view or install event - the same gate audit-log-upload-scheduler.service.ts uses. The GA script load and bootstrap config call are NOT gated by exam state and MAY occur on any app boot, including a reload during an in-progress exam, because ExamActivity is an in-memory signal that always starts false on a fresh boot; this carries no student-identifying payload and is treated as an accepted residual, not a defect."
 
 This amendment makes explicit what was implicit in the design (D3's emission-only gate) and documented in the verified code (GoogleAnalyticsService.start() guards only the emit() path, not the bootstrap path). No code change required. Spec is now compliant with the implemented design.
+
+---
+
+## Verdict after re-verify (2026-09-15)
+
+**Scope**: targeted re-verify following the spec amendment in commit `4fb2337` (no code changed) and the hexagonal-guard run completed by the orchestrator after this report's first pass.
+
+### CRITICAL-1 — CLOSED
+
+Re-read the amended requirement (spec.md lines 74-81, "No GA activity while the student is in an exam") against `src/L3_periphery/analytics/google-analytics.service.ts` and `tests/feature/L3_periphery/analytics/google-analytics.service.spec.ts`:
+
+- **(a) Matches implementation**: `start()` (lines 43-57) is unconditional — no `examActivity` check anywhere in the bootstrap/script-injection path, exactly as the amended text states ("GA script load and bootstrap config call are NOT gated by exam state"). `canEmit()` (lines 86-92) is the sole gate and only guards `trackPageView`/`trackPwaInstall`, matching "SHALL NOT emit any page_view or install event."
+- **(b) Covered by test**: `google-analytics.service.spec.ts` describe block `'while an exam is in progress'` (line 226) calls `analytics.start()` unconditionally, then `examActivity.markStarted()`, then asserts zero `page_view`/`pwa_install` events while active, and exactly one `page_view` after `markEnded()`. This is a direct behavioral proof of the emission-only gate now described in the spec; the test ordering (`start()` before `markStarted()`) is consistent with — though doesn't separately assert — the "script load is boot-time, not exam-gated" half, which the amended spec text now correctly scopes as an accepted residual rather than a tested guarantee.
+- **(c) Privacy invariant intact**: no wording change touches payload construction. `trackPageView`/`trackPwaInstall` still carry only `page_path`/`page_location` (rebuilt from route template, never `document.location`), `page_referrer` (scrubbed same-origin), and `display_mode` — zero identifiers. The residual GA script/config-call traffic during a mid-exam reload carries no student payload either (confirmed in the original CRITICAL-1 trace). The amendment narrows what is claimed, it does not loosen what is enforced.
+
+All three hold. **CRITICAL-1 is closed by the spec amendment; no code change required.**
+
+### WARNING-1 — CLOSED
+
+hexagonal-guard has now been run by the orchestrator: **APPROVED, 0 hard violations, 1 soft advisory** (pre-existing ESLint gap for browser globals in L1/L2, out of scope for this change — no L1/L2 files are touched by add-web-analytics). tasks.md 7.4 can now be checked. This closes WARNING-1.
+
+### WARNING-2 — remains open, non-blocking
+
+Judged against archive readiness: **does not block archive.** This is a documentation-precision gap in design.md D3, not a code or spec defect — the analogy to `audit-log-upload-scheduler.service.ts` holds for the emission check (`canEmit()` mirrors the tick-if-active pattern) but is inexact for the script-injection step (`AuditLogUploadScheduler` re-gates on every heartbeat; `GoogleAnalyticsService.start()` has no equivalent recurring gate — it runs once per boot, unconditionally). The distinction is already correctly captured in the amended spec.md text and in this report's own record; only design.md's prose still implies fuller parity than exists.
+
+If a one-sentence clarification is added to design.md D3 later, the exact sentence would be:
+
+> "The parity with `audit-log-upload-scheduler.service.ts` covers the emission check only — `AuditLogUploadScheduler` re-gates its work on every heartbeat, while `GoogleAnalyticsService.start()` bootstraps once per boot with no recurring gate."
+
+(Not applied — read-only re-verify, no design.md edit made.)
+
+### Verification steps performed
+
+- `git diff 4fb2337~1..4fb2337 --stat` → only `openspec/changes/add-web-analytics/specs/web-analytics/spec.md` (+9/-3) and `openspec/changes/add-web-analytics/verify-report.md` (+391 new) changed. **Confirmed: no source/test files touched by the amendment commit.**
+- `npm test` re-run independently: **Test Files 105 passed (105); Tests 1463 passed (1463)** — identical to the original verify pass, zero regressions, zero new failures.
+
+### Updated counts
+
+| Severity | Original | After re-verify |
+|----------|----------|------------------|
+| CRITICAL | 1 | 0 |
+| WARNING | 2 | 1 (WARNING-2, non-blocking doc precision) |
+| SUGGESTION | 4 | 4 (unchanged, all non-blocking) |
+
+### Final Verdict: **PASS**
+
+All spec requirements are now fully implemented, tested, and pass, including the amended exam-gate requirement, the full privacy invariant, CSP hardening, the csp-sync.mjs regression fix, and the kill switch. Tests 105/1463 green (no change from first pass). Lint clean (unchanged, not re-run this pass — no source changed). hexagonal-guard APPROVED with 0 hard violations. No CRITICAL issues remain. The one open WARNING (D3 analogy imprecision in design.md) is a documentation-clarity item, not a defect, and does not block archive.
+
+**Ready for sdd-archive.**
